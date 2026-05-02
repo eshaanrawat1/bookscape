@@ -889,7 +889,12 @@ export default function App() {
             onClick={() => { setTab('lists'); setActiveListName('all') }}
           >
             <span className="itemLead">
-              <span className="appleIcon" aria-hidden>���</span>
+              <span className="appleIcon" aria-hidden>
+                <svg className="appleIconSvg" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </span>
               <span>All Books</span>
             </span>
             <span className="collectionActions">
@@ -904,7 +909,11 @@ export default function App() {
               onDoubleClick={() => { setEditingListName(list.name); setRenameDraft(list.name) }}
             >
               <span className="itemLead">
-                <span className="appleIcon" aria-hidden>≡</span>
+                <span className="appleIcon" aria-hidden>
+                  <svg className="appleIconSvg" viewBox="0 0 24 24" fill="none">
+                    <path d="M3 7h18M3 12h18M3 17h18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                  </svg>
+                </span>
                 {editingListName === list.name ? (
                   <input
                     autoFocus
@@ -947,7 +956,11 @@ export default function App() {
             onClick={() => createReadingList(newListName || nextCollectionName)}
           >
             <span className="itemLead">
-              <span className="appleIcon" aria-hidden>＋</span>
+              <span className="appleIcon" aria-hidden>
+                <svg className="appleIconSvg" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </span>
               <span>New Collection</span>
             </span>
           </button>
@@ -1149,40 +1162,41 @@ export default function App() {
               const pageCount = getPageCount(b)
               const ratingCount = getRatingCount(b)
               return (
-              <section key={b.id || `${b.title}-${idx}`} className="feedItem feedItemModern">
-                <article className={`feedTikTokCard feedCardModern ${b.image_url ? 'hasImage' : ''} ${feedSimilarBookId === b.id ? 'similarOpen' : ''}`}>
-                  {b.image_url && <img className="feedPosterImg feedPosterImgModern" src={b.image_url} alt="" loading="lazy" />}
-                  <div className="feedCardGradient" />
+              <section key={b.id || `${b.title}-${idx}`} className="feedItem feedItemFull">
+                <article className={`feedTikTokCard feedCardFull ${b.image_url ? 'hasImage' : ''} ${feedSimilarBookId === b.id ? 'similarOpen' : ''}`}>
+                  {b.image_url && <img className="feedPosterImg feedPosterImgFull" src={b.image_url} alt="" loading="lazy" />}
+                  <div className="feedCardGradientFull" />
 
-                  <div className="feedContentOverlay">
-                    <div className="feedGenrePill">
+                  <div className="feedContentBottom">
+                    <div className="feedGenrePills">
                       <span>{formatGenreLabel(b.genre)}</span>
+                      {b.subgenre && <span>{b.subgenre}</span>}
+                      <span>Fiction</span>
                     </div>
-                    <h2 className="feedCardTitle">{b.title || 'Untitled'}</h2>
-                    <div className="feedCardAuthor">{formatAuthors(b.author) || 'Unknown author'}</div>
-                    <div className="feedCardStats">
-                      <div className="feedStatItem feedStatRating">
+                    <h2 className="feedCardTitleFull">{b.title || 'Untitled'}</h2>
+                    <div className="feedCardAuthorFull">{formatAuthors(b.author) || 'Unknown author'}</div>
+                    <div className="feedCardMetaRow">
+                      <div className="feedMetaItem">
                         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden>
                           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
                         </svg>
-                        <span>{avgRating != null ? Number(avgRating).toFixed(1) : 'N/A'}</span>
+                        <span>{avgRating != null ? Number(avgRating).toFixed(2) : 'N/A'}</span>
                       </div>
-                      <div className="feedStatDivider" />
-                      <div className="feedStatItem">
-                        <span>{ratingCount != null ? formatCompactCount(ratingCount) : '0'} ratings</span>
-                      </div>
-                      <div className="feedStatDivider" />
-                      <div className="feedStatItem">
+                      <div className="feedMetaItem">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" stroke="currentColor" strokeWidth="1.8"/>
+                        </svg>
                         <span>{pageCount != null ? `${pageCount} pages` : 'N/A'}</span>
                       </div>
                     </div>
-                    <p className="feedCardBlurb">{getShortDescription(b)}</p>
+                    <p className="feedCardDesc">{getShortDescription(b)}</p>
+                    <button className="feedReadMoreBtn">Read more</button>
                   </div>
 
-                  <div className="feedActionsColumn">
-                    <div className="feedActionItem">
+                  <div className="feedActionsRight">
+                    <div className="feedActionBtn">
                       <button
-                        className={`feedActionCircle ${isLiked(b.id) ? 'liked' : ''}`}
+                        className={`feedActionIcon ${isLiked(b.id) ? 'liked' : ''}`}
                         onClick={() => toggleLike(b)}
                         aria-label={isLiked(b.id) ? 'Unlike book' : 'Like book'}
                       >
@@ -1190,11 +1204,23 @@ export default function App() {
                           <path d="M12.1 21.35 10.8 20.2C5.9 15.8 2.7 12.9 2.7 9.3 2.7 6.4 4.9 4.2 7.8 4.2c1.7 0 3.3.8 4.3 2.1 1-1.3 2.6-2.1 4.3-2.1 2.9 0 5.1 2.2 5.1 5.1 0 3.6-3.2 6.5-8.1 10.9l-1.3 1.15Z" />
                         </svg>
                       </button>
-                      <span>Like</span>
+                      <span>{formatCompactCount(ratingCount)}</span>
                     </div>
-                    <div className="feedActionItem collectionMenuWrap" onClick={(e) => e.stopPropagation()}>
+                    <div className="feedActionBtn">
                       <button
-                        className="feedActionCircle"
+                        className="feedActionIcon"
+                        onClick={() => toggleFeedSimilar(b)}
+                        aria-label="Show reviews"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                      <span>{formatCompactCount(getReviewCount(b))}</span>
+                    </div>
+                    <div className="feedActionBtn collectionMenuWrap" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className="feedActionIcon"
                         onClick={(e) => {
                           e.stopPropagation()
                           setFeedCollectionMenuBookId((prev) => (prev === b.id ? '' : b.id))
@@ -1202,7 +1228,7 @@ export default function App() {
                         aria-label="Add to collection"
                       >
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-                          <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2v16z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
                         </svg>
                       </button>
                       <span>Save</span>
@@ -1236,17 +1262,17 @@ export default function App() {
                         </div>
                       )}
                     </div>
-                    <div className="feedActionItem">
+                    <div className="feedActionBtn">
                       <button
-                        className={`feedActionCircle ${feedSimilarBookId === b.id ? 'active' : ''}`}
-                        onClick={() => toggleFeedSimilar(b)}
-                        aria-label={feedSimilarBookId === b.id ? 'Hide similar books' : 'Show similar books'}
+                        className="feedActionIcon"
+                        onClick={() => {}}
+                        aria-label="Share"
                       >
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-                          <path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                          <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </button>
-                      <span>More</span>
+                      <span>Share</span>
                     </div>
                   </div>
 
@@ -1322,65 +1348,58 @@ export default function App() {
       {tab === 'search' && searchDetailBook && (
         <div className="searchDetailLayer">
           <div className="addListBackdrop" onClick={() => setSearchDetailBook(null)} />
-          <div className="searchDetailModal">
-            <button className="searchDetailClose" onClick={() => setSearchDetailBook(null)} aria-label="Close details">×</button>
-            <section className="feedItem searchDetailFeedItem">
-              <div className={`feedPoster ${searchDetailBook.image_url ? 'hasImage' : ''}`} aria-hidden>
-                {searchDetailBook.image_url && <img className="feedPosterImg" src={searchDetailBook.image_url} alt="" loading="lazy" />}
-                <div className="feedPosterTag">{formatGenreLabel(searchDetailBook.genre)}</div>
-                <div className="feedPosterTint" />
+          <div className="searchDetailModalNew">
+            <button className="searchDetailCloseNew" onClick={() => setSearchDetailBook(null)} aria-label="Close details">
+              <svg viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
+              </svg>
+            </button>
+            <div className="searchDetailGrid">
+              <div className="searchDetailCover">
+                {searchDetailBook.image_url ? (
+                  <img src={searchDetailBook.image_url} alt="" loading="lazy" />
+                ) : (
+                  <div className="searchDetailCoverFallback" />
+                )}
               </div>
-              <aside className="feedInfoCard">
-                <h2>{searchDetailBook.title || 'Untitled'}</h2>
-                <div className="feedAuthor">{formatAuthors(searchDetailBook.author) || 'Unknown author'}</div>
-                <div className="feedRatingHero">
-                  <div className="star">★</div>
-                  <div>
-                    <div className="score">{getAvgRating(searchDetailBook) != null ? Number(getAvgRating(searchDetailBook)).toFixed(2) : 'N/A'}</div>
+              <div className="searchDetailInfo">
+                <div className="searchDetailGenre">{formatGenreLabel(searchDetailBook.genre)}</div>
+                <h2 className="searchDetailTitle">{searchDetailBook.title || 'Untitled'}</h2>
+                <div className="searchDetailAuthor">{formatAuthors(searchDetailBook.author) || 'Unknown author'}</div>
+                <div className="searchDetailStats">
+                  <div className="searchDetailStat rating">
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                    </svg>
+                    <span>{getAvgRating(searchDetailBook) != null ? Number(getAvgRating(searchDetailBook)).toFixed(2) : 'N/A'}</span>
+                  </div>
+                  <div className="searchDetailStat">
+                    <span>{formatCompactCount(getRatingCount(searchDetailBook))} ratings</span>
+                  </div>
+                  <div className="searchDetailStat">
+                    <span>{getPageCount(searchDetailBook) != null ? `${getPageCount(searchDetailBook)} pages` : 'N/A'}</span>
                   </div>
                 </div>
-                <div className="feedMetaLine">
-                  <div>
-                    <span className="metaIcon" aria-hidden>
-                      <svg viewBox="0 0 24 24" fill="none">
-                        <path d="M4 5.5C4 4.67 4.67 4 5.5 4H18a2 2 0 0 1 2 2v12.5a1.5 1.5 0 0 1-2.56 1.06L15.9 18H5.5A1.5 1.5 0 0 1 4 16.5v-11Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
-                        <path d="M8 8h8M8 11h8M8 14h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                      </svg>
-                    </span>
-                    <strong>{getPageCount(searchDetailBook) != null ? `${getPageCount(searchDetailBook)} pages` : 'Unknown pages'}</strong>
-                  </div>
-                  <div>
-                    <span className="metaIcon" aria-hidden>
-                      <svg viewBox="0 0 24 24" fill="none">
-                        <path d="m12 3.8 2.5 5.06 5.58.81-4.04 3.94.95 5.57L12 16.7l-4.99 2.48.95-5.57L3.92 9.67l5.58-.81L12 3.8Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
-                      </svg>
-                    </span>
-                    <strong>{formatCompactCount(getRatingCount(searchDetailBook))} ratings</strong>
-                  </div>
-                  <div>
-                    <span className="metaIcon" aria-hidden>
-                      <svg viewBox="0 0 24 24" fill="none">
-                        <path d="M7 8.5h10M7 12h7m-7 3.5h5M6 4h12a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H11l-4.5 3v-3H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </span>
-                    <strong>{formatCompactCount(getReviewCount(searchDetailBook))} reviews</strong>
-                  </div>
-                </div>
-                <p className="feedBlurb">{(searchDetailBook?.description || 'No description available yet.').trim()}</p>
-                <div className="feedActionRow">
+                <p className="searchDetailDesc">{(searchDetailBook?.description || 'No description available yet.').trim()}</p>
+                <div className="searchDetailActions">
                   <button
-                    className={`heartBtn ${isLiked(searchDetailBook.id) ? 'on' : ''}`}
+                    className={`searchDetailLikeBtn ${isLiked(searchDetailBook.id) ? 'liked' : ''}`}
                     onClick={() => toggleLike(searchDetailBook)}
-                    aria-label={isLiked(searchDetailBook.id) ? 'Unlike book' : 'Like book'}
                   >
                     <svg viewBox="0 0 24 24" aria-hidden>
                       <path d="M12.1 21.35 10.8 20.2C5.9 15.8 2.7 12.9 2.7 9.3 2.7 6.4 4.9 4.2 7.8 4.2c1.7 0 3.3.8 4.3 2.1 1-1.3 2.6-2.1 4.3-2.1 2.9 0 5.1 2.2 5.1 5.1 0 3.6-3.2 6.5-8.1 10.9l-1.3 1.15Z" />
                     </svg>
+                    {isLiked(searchDetailBook.id) ? 'Liked' : 'Like'}
                   </button>
-                  <button className="collectionPlusBtn" onClick={() => setAddModalBook(searchDetailBook)}>+</button>
+                  <button className="searchDetailSaveBtn" onClick={() => setAddModalBook(searchDetailBook)}>
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    </svg>
+                    Add to Collection
+                  </button>
                 </div>
-              </aside>
-            </section>
+              </div>
+            </div>
           </div>
         </div>
       )}
