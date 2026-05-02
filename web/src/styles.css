@@ -766,6 +766,9 @@ h1 {
   position: absolute;
   inset: 0;
   z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .bookBackdrop {
@@ -2595,6 +2598,9 @@ h1 {
   position: absolute;
   inset: 0;
   z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .searchDetailModalNew {
@@ -2904,8 +2910,8 @@ h1 {
 }
 
 .feedScrollerModern {
-  gap: 20px;
-  padding-bottom: 40px;
+  gap: 0;
+  padding: 0 !important;
   scroll-snap-type: y mandatory;
 }
 
@@ -3360,9 +3366,9 @@ h1 {
 /* Full-height TikTok-style feed card */
 .feedItemFull {
   width: 100%;
-  height: calc(100vh - 130px);
-  min-height: calc(100vh - 130px);
-  max-height: calc(100vh - 130px);
+  height: 100%;
+  min-height: 100%;
+  max-height: 100%;
   scroll-snap-align: start;
   display: flex;
   justify-content: center;
@@ -3370,12 +3376,12 @@ h1 {
 }
 
 .feedCardFull {
-  width: min(520px, 92vw);
+  width: min(420px, 84vw);
   height: 100%;
   border-radius: 16px;
   background: #0d1117;
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  border: none;
+  box-shadow: none;
   overflow: hidden;
   position: relative;
 }
@@ -3413,7 +3419,7 @@ h1 {
   right: 70px;
   bottom: 0;
   z-index: 3;
-  padding: 24px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -3427,17 +3433,17 @@ h1 {
 
 .feedGenrePills span {
   display: inline-block;
-  padding: 6px 14px;
+  padding: 5px 10px;
   border-radius: 6px;
   background: rgba(40, 40, 45, 0.85);
   color: rgba(255,255,255,0.9);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 500;
 }
 
 .feedCardTitleFull {
   margin: 6px 0 0;
-  font-size: clamp(24px, 3.5vw, 32px);
+  font-size: clamp(19px, 2.6vw, 24px);
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -0.01em;
@@ -3445,7 +3451,7 @@ h1 {
 }
 
 .feedCardAuthorFull {
-  font-size: 15px;
+  font-size: 12px;
   color: rgba(255,255,255,0.6);
   font-weight: 400;
 }
@@ -3462,7 +3468,7 @@ h1 {
   align-items: center;
   gap: 6px;
   color: rgba(255,255,255,0.75);
-  font-size: 14px;
+  font-size: 11px;
 }
 
 .feedMetaItem svg {
@@ -3480,13 +3486,21 @@ h1 {
 
 .feedCardDesc {
   margin: 6px 0 0;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1.5;
   color: rgba(255,255,255,0.65);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.feedCardDesc.expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  -webkit-box-orient: unset;
+  overflow: auto;
+  max-height: 30vh;
 }
 
 .feedReadMoreBtn {
@@ -3497,7 +3511,7 @@ h1 {
   padding: 0;
   margin-top: 4px;
   color: #fff;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   text-decoration: none;
@@ -3510,12 +3524,12 @@ h1 {
 /* Right-side action buttons */
 .feedActionsRight {
   position: absolute;
-  right: 12px;
-  bottom: 50px;
+  right: 8px;
+  bottom: 32px;
   z-index: 4;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 7px;
   align-items: center;
 }
 
@@ -3523,7 +3537,7 @@ h1 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 0;
 }
 
 .feedActionBtn > span {
@@ -3533,21 +3547,30 @@ h1 {
 }
 
 .feedActionIcon {
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(50, 50, 55, 0.7);
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
   color: rgba(255,255,255,0.95);
   cursor: pointer;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.15s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: none !important;
+  padding: 0;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .feedActionIcon svg {
-  width: 24px;
-  height: 24px;
+  width: 21px;
+  height: 21px;
 }
 
 .feedActionIcon path {
@@ -3559,7 +3582,6 @@ h1 {
 }
 
 .feedActionIcon:hover {
-  background: rgba(70, 70, 75, 0.8);
   transform: scale(1.05);
 }
 
@@ -3570,6 +3592,44 @@ h1 {
 .feedActionIcon.liked path {
   fill: currentColor;
   stroke: currentColor;
+}
+
+.feedActionIcon.saveActionIcon {
+  border-radius: 0;
+  border: none;
+  background: transparent;
+}
+
+.feedActionIcon.saveActionIcon:hover {
+  background: transparent;
+}
+
+/* Hard override for TikTok feed icon buttons: remove any circular chrome from legacy rules */
+.feedCardFull .feedActionsRight .feedActionBtn,
+.feedCardFull .feedActionsRight .feedActionBtn > button.feedActionIcon {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.feedCardFull .feedActionsRight .feedActionBtn > button.feedActionIcon {
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+.feedCardFull .feedActionsRight .feedActionBtn > button.feedActionIcon::before,
+.feedCardFull .feedActionsRight .feedActionBtn > button.feedActionIcon::after {
+  content: none !important;
 }
 
 /* Mobile adjustments for modern feed */
@@ -3616,38 +3676,144 @@ h1 {
   }
 
   .feedItemFull {
-    height: calc(100vh - 160px);
-    min-height: calc(100vh - 160px);
-    max-height: calc(100vh - 160px);
+    height: 100%;
+    min-height: 100%;
+    max-height: 100%;
   }
 
   .feedCardFull {
-    width: calc(100vw - 24px);
+    width: min(360px, 86vw);
     border-radius: 14px;
   }
 
   .feedContentBottom {
     right: 60px;
-    padding: 18px;
+    padding: 14px;
   }
 
   .feedCardTitleFull {
-    font-size: 22px;
+    font-size: 18px;
   }
 
   .feedActionsRight {
-    right: 8px;
-    bottom: 40px;
-    gap: 14px;
+    right: 6px;
+    bottom: 28px;
+    gap: 6px;
   }
 
   .feedActionIcon {
-    width: 42px;
-    height: 42px;
+    width: auto;
+    height: auto;
   }
 
   .feedActionIcon svg {
-    width: 20px;
-    height: 20px;
+    width: 19px;
+    height: 19px;
+  }
+}
+
+.feedSimilarDrawerModern {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 18px;
+  z-index: 6;
+  padding: 10px 0 6px;
+  border-radius: 14px;
+  background: rgba(12, 12, 14, 0.72);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.feedSimilarCloseBtn {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.feedSimilarCloseBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.feedSimilarRailModern {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 10px 6px;
+  scrollbar-width: thin;
+}
+
+.feedSimilarCardModern {
+  border: none;
+  background: transparent;
+  padding: 0;
+  min-width: 92px;
+  width: 92px;
+  display: block;
+}
+
+.feedSimilarCoverModern {
+  width: 92px;
+  height: 132px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.feedSimilarCoverModern img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.feedDetailModalWrap {
+  position: relative;
+  width: min(420px, 84vw);
+  height: calc(100vh - 110px);
+  z-index: 9;
+  margin: 0 auto;
+}
+
+.feedDetailModalWrap .feedCardFull {
+  width: 100%;
+  height: 100%;
+}
+
+.feedDetailCloseBtn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 7;
+  border: 0;
+  background: rgba(16, 16, 18, 0.6);
+  color: rgba(255, 255, 255, 0.9);
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.feedDetailCloseBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 640px) {
+  .feedDetailModalWrap {
+    width: min(360px, 86vw);
+    height: calc(100vh - 130px);
   }
 }

@@ -207,6 +207,7 @@ export default function App() {
   const [feedNewCollectionDraft, setFeedNewCollectionDraft] = useState('')
   const [feedSimilarBookId, setFeedSimilarBookId] = useState('')
   const [feedRecsByBookId, setFeedRecsByBookId] = useState({})
+  const [expandedDescByBookId, setExpandedDescByBookId] = useState({})
   const [searchDetailBook, setSearchDetailBook] = useState(null)
   const [searchTabQuery, setSearchTabQuery] = useState('')
   const [searchTabSuggestions, setSearchTabSuggestions] = useState([])
@@ -608,6 +609,14 @@ export default function App() {
     selectBook(b)
   }
 
+  const goToMapEntry = (b) => {
+    if (!b) return
+    setTab('explorer')
+    setFeedSimilarBookId('')
+    setShowSimilar(false)
+    openFromSearch(b)
+  }
+
   const personalizedSurprise = () => {
     if (!mapped.length) return
     const pool = (mode === 'books' && activeGenre)
@@ -674,6 +683,15 @@ export default function App() {
     const text = (b?.description || '').trim()
     if (!text) return 'No description available yet.'
     return text.length > 220 ? `${text.slice(0, 220).trim()}...` : text
+  }
+  const getFullDescription = (b) => {
+    const text = (b?.description || '').trim()
+    return text || 'No description available yet.'
+  }
+  const isDescExpanded = (bookId) => !!expandedDescByBookId[bookId]
+  const toggleDescription = (bookId) => {
+    if (!bookId) return
+    setExpandedDescByBookId((prev) => ({ ...prev, [bookId]: !prev[bookId] }))
   }
 
   const shuffleFeed = () => {
@@ -1068,61 +1086,102 @@ export default function App() {
       {mode === 'books' && selectedBook && (
         <div className="bookModalLayer">
           <div className="bookBackdrop" onClick={() => setSelected(null)} />
-          <div className="bookModal">
-            <button className="bookModalClose" onClick={() => setSelected(null)}>×</button>
-            <div className="bookModalIcon" style={{ '--accent': activeColor }}>
-              <span />
-            </div>
-            <div className="bookModalTitle">{selectedBook.title}</div>
-            <div className="bookModalAuthor">{formatAuthors(selectedBook.author)}</div>
-            <div className="bookModalTags">
-              <span className="tagNeutral">{selectedBook.genre?.replaceAll('_', ' ') || 'Unknown'}</span>
-              <span className="tagAccent" style={{ '--accent': activeColor }}>{selectedBook.subgenre || 'General'}</span>
-              {(selectedBook.book_rating != null) && (
-                <span className="tagNeutral">★ {Number(selectedBook.book_rating).toFixed(1)}</span>
-              )}
-              {(selectedBook.book_rating_count != null) && (
-                <span className="tagNeutral">{Number(selectedBook.book_rating_count).toLocaleString()} ratings</span>
-              )}
-              {(selectedBook.book_review_count != null) && (
-                <span className="tagNeutral">{Number(selectedBook.book_review_count).toLocaleString()} reviews</span>
-              )}
-            </div>
-            <div className="bookModalRule" />
-            <p className="bookModalBody">
-              {selectedBook.description
-                ? selectedBook.description
-                : 'Part of a cluster of similar books based on themes, writing style, and reader preferences.'}
-            </p>
-            <div className="mapModalActions">
-              <button
-                className={`heartBtn ${isLiked(selectedBook.id) ? 'on' : ''}`}
-                onClick={() => toggleLike(selectedBook)}
-                aria-label={isLiked(selectedBook.id) ? 'Unlike book' : 'Like book'}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden>
-                  <path d="M12.1 21.35 10.8 20.2C5.9 15.8 2.7 12.9 2.7 9.3 2.7 6.4 4.9 4.2 7.8 4.2c1.7 0 3.3.8 4.3 2.1 1-1.3 2.6-2.1 4.3-2.1 2.9 0 5.1 2.2 5.1 5.1 0 3.6-3.2 6.5-8.1 10.9l-1.3 1.15Z" />
+          <div className="feedDetailModalWrap">
+            <article className={`feedTikTokCard feedCardFull ${selectedBook.image_url ? 'hasImage' : ''}`}>
+              {selectedBook.image_url && <img className="feedPosterImg feedPosterImgFull" src={selectedBook.image_url} alt="" loading="lazy" />}
+              <div className="feedCardGradientFull" />
+              <button className="feedDetailCloseBtn" onClick={() => setSelected(null)} aria-label="Close details">
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
                 </svg>
               </button>
-              <button
-                className="collectionPlusBtn mapModalAddBtn"
-                onClick={() => setAddModalBook(selectedBook)}
-                aria-label="Add to collection"
-              >
-                +
-              </button>
-              {recs.length > 0 && (
-                <button
-                  className={`mapMenuBtn ${showSimilar ? 'on' : ''}`}
-                  onClick={() => setShowSimilar((v) => !v)}
-                  aria-label={showSimilar ? 'Hide similar books' : 'Show similar books'}
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden>
-                    <path d="M5 7h14M5 12h14M5 17h14" />
-                  </svg>
+
+              <div className="feedContentBottom">
+                <div className="feedGenrePills">
+                  <span>{formatGenreLabel(selectedBook.genre)}</span>
+                  {selectedBook.subgenre && <span>{selectedBook.subgenre}</span>}
+                  <span>Fiction</span>
+                </div>
+                <h2 className="feedCardTitleFull">{selectedBook.title || 'Untitled'}</h2>
+                <div className="feedCardAuthorFull">{formatAuthors(selectedBook.author) || 'Unknown author'}</div>
+                <div className="feedCardMetaRow">
+                  <div className="feedMetaItem">
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                    </svg>
+                    <span>{getAvgRating(selectedBook) != null ? Number(getAvgRating(selectedBook)).toFixed(2) : 'N/A'}</span>
+                  </div>
+                  <div className="feedMetaItem">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" stroke="currentColor" strokeWidth="1.8"/>
+                    </svg>
+                    <span>{getPageCount(selectedBook) != null ? `${getPageCount(selectedBook)} pages` : 'N/A'}</span>
+                  </div>
+                </div>
+                <p className={`feedCardDesc ${isDescExpanded(selectedBook.id) ? 'expanded' : ''}`}>
+                  {isDescExpanded(selectedBook.id) ? getFullDescription(selectedBook) : getShortDescription(selectedBook)}
+                </p>
+                <button className="feedReadMoreBtn" onClick={() => toggleDescription(selectedBook.id)}>
+                  {isDescExpanded(selectedBook.id) ? 'Show less' : 'Read more'}
                 </button>
+              </div>
+
+              <div className="feedActionsRight">
+                <div className="feedActionBtn">
+                  <button
+                    className={`feedActionIcon ${isLiked(selectedBook.id) ? 'liked' : ''}`}
+                    onClick={() => toggleLike(selectedBook)}
+                    aria-label={isLiked(selectedBook.id) ? 'Unlike book' : 'Like book'}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden>
+                      <path d="M12.1 21.35 10.8 20.2C5.9 15.8 2.7 12.9 2.7 9.3 2.7 6.4 4.9 4.2 7.8 4.2c1.7 0 3.3.8 4.3 2.1 1-1.3 2.6-2.1 4.3-2.1 2.9 0 5.1 2.2 5.1 5.1 0 3.6-3.2 6.5-8.1 10.9l-1.3 1.15Z" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="feedActionBtn">
+                  <button
+                    className="feedActionIcon saveActionIcon"
+                    onClick={() => setAddModalBook(selectedBook)}
+                    aria-label="Save to collection"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M7 3h10a1 1 0 0 1 1 1v17l-6-3-6 3V4a1 1 0 0 1 1-1Z" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                </div>
+                <div className="feedActionBtn">
+                  <button
+                    className="feedActionIcon"
+                    onClick={() => setShowSimilar((v) => !v)}
+                    aria-label={showSimilar ? 'Hide similar books' : 'Show similar books'}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {showSimilar && (
+                <div className="feedSimilarDrawer feedSimilarDrawerModern">
+                  <button className="feedSimilarCloseBtn" onClick={() => setShowSimilar(false)} aria-label="Close similar books">
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
+                    </svg>
+                  </button>
+                  <div className="feedSimilarRail feedSimilarRailModern">
+                    {recs.slice(0, 10).map((rec) => (
+                      <button key={`map-rec-${selectedBook.id}-${rec.id || rec.title}`} className="feedSimilarCard feedSimilarCardModern" onClick={() => goToMapEntry(rec)}>
+                        <div className="feedSimilarCover feedSimilarCoverModern">
+                          {rec.image_url ? <img src={rec.image_url} alt="" loading="lazy" /> : <div className="feedSimilarFallback" />}
+                        </div>
+                      </button>
+                    ))}
+                    {!recs.length && <div className="feedSimilarEmpty">No similar books found yet.</div>}
+                  </div>
+                </div>
               )}
-            </div>
+            </article>
           </div>
         </div>
       )}
@@ -1160,7 +1219,6 @@ export default function App() {
             {feedBooks.map((b, idx) => {
               const avgRating = getAvgRating(b)
               const pageCount = getPageCount(b)
-              const ratingCount = getRatingCount(b)
               return (
               <section key={b.id || `${b.title}-${idx}`} className="feedItem feedItemFull">
                 <article className={`feedTikTokCard feedCardFull ${b.image_url ? 'hasImage' : ''} ${feedSimilarBookId === b.id ? 'similarOpen' : ''}`}>
@@ -1189,8 +1247,12 @@ export default function App() {
                         <span>{pageCount != null ? `${pageCount} pages` : 'N/A'}</span>
                       </div>
                     </div>
-                    <p className="feedCardDesc">{getShortDescription(b)}</p>
-                    <button className="feedReadMoreBtn">Read more</button>
+                    <p className={`feedCardDesc ${isDescExpanded(b.id) ? 'expanded' : ''}`}>
+                      {isDescExpanded(b.id) ? getFullDescription(b) : getShortDescription(b)}
+                    </p>
+                    <button className="feedReadMoreBtn" onClick={() => toggleDescription(b.id)}>
+                      {isDescExpanded(b.id) ? 'Show less' : 'Read more'}
+                    </button>
                   </div>
 
                   <div className="feedActionsRight">
@@ -1204,34 +1266,20 @@ export default function App() {
                           <path d="M12.1 21.35 10.8 20.2C5.9 15.8 2.7 12.9 2.7 9.3 2.7 6.4 4.9 4.2 7.8 4.2c1.7 0 3.3.8 4.3 2.1 1-1.3 2.6-2.1 4.3-2.1 2.9 0 5.1 2.2 5.1 5.1 0 3.6-3.2 6.5-8.1 10.9l-1.3 1.15Z" />
                         </svg>
                       </button>
-                      <span>{formatCompactCount(ratingCount)}</span>
-                    </div>
-                    <div className="feedActionBtn">
-                      <button
-                        className="feedActionIcon"
-                        onClick={() => toggleFeedSimilar(b)}
-                        aria-label="Show reviews"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-                          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      <span>{formatCompactCount(getReviewCount(b))}</span>
                     </div>
                     <div className="feedActionBtn collectionMenuWrap" onClick={(e) => e.stopPropagation()}>
                       <button
-                        className="feedActionIcon"
+                        className="feedActionIcon saveActionIcon"
                         onClick={(e) => {
                           e.stopPropagation()
                           setFeedCollectionMenuBookId((prev) => (prev === b.id ? '' : b.id))
                         }}
-                        aria-label="Add to collection"
+                        aria-label="Save to collection"
                       >
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-                          <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
+                          <path d="M7 3h10a1 1 0 0 1 1 1v17l-6-3-6 3V4a1 1 0 0 1 1-1Z" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </button>
-                      <span>Save</span>
                       {feedCollectionMenuBookId === b.id && (
                         <div className="collectionDropdown collectionDropdownModern">
                           <div className="collectionDropdownHeader">Save to Collection</div>
@@ -1265,39 +1313,28 @@ export default function App() {
                     <div className="feedActionBtn">
                       <button
                         className="feedActionIcon"
-                        onClick={() => {}}
-                        aria-label="Share"
+                        onClick={() => toggleFeedSimilar(b)}
+                        aria-label={feedSimilarBookId === b.id ? 'Hide similar books' : 'Show similar books'}
                       >
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-                          <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </button>
-                      <span>Share</span>
                     </div>
                   </div>
 
                   {feedSimilarBookId === b.id && (
                     <div className="feedSimilarDrawer feedSimilarDrawerModern">
-                      <div className="feedSimilarHead feedSimilarHeadModern">
-                        <div>
-                          <strong>Similar to this book</strong>
-                          <span>Based on readers who enjoyed this</span>
-                        </div>
-                        <button onClick={() => setFeedSimilarBookId('')} aria-label="Close similar books">
-                          <svg viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
-                          </svg>
-                        </button>
-                      </div>
+                      <button className="feedSimilarCloseBtn" onClick={() => setFeedSimilarBookId('')} aria-label="Close similar books">
+                        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
+                        </svg>
+                      </button>
                       <div className="feedSimilarRail feedSimilarRailModern">
                         {(feedRecsByBookId[b.id] || []).slice(0, 10).map((rec) => (
-                          <button key={`feed-rec-${b.id}-${rec.id || rec.title}`} className="feedSimilarCard feedSimilarCardModern" onClick={() => openFromSearch(rec)}>
+                          <button key={`feed-rec-${b.id}-${rec.id || rec.title}`} className="feedSimilarCard feedSimilarCardModern" onClick={() => goToMapEntry(rec)}>
                             <div className="feedSimilarCover feedSimilarCoverModern">
                               {rec.image_url ? <img src={rec.image_url} alt="" loading="lazy" /> : <div className="feedSimilarFallback" />}
-                            </div>
-                            <div className="feedSimilarInfo">
-                              <div className="feedSimilarTitle">{rec.title || 'Untitled'}</div>
-                              <div className="feedSimilarAuthor">{formatAuthors(rec.author) || 'Unknown'}</div>
                             </div>
                           </button>
                         ))}
@@ -1348,61 +1385,113 @@ export default function App() {
       {tab === 'search' && searchDetailBook && (
         <div className="searchDetailLayer">
           <div className="addListBackdrop" onClick={() => setSearchDetailBook(null)} />
-          <div className="searchDetailModalNew">
-            <button className="searchDetailCloseNew" onClick={() => setSearchDetailBook(null)} aria-label="Close details">
-              <svg viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
-              </svg>
-            </button>
-            <div className="searchDetailGrid">
-              <div className="searchDetailCover">
-                {searchDetailBook.image_url ? (
-                  <img src={searchDetailBook.image_url} alt="" loading="lazy" />
-                ) : (
-                  <div className="searchDetailCoverFallback" />
-                )}
-              </div>
-              <div className="searchDetailInfo">
-                <div className="searchDetailGenre">{formatGenreLabel(searchDetailBook.genre)}</div>
-                <h2 className="searchDetailTitle">{searchDetailBook.title || 'Untitled'}</h2>
-                <div className="searchDetailAuthor">{formatAuthors(searchDetailBook.author) || 'Unknown author'}</div>
-                <div className="searchDetailStats">
-                  <div className="searchDetailStat rating">
+          <div className="feedDetailModalWrap">
+            <article className={`feedTikTokCard feedCardFull ${searchDetailBook.image_url ? 'hasImage' : ''} ${feedSimilarBookId === searchDetailBook.id ? 'similarOpen' : ''}`}>
+              {searchDetailBook.image_url && <img className="feedPosterImg feedPosterImgFull" src={searchDetailBook.image_url} alt="" loading="lazy" />}
+              <div className="feedCardGradientFull" />
+              <button className="feedDetailCloseBtn" onClick={() => setSearchDetailBook(null)} aria-label="Close details">
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
+                </svg>
+              </button>
+
+              <div className="feedContentBottom">
+                <div className="feedGenrePills">
+                  <span>{formatGenreLabel(searchDetailBook.genre)}</span>
+                  {searchDetailBook.subgenre && <span>{searchDetailBook.subgenre}</span>}
+                  <span>Fiction</span>
+                </div>
+                <h2 className="feedCardTitleFull">{searchDetailBook.title || 'Untitled'}</h2>
+                <div className="feedCardAuthorFull">{formatAuthors(searchDetailBook.author) || 'Unknown author'}</div>
+                <div className="feedCardMetaRow">
+                  <div className="feedMetaItem">
                     <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden>
                       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
                     </svg>
                     <span>{getAvgRating(searchDetailBook) != null ? Number(getAvgRating(searchDetailBook)).toFixed(2) : 'N/A'}</span>
                   </div>
-                  <div className="searchDetailStat">
-                    <span>{formatCompactCount(getRatingCount(searchDetailBook))} ratings</span>
-                  </div>
-                  <div className="searchDetailStat">
+                  <div className="feedMetaItem">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" stroke="currentColor" strokeWidth="1.8"/>
+                    </svg>
                     <span>{getPageCount(searchDetailBook) != null ? `${getPageCount(searchDetailBook)} pages` : 'N/A'}</span>
                   </div>
                 </div>
-                <p className="searchDetailDesc">{(searchDetailBook?.description || 'No description available yet.').trim()}</p>
-                <div className="searchDetailActions">
+                <p className={`feedCardDesc ${isDescExpanded(searchDetailBook.id) ? 'expanded' : ''}`}>
+                  {isDescExpanded(searchDetailBook.id) ? getFullDescription(searchDetailBook) : getShortDescription(searchDetailBook)}
+                </p>
+                <button className="feedReadMoreBtn" onClick={() => toggleDescription(searchDetailBook.id)}>
+                  {isDescExpanded(searchDetailBook.id) ? 'Show less' : 'Read more'}
+                </button>
+              </div>
+
+              <div className="feedActionsRight">
+                <div className="feedActionBtn">
                   <button
-                    className={`searchDetailLikeBtn ${isLiked(searchDetailBook.id) ? 'liked' : ''}`}
+                    className={`feedActionIcon ${isLiked(searchDetailBook.id) ? 'liked' : ''}`}
                     onClick={() => toggleLike(searchDetailBook)}
+                    aria-label={isLiked(searchDetailBook.id) ? 'Unlike book' : 'Like book'}
                   >
                     <svg viewBox="0 0 24 24" aria-hidden>
                       <path d="M12.1 21.35 10.8 20.2C5.9 15.8 2.7 12.9 2.7 9.3 2.7 6.4 4.9 4.2 7.8 4.2c1.7 0 3.3.8 4.3 2.1 1-1.3 2.6-2.1 4.3-2.1 2.9 0 5.1 2.2 5.1 5.1 0 3.6-3.2 6.5-8.1 10.9l-1.3 1.15Z" />
                     </svg>
-                    {isLiked(searchDetailBook.id) ? 'Liked' : 'Like'}
                   </button>
-                  <button className="searchDetailSaveBtn" onClick={() => setAddModalBook(searchDetailBook)}>
+                </div>
+                <div className="feedActionBtn">
+                  <button
+                    className="feedActionIcon saveActionIcon"
+                    onClick={() => setAddModalBook(searchDetailBook)}
+                    aria-label="Save to collection"
+                  >
                     <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      <path d="M7 3h10a1 1 0 0 1 1 1v17l-6-3-6 3V4a1 1 0 0 1 1-1Z" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
-                    Add to Collection
+                  </button>
+                </div>
+                <div className="feedActionBtn">
+                  <button
+                    className="feedActionIcon"
+                    onClick={() => toggleFeedSimilar(searchDetailBook)}
+                    aria-label={feedSimilarBookId === searchDetailBook.id ? 'Hide similar books' : 'Show similar books'}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                   </button>
                 </div>
               </div>
-            </div>
+
+              {feedSimilarBookId === searchDetailBook.id && (
+                <div className="feedSimilarDrawer feedSimilarDrawerModern">
+                  <button className="feedSimilarCloseBtn" onClick={() => setFeedSimilarBookId('')} aria-label="Close similar books">
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
+                    </svg>
+                  </button>
+                  <div className="feedSimilarRail feedSimilarRailModern">
+                    {(feedRecsByBookId[searchDetailBook.id] || []).slice(0, 10).map((rec) => (
+                      <button
+                        key={`search-rec-${searchDetailBook.id}-${rec.id || rec.title}`}
+                        className="feedSimilarCard feedSimilarCardModern"
+                        onClick={() => {
+                          setFeedSimilarBookId('')
+                          setSearchDetailBook(rec)
+                        }}
+                      >
+                        <div className="feedSimilarCover feedSimilarCoverModern">
+                          {rec.image_url ? <img src={rec.image_url} alt="" loading="lazy" /> : <div className="feedSimilarFallback" />}
+                        </div>
+                      </button>
+                    ))}
+                    {!feedRecsByBookId[searchDetailBook.id]?.length && <div className="feedSimilarEmpty">No similar books found yet.</div>}
+                  </div>
+                </div>
+              )}
+            </article>
           </div>
         </div>
       )}
+
 
       {tab === 'liked' && (
         <div className="listsShell appleBooksCollectionShell">
@@ -1616,24 +1705,6 @@ export default function App() {
           </div>
         </div>
       )}
-      <aside className={`recoDrawer ${showSimilar ? 'open' : ''}`}>
-        <div className="recoTitle">Similar Books</div>
-        <div className="recoList">
-          {recs.slice(0, 12).map((rec) => (
-            <button
-              key={`rec-${rec.id || rec.title}`}
-              onClick={() => {
-                setShowSimilar(false)
-                selectBook(rec)
-              }}
-            >
-              <strong>{rec.title || 'Untitled'}</strong>
-              <span>{formatAuthors(rec.author) || 'Unknown author'}</span>
-            </button>
-          ))}
-          {!recs.length && <div className="emptyList">No similar books found yet.</div>}
-        </div>
-      </aside>
       {toastMsg && <div className="toastMsg">{toastMsg}</div>}
       </main>
     </div>
