@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+numpy
+pandas
+scikit-learn
+requests
+hdbscan
+umap-learn
+faiss-cpu
+sentence-transformers
+PyYAML
+python-dotenv

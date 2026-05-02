@@ -1,0 +1,35 @@
+fantasy:
+  epic_fantasy: [kingdom, empire, war, quest, throne, dragon]
+  urban_fantasy: [city, modern, detective, supernatural, vampire, werewolf]
+  dark_fantasy: [curse, dark, demon, nightmare, haunted]
+  magical_academy: [school, academy, student, magic, wizard]
+
+science_fiction:
+  space_opera: [space, galaxy, starship, interstellar, alien, planet]
+  cyberpunk: [cyber, network, ai, hacker, dystopian, corporate]
+  dystopian_sf: [dystopia, surveillance, authoritarian, regime, rebellion]
+  time_travel: [time, timeline, paradox, future, past]
+
+mystery:
+  detective_mystery: [detective, case, clue, suspect, investigation]
+  psychological_thriller: [psychological, mind, manipulation, obsession]
+  crime_mystery: [murder, killer, victim, police, crime]
+  conspiracy_mystery: [secret, conspiracy, code, society, hidden]
+
+romance:
+  enemies_to_lovers: [enemy, rivals, tension, banter, hate, love]
+  historical_romance: [duke, regency, victorian, historical, ball]
+  contemporary_romance: [modern, relationship, dating, breakup, marriage]
+  romantic_drama: [heartbreak, emotional, passion, family, second]
+
+history:
+  ancient_history: [ancient, rome, greece, empire, classical]
+  war_history: [war, battle, military, soldiers, campaign]
+  modern_history: [modern, industrial, century, nation, world]
+  social_history: [culture, society, people, civilization, anthropology]
+
+self_help:
+  productivity: [productivity, habits, focus, routine, discipline]
+  mindset_growth: [mindset, growth, confidence, purpose, motivation]
+  wellbeing: [health, stress, anxiety, wellness, sleep]
+  leadership: [leadership, team, influence, management, communication]

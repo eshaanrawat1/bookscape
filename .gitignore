@@ -1,0 +1,14 @@
+/archive
+/artifacts
+/data
+/user_data
+
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+web/node_modules/
+web/dist/
+
+.env

@@ -1,0 +1,29 @@
+fantasy:
+  - magic
+  - dragon
+  - wizard
+  - quest
+science_fiction:
+  - spaceship
+  - alien
+  - future
+  - dystopia
+mystery:
+  - detective
+  - murder
+  - investigation
+  - case
+romance:
+  - love
+  - relationship
+  - heart
+history:
+  - empire
+  - war
+  - revolution
+  - historical
+self_help:
+  - habits
+  - productivity
+  - mindset
+  - growth
