@@ -1,7 +1,23 @@
-:root { color-scheme: dark; }
+:root { 
+  color-scheme: dark;
+  --bg-primary: #08090c;
+  --bg-secondary: #0d1117;
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-light: rgba(255,255,255,0.1);
+  --text-primary: rgba(255,255,255,0.95);
+  --text-secondary: rgba(255,255,255,0.65);
+  --text-muted: rgba(255,255,255,0.4);
+  --accent: #3b82f6;
+  --accent-muted: rgba(59, 130, 246, 0.2);
+}
 * { box-sizing: border-box; }
 html, body, #root { width: 100%; height: 100%; margin: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif; background: #02060f; }
+body { 
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', sans-serif; 
+  background: var(--bg-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
 .scene {
   position: relative;
@@ -2144,16 +2160,17 @@ h1 {
   display: flex;
   border-radius: 0;
   border: 0;
+  background: #08090c;
 }
 
 .appleSidebar {
-  width: 312px;
-  border-right: 1px solid rgba(255,255,255,0.1);
-  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015));
-  padding: 16px 14px 14px;
+  width: 280px;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+  padding: 20px 16px 16px;
   display: grid;
   grid-template-rows: auto auto auto auto 1fr;
-  gap: 10px;
+  gap: 12px;
   min-height: 0;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", sans-serif;
@@ -2174,10 +2191,10 @@ h1 {
 
 .appleSectionTitle {
   margin-top: 4px;
-  font-size: 11px;
-  letter-spacing: 0.05em;
+  font-size: 10px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.56);
+  color: rgba(255,255,255,0.4);
   font-weight: 600;
 }
 
@@ -2203,44 +2220,55 @@ h1 {
   text-align: left;
   justify-content: flex-start;
   width: 100%;
-  height: 34px;
-  border-radius: 8px;
+  height: 38px;
+  border-radius: 10px;
   border: 1px solid transparent;
   background: transparent;
-  color: rgba(255,255,255,0.84);
+  color: rgba(255,255,255,0.65);
   font-size: 14px;
   font-weight: 500;
   letter-spacing: 0;
   line-height: 1.25;
-  padding: 0 10px;
+  padding: 0 12px;
+  transition: all 0.15s ease;
+}
+
+.appleNav .menuTab:hover {
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.85);
 }
 
 .appleNav .menuTab.active {
-  background: rgba(255,255,255,0.18);
-  border-color: rgba(255,255,255,0.24);
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.12);
   color: #fff;
   text-decoration: none;
 }
 
 .appleIcon {
-  width: 18px;
-  min-width: 18px;
+  width: 20px;
+  min-width: 20px;
   text-align: center;
-  color: rgba(255,255,255,0.74);
+  color: rgba(255,255,255,0.55);
   font-size: 14px;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.appleNav .menuTab:hover .appleIcon {
+  color: rgba(255,255,255,0.75);
 }
 
 .appleNav .menuTab.active .appleIcon {
-  color: rgba(255,255,255,0.96);
+  color: rgba(255,255,255,0.95);
 }
 
 .appleIconSvg {
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
   display: block;
 }
 
@@ -2258,24 +2286,26 @@ h1 {
 
 .appleCollections .sideListItem {
   margin-top: 0;
-  min-height: 34px;
+  min-height: 36px;
   border-radius: 8px;
-  padding: 0 10px;
+  padding: 0 12px;
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0;
   border: 1px solid transparent;
   background: transparent;
-  color: rgba(255,255,255,0.84);
+  color: rgba(255,255,255,0.65);
+  transition: all 0.15s ease;
 }
 
 .appleCollections .sideListItem:hover {
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.85);
 }
 
 .appleCollections .sideListItem.on {
-  background: rgba(255,255,255,0.18);
-  border-color: rgba(255,255,255,0.24);
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.1);
   color: #fff;
 }
 
@@ -2625,5 +2655,548 @@ h1 {
 
   .listsActions .listsCreateRow.compact input {
     width: 100%;
+  }
+}
+
+/* Modern Feed Styles */
+.feedShellModern {
+  background: linear-gradient(180deg, #0a0c10 0%, #080a0e 100%);
+}
+
+.feedToolbarModern {
+  padding: 0 8px;
+  margin-bottom: 16px;
+}
+
+.feedToolbarModern .feedToolbarLabel {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgba(255,255,255,0.9);
+}
+
+.feedShuffleBtnModern {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.88);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.feedShuffleBtnModern svg {
+  width: 16px;
+  height: 16px;
+}
+
+.feedShuffleBtnModern:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.2);
+  transform: translateY(-1px);
+}
+
+.feedScrollerModern {
+  gap: 20px;
+  padding-bottom: 40px;
+  scroll-snap-type: y mandatory;
+}
+
+.feedItemModern {
+  min-height: calc(100vh - 140px);
+  scroll-snap-align: center;
+}
+
+.feedCardModern {
+  width: min(480px, 90vw);
+  height: min(82vh, 780px);
+  border-radius: 24px;
+  background: #0d1117;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 
+    0 4px 6px rgba(0,0,0,0.1),
+    0 20px 40px rgba(0,0,0,0.3),
+    0 0 0 1px rgba(255,255,255,0.05) inset;
+  overflow: hidden;
+  position: relative;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.feedCardModern:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 12px rgba(0,0,0,0.15),
+    0 32px 64px rgba(0,0,0,0.35),
+    0 0 0 1px rgba(255,255,255,0.08) inset;
+}
+
+.feedPosterImgModern {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  opacity: 1;
+  filter: none;
+  transition: transform 0.4s ease;
+}
+
+.feedCardModern:hover .feedPosterImgModern {
+  transform: scale(1.02);
+}
+
+.feedCardGradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(0,0,0,0.95) 0%,
+    rgba(0,0,0,0.8) 20%,
+    rgba(0,0,0,0.4) 45%,
+    rgba(0,0,0,0.1) 70%,
+    transparent 100%
+  );
+  z-index: 1;
+  pointer-events: none;
+}
+
+.feedContentOverlay {
+  position: absolute;
+  left: 0;
+  right: 72px;
+  bottom: 0;
+  z-index: 3;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feedGenrePill {
+  display: flex;
+  gap: 8px;
+}
+
+.feedGenrePill span {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.12);
+  backdrop-filter: blur(10px);
+  color: rgba(255,255,255,0.95);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.feedCardTitle {
+  margin: 0;
+  font-size: clamp(26px, 4vw, 38px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: #fff;
+  text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+}
+
+.feedCardAuthor {
+  font-size: 16px;
+  color: rgba(255,255,255,0.7);
+  font-weight: 400;
+}
+
+.feedCardStats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.feedStatItem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(255,255,255,0.8);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.feedStatRating {
+  color: #fbbf24;
+}
+
+.feedStatRating svg {
+  width: 14px;
+  height: 14px;
+}
+
+.feedStatDivider {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+}
+
+.feedCardBlurb {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255,255,255,0.6);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Action buttons column */
+.feedActionsColumn {
+  position: absolute;
+  right: 16px;
+  bottom: 100px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+}
+
+.feedActionItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.feedActionItem > span {
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
+  font-weight: 500;
+}
+
+.feedActionCircle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.1);
+  backdrop-filter: blur(10px);
+  color: rgba(255,255,255,0.9);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: all 0.2s ease;
+}
+
+.feedActionCircle svg {
+  width: 22px;
+  height: 22px;
+}
+
+.feedActionCircle path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.feedActionCircle:hover {
+  background: rgba(255,255,255,0.18);
+  transform: scale(1.08);
+}
+
+.feedActionCircle.liked {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.feedActionCircle.liked path {
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+.feedActionCircle.active {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+/* Modern collection dropdown */
+.collectionDropdownModern {
+  position: absolute;
+  right: calc(100% + 12px);
+  bottom: 0;
+  width: 260px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(20, 24, 32, 0.95);
+  backdrop-filter: blur(20px);
+  padding: 12px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+}
+
+.collectionDropdownHeader {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0 8px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 8px;
+}
+
+.collectionDropdownModern .collectionDropdownList {
+  max-height: 160px;
+}
+
+.collectionDropdownModern .collectionDropdownList button {
+  height: 38px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 0 12px;
+  transition: background 0.15s ease;
+}
+
+.collectionDropdownModern .collectionDropdownCreate {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.collectionDropdownModern .collectionDropdownCreate input {
+  flex: 1;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.collectionDropdownModern .collectionDropdownCreate button {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  padding: 0;
+  font-size: 20px;
+  font-weight: 400;
+  display: grid;
+  place-items: center;
+}
+
+/* Modern similar books drawer */
+.feedSimilarDrawerModern {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  background: rgba(12, 14, 20, 0.98);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255,255,255,0.1);
+  border-radius: 24px 24px 0 0;
+  padding: 20px;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.4);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.feedSimilarHeadModern {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.feedSimilarHeadModern > div strong {
+  display: block;
+  font-size: 17px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.feedSimilarHeadModern > div span {
+  display: block;
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+  margin-top: 2px;
+}
+
+.feedSimilarHeadModern button {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: all 0.15s ease;
+}
+
+.feedSimilarHeadModern button:hover {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+}
+
+.feedSimilarHeadModern button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.feedSimilarRailModern {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x mandatory;
+}
+
+.feedSimilarRailModern::-webkit-scrollbar {
+  height: 4px;
+}
+
+.feedSimilarRailModern::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.05);
+  border-radius: 2px;
+}
+
+.feedSimilarRailModern::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+}
+
+.feedSimilarCardModern {
+  min-width: 130px;
+  width: 130px;
+  border: none;
+  background: transparent;
+  color: #fff;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition: transform 0.2s ease;
+}
+
+.feedSimilarCardModern:hover {
+  transform: translateY(-4px);
+}
+
+.feedSimilarCoverModern {
+  width: 130px;
+  height: 180px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.05);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+}
+
+.feedSimilarCoverModern img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.feedSimilarCardModern:hover .feedSimilarCoverModern img {
+  transform: scale(1.05);
+}
+
+.feedSimilarFallback {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+}
+
+.feedSimilarInfo {
+  padding: 10px 2px 0;
+}
+
+.feedSimilarInfo .feedSimilarTitle {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #fff;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.feedSimilarInfo .feedSimilarAuthor {
+  margin-top: 4px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+}
+
+.feedSimilarEmpty {
+  padding: 20px;
+  color: rgba(255,255,255,0.4);
+  font-size: 13px;
+}
+
+/* Mobile adjustments for modern feed */
+@media (max-width: 640px) {
+  .feedCardModern {
+    width: calc(100vw - 32px);
+    height: calc(100vh - 180px);
+    border-radius: 20px;
+  }
+
+  .feedContentOverlay {
+    right: 64px;
+    padding: 20px;
+  }
+
+  .feedCardTitle {
+    font-size: 24px;
+  }
+
+  .feedActionsColumn {
+    right: 12px;
+    bottom: 80px;
+    gap: 16px;
+  }
+
+  .feedActionCircle {
+    width: 44px;
+    height: 44px;
+  }
+
+  .feedActionCircle svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .feedSimilarCoverModern {
+    width: 110px;
+    height: 150px;
+  }
+
+  .feedSimilarCardModern {
+    min-width: 110px;
+    width: 110px;
   }
 }

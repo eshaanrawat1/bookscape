@@ -889,7 +889,7 @@ export default function App() {
             onClick={() => { setTab('lists'); setActiveListName('all') }}
           >
             <span className="itemLead">
-              <span className="appleIcon" aria-hidden>⌸</span>
+              <span className="appleIcon" aria-hidden>���</span>
               <span>All Books</span>
             </span>
             <span className="collectionActions">
@@ -1133,40 +1133,56 @@ export default function App() {
       )}
 
       {tab === 'feed' && (
-        <div className="feedShell">
-          <div className="feedToolbar">
-            <div className="feedToolbarLabel">Top 100 Books Feed</div>
-            <button className="feedShuffleBtn" onClick={shuffleFeed}>Shuffle</button>
+        <div className="feedShell feedShellModern">
+          <div className="feedToolbar feedToolbarModern">
+            <div className="feedToolbarLabel">Discover</div>
+            <button className="feedShuffleBtn feedShuffleBtnModern" onClick={shuffleFeed}>
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden>
+                <path d="M3 7h2.5a4 4 0 013.2 1.6L10 10.5m0 0l1.3 1.9A4 4 0 0014.5 14H17m-7-3.5l-1.3-1.9A4 4 0 005.5 7H3m14 7l-2 2m2-2l-2-2M3 14h2.5a4 4 0 003.2-1.6L10 10.5m7-3.5h-2.5a4 4 0 00-3.2 1.6L10 10.5m7-3.5l-2-2m2 2l-2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Shuffle
+            </button>
           </div>
-          <div className="feedScroller" ref={feedScrollerRef}>
+          <div className="feedScroller feedScrollerModern" ref={feedScrollerRef}>
             {feedBooks.map((b, idx) => {
               const avgRating = getAvgRating(b)
               const pageCount = getPageCount(b)
+              const ratingCount = getRatingCount(b)
               return (
-              <section key={b.id || `${b.title}-${idx}`} className="feedItem">
-                <article className={`feedTikTokCard ${b.image_url ? 'hasImage' : ''} ${feedSimilarBookId === b.id ? 'similarOpen' : ''}`}>
-                  {b.image_url && <img className="feedPosterImg" src={b.image_url} alt="" loading="lazy" />}
-                  <div className="feedPosterTint" />
+              <section key={b.id || `${b.title}-${idx}`} className="feedItem feedItemModern">
+                <article className={`feedTikTokCard feedCardModern ${b.image_url ? 'hasImage' : ''} ${feedSimilarBookId === b.id ? 'similarOpen' : ''}`}>
+                  {b.image_url && <img className="feedPosterImg feedPosterImgModern" src={b.image_url} alt="" loading="lazy" />}
+                  <div className="feedCardGradient" />
 
-                  <div className="feedOverlayLeft">
-                    <div className="feedPills">
+                  <div className="feedContentOverlay">
+                    <div className="feedGenrePill">
                       <span>{formatGenreLabel(b.genre)}</span>
-                      {b.subgenre && <span>{b.subgenre}</span>}
-                      <span>YA</span>
                     </div>
-                    <h2 className="feedOverlayTitle">{b.title || 'Untitled'}</h2>
-                    <div className="feedOverlayAuthor">{formatAuthors(b.author) || 'Unknown author'}</div>
-                    <div className="feedOverlayMeta">
-                      <span className="rating">★ {avgRating != null ? Number(avgRating).toFixed(2) : 'N/A'}</span>
-                      <span>{pageCount != null ? `${pageCount} pages` : 'Unknown pages'}</span>
+                    <h2 className="feedCardTitle">{b.title || 'Untitled'}</h2>
+                    <div className="feedCardAuthor">{formatAuthors(b.author) || 'Unknown author'}</div>
+                    <div className="feedCardStats">
+                      <div className="feedStatItem feedStatRating">
+                        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                        </svg>
+                        <span>{avgRating != null ? Number(avgRating).toFixed(1) : 'N/A'}</span>
+                      </div>
+                      <div className="feedStatDivider" />
+                      <div className="feedStatItem">
+                        <span>{ratingCount != null ? formatCompactCount(ratingCount) : '0'} ratings</span>
+                      </div>
+                      <div className="feedStatDivider" />
+                      <div className="feedStatItem">
+                        <span>{pageCount != null ? `${pageCount} pages` : 'N/A'}</span>
+                      </div>
                     </div>
-                    <p className="feedOverlayBlurb">{getShortDescription(b)}</p>
+                    <p className="feedCardBlurb">{getShortDescription(b)}</p>
                   </div>
 
-                  <div className="feedOverlayActions">
-                    <div className="feedActionStack">
+                  <div className="feedActionsColumn">
+                    <div className="feedActionItem">
                       <button
-                        className={`heartBtn feedActionBtn ${isLiked(b.id) ? 'on' : ''}`}
+                        className={`feedActionCircle ${isLiked(b.id) ? 'liked' : ''}`}
                         onClick={() => toggleLike(b)}
                         aria-label={isLiked(b.id) ? 'Unlike book' : 'Like book'}
                       >
@@ -1174,21 +1190,25 @@ export default function App() {
                           <path d="M12.1 21.35 10.8 20.2C5.9 15.8 2.7 12.9 2.7 9.3 2.7 6.4 4.9 4.2 7.8 4.2c1.7 0 3.3.8 4.3 2.1 1-1.3 2.6-2.1 4.3-2.1 2.9 0 5.1 2.2 5.1 5.1 0 3.6-3.2 6.5-8.1 10.9l-1.3 1.15Z" />
                         </svg>
                       </button>
+                      <span>Like</span>
                     </div>
-                    <div className="feedActionStack collectionMenuWrap" onClick={(e) => e.stopPropagation()}>
+                    <div className="feedActionItem collectionMenuWrap" onClick={(e) => e.stopPropagation()}>
                       <button
-                        className="collectionPlusBtn feedActionBtn"
+                        className="feedActionCircle"
                         onClick={(e) => {
                           e.stopPropagation()
                           setFeedCollectionMenuBookId((prev) => (prev === b.id ? '' : b.id))
                         }}
                         aria-label="Add to collection"
                       >
-                        +
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2v16z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
                       </button>
                       <span>Save</span>
                       {feedCollectionMenuBookId === b.id && (
-                        <div className="collectionDropdown">
+                        <div className="collectionDropdown collectionDropdownModern">
+                          <div className="collectionDropdownHeader">Save to Collection</div>
                           <div className="collectionDropdownList">
                             {readingLists.map((list) => (
                               <button key={`feed-add-${b.id}-${list.name}`} onClick={() => addFromFeedMenu(list.name, b.id)}>
@@ -1210,40 +1230,52 @@ export default function App() {
                                 setFeedNewCollectionDraft('')
                               }}
                             >
-                              Create
+                              +
                             </button>
                           </div>
                         </div>
                       )}
                     </div>
-                    <button
-                      className={`mapMenuBtn feedActionBtn ${feedSimilarBookId === b.id ? 'on' : ''}`}
-                      onClick={() => toggleFeedSimilar(b)}
-                      aria-label={feedSimilarBookId === b.id ? 'Hide similar books' : 'Show similar books'}
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden>
-                        <path d="M5 7h14M5 12h14M5 17h14" />
-                      </svg>
-                    </button>
-                    <span className="feedActionLabel">Similar</span>
+                    <div className="feedActionItem">
+                      <button
+                        className={`feedActionCircle ${feedSimilarBookId === b.id ? 'active' : ''}`}
+                        onClick={() => toggleFeedSimilar(b)}
+                        aria-label={feedSimilarBookId === b.id ? 'Hide similar books' : 'Show similar books'}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        </svg>
+                      </button>
+                      <span>More</span>
+                    </div>
                   </div>
+
                   {feedSimilarBookId === b.id && (
-                    <div className="feedSimilarDrawer">
-                      <div className="feedSimilarHead">
-                        <strong>Similar Books</strong>
-                        <button onClick={() => setFeedSimilarBookId('')} aria-label="Close similar books">×</button>
+                    <div className="feedSimilarDrawer feedSimilarDrawerModern">
+                      <div className="feedSimilarHead feedSimilarHeadModern">
+                        <div>
+                          <strong>Similar to this book</strong>
+                          <span>Based on readers who enjoyed this</span>
+                        </div>
+                        <button onClick={() => setFeedSimilarBookId('')} aria-label="Close similar books">
+                          <svg viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
+                          </svg>
+                        </button>
                       </div>
-                      <div className="feedSimilarRail">
+                      <div className="feedSimilarRail feedSimilarRailModern">
                         {(feedRecsByBookId[b.id] || []).slice(0, 10).map((rec) => (
-                          <button key={`feed-rec-${b.id}-${rec.id || rec.title}`} className="feedSimilarCard" onClick={() => openFromSearch(rec)}>
-                            <div className="feedSimilarCover">
-                              {rec.image_url ? <img src={rec.image_url} alt="" loading="lazy" /> : <div className="listBookImageFallback" />}
+                          <button key={`feed-rec-${b.id}-${rec.id || rec.title}`} className="feedSimilarCard feedSimilarCardModern" onClick={() => openFromSearch(rec)}>
+                            <div className="feedSimilarCover feedSimilarCoverModern">
+                              {rec.image_url ? <img src={rec.image_url} alt="" loading="lazy" /> : <div className="feedSimilarFallback" />}
                             </div>
-                            <div className="feedSimilarTitle">{rec.title || 'Untitled'}</div>
-                            <div className="feedSimilarAuthor">{formatAuthors(rec.author) || 'Unknown author'}</div>
+                            <div className="feedSimilarInfo">
+                              <div className="feedSimilarTitle">{rec.title || 'Untitled'}</div>
+                              <div className="feedSimilarAuthor">{formatAuthors(rec.author) || 'Unknown'}</div>
+                            </div>
                           </button>
                         ))}
-                        {!feedRecsByBookId[b.id]?.length && <div className="emptyList">No similar books found yet.</div>}
+                        {!feedRecsByBookId[b.id]?.length && <div className="feedSimilarEmpty">No similar books found yet.</div>}
                       </div>
                     </div>
                   )}
