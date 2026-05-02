@@ -1,7 +1,23 @@
-:root { color-scheme: dark; }
+:root { 
+  color-scheme: dark;
+  --bg-primary: #08090c;
+  --bg-secondary: #0d1117;
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-light: rgba(255,255,255,0.1);
+  --text-primary: rgba(255,255,255,0.95);
+  --text-secondary: rgba(255,255,255,0.65);
+  --text-muted: rgba(255,255,255,0.4);
+  --accent: #3b82f6;
+  --accent-muted: rgba(59, 130, 246, 0.2);
+}
 * { box-sizing: border-box; }
 html, body, #root { width: 100%; height: 100%; margin: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif; background: #02060f; }
+body { 
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', sans-serif; 
+  background: var(--bg-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
 .scene {
   position: relative;
@@ -750,6 +766,9 @@ h1 {
   position: absolute;
   inset: 0;
   z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .bookBackdrop {
@@ -2144,16 +2163,17 @@ h1 {
   display: flex;
   border-radius: 0;
   border: 0;
+  background: #08090c;
 }
 
 .appleSidebar {
-  width: 312px;
-  border-right: 1px solid rgba(255,255,255,0.1);
-  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015));
-  padding: 16px 14px 14px;
+  width: 280px;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+  padding: 20px 16px 16px;
   display: grid;
   grid-template-rows: auto auto auto auto 1fr;
-  gap: 10px;
+  gap: 12px;
   min-height: 0;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", sans-serif;
@@ -2174,10 +2194,10 @@ h1 {
 
 .appleSectionTitle {
   margin-top: 4px;
-  font-size: 11px;
-  letter-spacing: 0.05em;
+  font-size: 10px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.56);
+  color: rgba(255,255,255,0.4);
   font-weight: 600;
 }
 
@@ -2203,44 +2223,55 @@ h1 {
   text-align: left;
   justify-content: flex-start;
   width: 100%;
-  height: 34px;
-  border-radius: 8px;
+  height: 38px;
+  border-radius: 10px;
   border: 1px solid transparent;
   background: transparent;
-  color: rgba(255,255,255,0.84);
+  color: rgba(255,255,255,0.65);
   font-size: 14px;
   font-weight: 500;
   letter-spacing: 0;
   line-height: 1.25;
-  padding: 0 10px;
+  padding: 0 12px;
+  transition: all 0.15s ease;
+}
+
+.appleNav .menuTab:hover {
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.85);
 }
 
 .appleNav .menuTab.active {
-  background: rgba(255,255,255,0.18);
-  border-color: rgba(255,255,255,0.24);
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.12);
   color: #fff;
   text-decoration: none;
 }
 
 .appleIcon {
-  width: 18px;
-  min-width: 18px;
+  width: 20px;
+  min-width: 20px;
   text-align: center;
-  color: rgba(255,255,255,0.74);
+  color: rgba(255,255,255,0.55);
   font-size: 14px;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.appleNav .menuTab:hover .appleIcon {
+  color: rgba(255,255,255,0.75);
 }
 
 .appleNav .menuTab.active .appleIcon {
-  color: rgba(255,255,255,0.96);
+  color: rgba(255,255,255,0.95);
 }
 
 .appleIconSvg {
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
   display: block;
 }
 
@@ -2258,24 +2289,26 @@ h1 {
 
 .appleCollections .sideListItem {
   margin-top: 0;
-  min-height: 34px;
+  min-height: 36px;
   border-radius: 8px;
-  padding: 0 10px;
+  padding: 0 12px;
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0;
   border: 1px solid transparent;
   background: transparent;
-  color: rgba(255,255,255,0.84);
+  color: rgba(255,255,255,0.65);
+  transition: all 0.15s ease;
 }
 
 .appleCollections .sideListItem:hover {
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.85);
 }
 
 .appleCollections .sideListItem.on {
-  background: rgba(255,255,255,0.18);
-  border-color: rgba(255,255,255,0.24);
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.1);
   color: #fff;
 }
 
@@ -2565,41 +2598,244 @@ h1 {
   position: absolute;
   inset: 0;
   z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.searchDetailModal {
+.searchDetailModalNew {
   position: absolute;
   inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 21;
+}
+
+.searchDetailCloseNew {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.9);
+  cursor: pointer;
   display: grid;
   place-items: center;
-  padding: 24px;
-}
-
-.searchDetailClose {
-  position: absolute;
-  top: 26px;
-  right: 30px;
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.18);
-  background: rgba(0,0,0,0.5);
-  color: rgba(255,255,255,0.92);
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
   z-index: 25;
+  transition: all 0.15s ease;
 }
 
-.searchDetailFeedItem {
-  width: min(820px, 92vw);
-  min-height: auto;
-  max-height: 86vh;
-  grid-template-columns: 300px minmax(260px, 420px);
+.searchDetailCloseNew:hover {
+  background: rgba(255,255,255,0.18);
 }
 
-.searchDetailFeedItem .feedInfoCard {
-  max-height: 86vh;
+.searchDetailCloseNew svg {
+  width: 18px;
+  height: 18px;
+}
+
+.searchDetailGrid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 32px;
+  background: rgba(14, 18, 26, 0.98);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 28px;
+  max-width: 780px;
+  width: 100%;
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+}
+
+.searchDetailCover {
+  width: 280px;
+  height: 400px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.05);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+}
+
+.searchDetailCover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.searchDetailCoverFallback {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02));
+}
+
+.searchDetailInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.searchDetailGenre {
+  display: inline-block;
+  width: fit-content;
+  padding: 6px 14px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.8);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.searchDetailTitle {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+.searchDetailAuthor {
+  font-size: 16px;
+  color: rgba(255,255,255,0.55);
+}
+
+.searchDetailStats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.searchDetailStat {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  color: rgba(255,255,255,0.7);
+}
+
+.searchDetailStat.rating {
+  color: #f59e0b;
+}
+
+.searchDetailStat.rating svg {
+  width: 16px;
+  height: 16px;
+}
+
+.searchDetailDesc {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(255,255,255,0.6);
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.searchDetailActions {
+  display: flex;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+.searchDetailLikeBtn,
+.searchDetailSaveBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 10px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.searchDetailLikeBtn {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.9);
+}
+
+.searchDetailLikeBtn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.searchDetailLikeBtn path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
+.searchDetailLikeBtn:hover {
+  background: rgba(255,255,255,0.14);
+}
+
+.searchDetailLikeBtn.liked {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.searchDetailLikeBtn.liked path {
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+.searchDetailSaveBtn {
+  background: #fff;
+  color: #0d1117;
+}
+
+.searchDetailSaveBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.searchDetailSaveBtn:hover {
+  background: rgba(255,255,255,0.9);
+}
+
+@media (max-width: 720px) {
+  .searchDetailGrid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 20px;
+    max-height: 90vh;
+  }
+
+  .searchDetailCover {
+    width: 100%;
+    max-width: 200px;
+    height: 280px;
+    margin: 0 auto;
+  }
+
+  .searchDetailTitle {
+    font-size: 22px;
+  }
+
+  .searchDetailActions {
+    flex-direction: column;
+  }
+
+  .searchDetailLikeBtn,
+  .searchDetailSaveBtn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 @media (max-width: 980px) {
@@ -2625,5 +2861,959 @@ h1 {
 
   .listsActions .listsCreateRow.compact input {
     width: 100%;
+  }
+}
+
+/* Modern Feed Styles */
+.feedShellModern {
+  background: linear-gradient(180deg, #0a0c10 0%, #080a0e 100%);
+}
+
+.feedToolbarModern {
+  padding: 0 8px;
+  margin-bottom: 16px;
+}
+
+.feedToolbarModern .feedToolbarLabel {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgba(255,255,255,0.9);
+}
+
+.feedShuffleBtnModern {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.88);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.feedShuffleBtnModern svg {
+  width: 16px;
+  height: 16px;
+}
+
+.feedShuffleBtnModern:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.2);
+  transform: translateY(-1px);
+}
+
+.feedScrollerModern {
+  gap: 0;
+  padding: 0 !important;
+  scroll-snap-type: y mandatory;
+}
+
+.feedItemModern {
+  min-height: calc(100vh - 140px);
+  scroll-snap-align: center;
+}
+
+.feedCardModern {
+  width: min(480px, 90vw);
+  height: min(82vh, 780px);
+  border-radius: 24px;
+  background: #0d1117;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 
+    0 4px 6px rgba(0,0,0,0.1),
+    0 20px 40px rgba(0,0,0,0.3),
+    0 0 0 1px rgba(255,255,255,0.05) inset;
+  overflow: hidden;
+  position: relative;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.feedCardModern:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 12px rgba(0,0,0,0.15),
+    0 32px 64px rgba(0,0,0,0.35),
+    0 0 0 1px rgba(255,255,255,0.08) inset;
+}
+
+.feedPosterImgModern {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  opacity: 1;
+  filter: none;
+  transition: transform 0.4s ease;
+}
+
+.feedCardModern:hover .feedPosterImgModern {
+  transform: scale(1.02);
+}
+
+.feedCardGradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(0,0,0,0.95) 0%,
+    rgba(0,0,0,0.8) 20%,
+    rgba(0,0,0,0.4) 45%,
+    rgba(0,0,0,0.1) 70%,
+    transparent 100%
+  );
+  z-index: 1;
+  pointer-events: none;
+}
+
+.feedContentOverlay {
+  position: absolute;
+  left: 0;
+  right: 72px;
+  bottom: 0;
+  z-index: 3;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feedGenrePill {
+  display: flex;
+  gap: 8px;
+}
+
+.feedGenrePill span {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.12);
+  backdrop-filter: blur(10px);
+  color: rgba(255,255,255,0.95);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.feedCardTitle {
+  margin: 0;
+  font-size: clamp(26px, 4vw, 38px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: #fff;
+  text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+}
+
+.feedCardAuthor {
+  font-size: 16px;
+  color: rgba(255,255,255,0.7);
+  font-weight: 400;
+}
+
+.feedCardStats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.feedStatItem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(255,255,255,0.8);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.feedStatRating {
+  color: #fbbf24;
+}
+
+.feedStatRating svg {
+  width: 14px;
+  height: 14px;
+}
+
+.feedStatDivider {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+}
+
+.feedCardBlurb {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255,255,255,0.6);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Action buttons column */
+.feedActionsColumn {
+  position: absolute;
+  right: 16px;
+  bottom: 100px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+}
+
+.feedActionItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.feedActionItem > span {
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
+  font-weight: 500;
+}
+
+.feedActionCircle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.1);
+  backdrop-filter: blur(10px);
+  color: rgba(255,255,255,0.9);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: all 0.2s ease;
+}
+
+.feedActionCircle svg {
+  width: 22px;
+  height: 22px;
+}
+
+.feedActionCircle path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.feedActionCircle:hover {
+  background: rgba(255,255,255,0.18);
+  transform: scale(1.08);
+}
+
+.feedActionCircle.liked {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.feedActionCircle.liked path {
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+.feedActionCircle.active {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+/* Modern collection dropdown */
+.collectionDropdownModern {
+  position: absolute;
+  right: calc(100% + 12px);
+  bottom: 0;
+  width: 260px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(20, 24, 32, 0.95);
+  backdrop-filter: blur(20px);
+  padding: 12px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+}
+
+.collectionDropdownHeader {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0 8px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 8px;
+}
+
+.collectionDropdownModern .collectionDropdownList {
+  max-height: 160px;
+}
+
+.collectionDropdownModern .collectionDropdownList button {
+  height: 38px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 0 12px;
+  transition: background 0.15s ease;
+}
+
+.collectionDropdownModern .collectionDropdownCreate {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.collectionDropdownModern .collectionDropdownCreate input {
+  flex: 1;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.collectionDropdownModern .collectionDropdownCreate button {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  padding: 0;
+  font-size: 20px;
+  font-weight: 400;
+  display: grid;
+  place-items: center;
+}
+
+/* Modern similar books drawer */
+.feedSimilarDrawerModern {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  background: rgba(12, 14, 20, 0.98);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255,255,255,0.1);
+  border-radius: 24px 24px 0 0;
+  padding: 20px;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.4);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.feedSimilarHeadModern {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.feedSimilarHeadModern > div strong {
+  display: block;
+  font-size: 17px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.feedSimilarHeadModern > div span {
+  display: block;
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+  margin-top: 2px;
+}
+
+.feedSimilarHeadModern button {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: all 0.15s ease;
+}
+
+.feedSimilarHeadModern button:hover {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+}
+
+.feedSimilarHeadModern button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.feedSimilarRailModern {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x mandatory;
+}
+
+.feedSimilarRailModern::-webkit-scrollbar {
+  height: 4px;
+}
+
+.feedSimilarRailModern::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.05);
+  border-radius: 2px;
+}
+
+.feedSimilarRailModern::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+}
+
+.feedSimilarCardModern {
+  min-width: 130px;
+  width: 130px;
+  border: none;
+  background: transparent;
+  color: #fff;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition: transform 0.2s ease;
+}
+
+.feedSimilarCardModern:hover {
+  transform: translateY(-4px);
+}
+
+.feedSimilarCoverModern {
+  width: 130px;
+  height: 180px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.05);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+}
+
+.feedSimilarCoverModern img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.feedSimilarCardModern:hover .feedSimilarCoverModern img {
+  transform: scale(1.05);
+}
+
+.feedSimilarFallback {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+}
+
+.feedSimilarInfo {
+  padding: 10px 2px 0;
+}
+
+.feedSimilarInfo .feedSimilarTitle {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #fff;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.feedSimilarInfo .feedSimilarAuthor {
+  margin-top: 4px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+}
+
+.feedSimilarEmpty {
+  padding: 20px;
+  color: rgba(255,255,255,0.4);
+  font-size: 13px;
+}
+
+/* Full-height TikTok-style feed card */
+.feedItemFull {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  max-height: 100%;
+  scroll-snap-align: start;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.feedCardFull {
+  width: min(420px, 84vw);
+  height: 100%;
+  border-radius: 16px;
+  background: #0d1117;
+  border: none;
+  box-shadow: none;
+  overflow: hidden;
+  position: relative;
+}
+
+.feedCardFull.similarOpen {
+  margin-bottom: 0;
+}
+
+.feedPosterImgFull {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+.feedCardGradientFull {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(0,0,0,0.95) 0%,
+    rgba(0,0,0,0.75) 25%,
+    rgba(0,0,0,0.3) 50%,
+    transparent 70%
+  );
+  z-index: 1;
+  pointer-events: none;
+}
+
+.feedContentBottom {
+  position: absolute;
+  left: 0;
+  right: 70px;
+  bottom: 0;
+  z-index: 3;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.feedGenrePills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.feedGenrePills span {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: rgba(40, 40, 45, 0.85);
+  color: rgba(255,255,255,0.9);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.feedCardTitleFull {
+  margin: 6px 0 0;
+  font-size: clamp(19px, 2.6vw, 24px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+
+.feedCardAuthorFull {
+  font-size: 12px;
+  color: rgba(255,255,255,0.6);
+  font-weight: 400;
+}
+
+.feedCardMetaRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.feedMetaItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255,255,255,0.75);
+  font-size: 11px;
+}
+
+.feedMetaItem svg {
+  width: 16px;
+  height: 16px;
+}
+
+.feedMetaItem:first-child {
+  color: #f59e0b;
+}
+
+.feedMetaItem:first-child svg {
+  fill: #f59e0b;
+}
+
+.feedCardDesc {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255,255,255,0.65);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.feedCardDesc.expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  -webkit-box-orient: unset;
+  overflow: auto;
+  max-height: 30vh;
+}
+
+.feedReadMoreBtn {
+  display: inline-block;
+  width: fit-content;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 4px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.feedReadMoreBtn:hover {
+  text-decoration: underline;
+}
+
+/* Right-side action buttons */
+.feedActionsRight {
+  position: absolute;
+  right: 8px;
+  bottom: 32px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  align-items: center;
+}
+
+.feedActionBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.feedActionBtn > span {
+  font-size: 12px;
+  color: rgba(255,255,255,0.85);
+  font-weight: 500;
+}
+
+.feedActionIcon {
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: rgba(255,255,255,0.95);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: none !important;
+  padding: 0;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.feedActionIcon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.feedActionIcon path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.feedActionIcon:hover {
+  transform: scale(1.05);
+}
+
+.feedActionIcon.liked {
+  color: #ef4444;
+}
+
+.feedActionIcon.liked path {
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+.feedActionIcon.saveActionIcon {
+  border-radius: 0;
+  border: none;
+  background: transparent;
+}
+
+.feedActionIcon.saveActionIcon:hover {
+  background: transparent;
+}
+
+/* Hard override for TikTok feed icon buttons: remove any circular chrome from legacy rules */
+.feedCardFull .feedActionsRight .feedActionBtn,
+.feedCardFull .feedActionsRight .feedActionBtn > button.feedActionIcon {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.feedCardFull .feedActionsRight .feedActionBtn > button.feedActionIcon {
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+.feedCardFull .feedActionsRight .feedActionBtn > button.feedActionIcon::before,
+.feedCardFull .feedActionsRight .feedActionBtn > button.feedActionIcon::after {
+  content: none !important;
+}
+
+/* Mobile adjustments for modern feed */
+@media (max-width: 640px) {
+  .feedCardModern {
+    width: calc(100vw - 32px);
+    height: calc(100vh - 180px);
+    border-radius: 20px;
+  }
+
+  .feedContentOverlay {
+    right: 64px;
+    padding: 20px;
+  }
+
+  .feedCardTitle {
+    font-size: 24px;
+  }
+
+  .feedActionsColumn {
+    right: 12px;
+    bottom: 80px;
+    gap: 16px;
+  }
+
+  .feedActionCircle {
+    width: 44px;
+    height: 44px;
+  }
+
+  .feedActionCircle svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .feedSimilarCoverModern {
+    width: 110px;
+    height: 150px;
+  }
+
+  .feedSimilarCardModern {
+    min-width: 110px;
+    width: 110px;
+  }
+
+  .feedItemFull {
+    height: 100%;
+    min-height: 100%;
+    max-height: 100%;
+  }
+
+  .feedCardFull {
+    width: min(360px, 86vw);
+    border-radius: 14px;
+  }
+
+  .feedContentBottom {
+    right: 60px;
+    padding: 14px;
+  }
+
+  .feedCardTitleFull {
+    font-size: 18px;
+  }
+
+  .feedActionsRight {
+    right: 6px;
+    bottom: 28px;
+    gap: 6px;
+  }
+
+  .feedActionIcon {
+    width: auto;
+    height: auto;
+  }
+
+  .feedActionIcon svg {
+    width: 19px;
+    height: 19px;
+  }
+}
+
+.feedSimilarDrawerModern {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 18px;
+  z-index: 6;
+  padding: 10px 0 6px;
+  border-radius: 14px;
+  background: rgba(12, 12, 14, 0.72);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.feedSimilarCloseBtn {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.feedSimilarCloseBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.feedSimilarRailModern {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 10px 6px;
+  scrollbar-width: thin;
+}
+
+.feedSimilarCardModern {
+  border: none;
+  background: transparent;
+  padding: 0;
+  min-width: 92px;
+  width: 92px;
+  display: block;
+}
+
+.feedSimilarCoverModern {
+  width: 92px;
+  height: 132px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.feedSimilarCoverModern img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.feedDetailModalWrap {
+  position: relative;
+  width: min(420px, 84vw);
+  height: calc(100vh - 110px);
+  z-index: 9;
+  margin: 0 auto;
+}
+
+.feedDetailModalWrap .feedCardFull {
+  width: 100%;
+  height: 100%;
+}
+
+.feedDetailCloseBtn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 7;
+  border: 0;
+  background: rgba(16, 16, 18, 0.6);
+  color: rgba(255, 255, 255, 0.9);
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.feedDetailCloseBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 640px) {
+  .feedDetailModalWrap {
+    width: min(360px, 86vw);
+    height: calc(100vh - 130px);
   }
 }
