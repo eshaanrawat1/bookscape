@@ -9,12 +9,15 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[2]
 ARTIFACTS = ROOT / "artifacts"
 RAW_DATA = ROOT / "data" / "raw"
+USER_DATA = ROOT / "user_data"
 
 
 class AtlasStore:
     def __init__(self) -> None:
         self.points: list[dict] = []
         self.point_by_id: dict[str, dict] = {}
+        self.books_by_id: dict[str, dict] = {}
+        self.catalog: list[dict] = []
         self.id_to_index: dict[str, int] = {}
         self.search_docs: list[tuple[str, str, dict]] = []
         self.points_cache: dict[tuple[str, int], list[dict]] = {}
@@ -24,7 +27,22 @@ class AtlasStore:
         self.faiss_index = None
         self._load()
 
+    def reload(self) -> None:
+        self._load()
+
     def _load(self) -> None:
+        self.points = []
+        self.point_by_id = {}
+        self.books_by_id = {}
+        self.catalog = []
+        self.search_docs = []
+        self.points_cache = {}
+        self.clusters = {}
+        self.ids = []
+        self.id_to_index = {}
+        self.embeddings = None
+        self.faiss_index = None
+
         points_path = ARTIFACTS / "books_globe.json"
         if points_path.exists():
             with points_path.open("r", encoding="utf-8") as f:
@@ -32,7 +50,40 @@ class AtlasStore:
             self.points = payload.get("points", [])
             self._hydrate_point_metadata()
             self.point_by_id = {p["id"]: p for p in self.points}
-            self._build_point_indexes()
+
+        self.books_by_id = dict(self.point_by_id)
+        obsidian_books_path = USER_DATA / "obsidian_books.json"
+        if obsidian_books_path.exists():
+            try:
+                with obsidian_books_path.open("r", encoding="utf-8") as f:
+                    obsidian_payload = json.load(f)
+                books = (obsidian_payload or {}).get("books", {})
+                if isinstance(books, dict):
+                    for book_id, row in books.items():
+                        if not book_id or not isinstance(row, dict):
+                            continue
+                        normalized = {
+                            "id": str(book_id),
+                            "title": row.get("title") or str(book_id),
+                            "author": row.get("author") or "",
+                            "description": row.get("description") or "",
+                            "genre": (
+                                row.get("genre")
+                                or ((row.get("genres") or ["unknown"])[0] if isinstance(row.get("genres"), list) else (row.get("genres") or "unknown"))
+                            ),
+                            "genres": row.get("genres") if isinstance(row.get("genres"), list) else [],
+                            "image_url": row.get("image_url") or "",
+                            "book_rating": row.get("book_rating"),
+                            "book_rating_count": row.get("book_rating_count"),
+                            "book_review_count": row.get("book_review_count"),
+                            "book_pages": row.get("total_pages") or 0,
+                        }
+                        self.books_by_id[str(book_id)] = normalized
+            except Exception:
+                pass
+
+        self.catalog = list(self.books_by_id.values())
+        self._build_point_indexes()
 
         ids_path = ARTIFACTS / "book_ids.npy"
         emb_path = ARTIFACTS / "embeddings.npy"
@@ -92,6 +143,7 @@ class AtlasStore:
         self.points_cache = {}
         for p in self.points:
             self.clusters.setdefault(int(p["cluster"]), []).append(p)
+        for p in self.catalog:
             title = p.get("title", "").lower()
             text = f"{title} {p.get('author', '')} {p.get('genre', '')} {p.get('description', '')}".lower()
             self.search_docs.append((title, text, p))
@@ -147,7 +199,7 @@ class AtlasStore:
         return out
 
     def get_book(self, book_id: str) -> dict | None:
-        return self.point_by_id.get(book_id)
+        return self.books_by_id.get(book_id)
 
     def search(self, query: str, limit: int = 10) -> list[dict]:
         q = query.lower().strip()
@@ -185,7 +237,7 @@ class AtlasStore:
         q = query.lower().strip()
         if not q:
             return []
-        title_set = {p.get("title", "").strip() for p in self.points if p.get("title")}
+        title_set = {p.get("title", "").strip() for p in self.catalog if p.get("title")}
         titles = [t for t in title_set if t]
         prefix = [t for t in titles if t.lower().startswith(q)]
         contains = [t for t in titles if q in t.lower() and not t.lower().startswith(q)]

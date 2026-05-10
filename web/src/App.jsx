@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-const API = 'http://127.0.0.1:8000'
+// prod 
+const API = '/api'
+
+// dev
+// const API = 'http://127.0.0.1:8000'
 const W = 1600
 const H = 900
 const PAD = 120
@@ -63,6 +67,42 @@ function formatAuthors(author) {
 function formatCount(n) {
   if (n == null || Number.isNaN(Number(n))) return 'Unknown'
   return Number(n).toLocaleString()
+}
+
+function formatShortDate(isoDate) {
+  if (!isoDate) return 'Unknown day'
+  const d = new Date(`${isoDate}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return isoDate
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function buildHeatmapGrid(days) {
+  if (!Array.isArray(days) || !days.length) return { columns: [], monthTicks: [] }
+  const byDate = new Map(days.map((d) => [d.date, d]))
+  const start = new Date(`${days[0].date}T00:00:00`)
+  const end = new Date(`${days[days.length - 1].date}T00:00:00`)
+  const startMonday = new Date(start)
+  const shift = (startMonday.getDay() + 6) % 7
+  startMonday.setDate(startMonday.getDate() - shift)
+  const columns = []
+  const monthTicks = []
+  let cursor = new Date(startMonday)
+  while (cursor <= end) {
+    const week = []
+    for (let i = 0; i < 7; i += 1) {
+      const day = new Date(cursor)
+      day.setDate(cursor.getDate() + i)
+      const key = day.toISOString().slice(0, 10)
+      week.push(byDate.get(key) || null)
+    }
+    const monthIdx = week[0] ? new Date(`${week[0].date}T00:00:00`).getMonth() : cursor.getMonth()
+    if (columns.length === 0 || monthIdx !== (columns[columns.length - 1]?.monthIdx)) {
+      monthTicks.push({ monthIdx, col: columns.length })
+    }
+    columns.push({ week, monthIdx })
+    cursor.setDate(cursor.getDate() + 7)
+  }
+  return { columns, monthTicks }
 }
 
 function formatCompactCount(n) {
@@ -223,10 +263,19 @@ export default function App() {
   const [listsQuery, setListsQuery] = useState('')
   const [activeListName, setActiveListName] = useState('all')
   const [readingProgressById, setReadingProgressById] = useState({})
+  const [syncedAllBooks, setSyncedAllBooks] = useState([])
   const [trackerBook, setTrackerBook] = useState(null)
   const [trackerDraft, setTrackerDraft] = useState(null)
   const [trackerSaving, setTrackerSaving] = useState(false)
   const [trackerStatusOpen, setTrackerStatusOpen] = useState(false)
+  const [activeStatsPeriod, setActiveStatsPeriod] = useState('monthly')
+  const [statsByPeriod, setStatsByPeriod] = useState({})
+  const [statsActivity, setStatsActivity] = useState({ days: [], summary: { activeDays: 0, currentStreak: 0, longestStreak: 0, totalPagesYear: 0 } })
+  const [syncingStats, setSyncingStats] = useState(false)
+  const [syncPreviewBooks, setSyncPreviewBooks] = useState([])
+  const [syncSelectedBookIds, setSyncSelectedBookIds] = useState([])
+  const [syncPickerOpen, setSyncPickerOpen] = useState(false)
+  const [applyingSyncSelection, setApplyingSyncSelection] = useState(false)
 
   const [mode, setMode] = useState('genres')
   const [activeGenre, setActiveGenre] = useState(null)
@@ -256,6 +305,17 @@ export default function App() {
     return () => document.removeEventListener('click', onDocClick)
   }, [feedCollectionMenuBookId])
 
+  useEffect(() => {
+    setAddModalBook(null)
+    setFeedCollectionMenuBookId('')
+    setFeedNewCollectionDraft('')
+    setFeedSimilarBookId('')
+    setShowSimilar(false)
+    setSearchDetailBook(null)
+    setSelected(null)
+    setTrackerBook(null)
+  }, [tab])
+
   const refreshReadingLists = async () => {
     const r = await fetch(`${API}/reading-lists`)
     const d = await r.json()
@@ -270,6 +330,21 @@ export default function App() {
     fetch(`${API}/reading-progress`)
       .then((r) => r.json())
       .then((d) => setReadingProgressById(d.entries || {}))
+  }, [])
+
+  const refreshSyncedAllBooks = async () => {
+    try {
+      const r = await fetch(`${API}/my-books`)
+      const d = await r.json()
+      if (!r.ok) return
+      setSyncedAllBooks(d.books || [])
+    } catch {
+      // Best effort only.
+    }
+  }
+
+  useEffect(() => {
+    refreshSyncedAllBooks()
   }, [])
 
   useEffect(() => {
@@ -512,12 +587,6 @@ export default function App() {
     setLikedBookIds((d.book_ids || []).filter(Boolean))
   }
 
-  const addFromFeedMenu = async (listName, bookId) => {
-    await addBookToList(listName, bookId)
-    setFeedCollectionMenuBookId('')
-    setFeedNewCollectionDraft('')
-  }
-
   const loadRecommendations = async (bookId) => {
     if (!bookId) return []
     const r = await fetch(`${API}/recommendations?book_id=${encodeURIComponent(bookId)}`)
@@ -549,17 +618,67 @@ export default function App() {
   const openTracker = (book) => {
     if (!book?.id) return
     const existing = readingProgressById[book.id] || {}
-    const totalPages = Math.max(0, Number(existing.total_pages || getPageCount(book) || 0))
-    const currentPage = Math.max(0, Math.min(Number(existing.current_page || 0), totalPages || Number(existing.current_page || 0)))
+    // Match /my-books merge: stale progress rows (e.g. after a sparse sync) can be all zeros while
+    // Obsidian snapshot on the book still has pages/status — treat that as "no saved progress".
+    const st = String(existing.status || '').toLowerCase()
+    const isDegenerateProgress =
+      (st === 'not_started' || !st) &&
+      !Number(existing.total_pages) &&
+      !Number(existing.current_page)
+    const src = isDegenerateProgress ? {} : existing
+    const totalPages = Math.max(
+      0,
+      Number(
+        src.total_pages ||
+          book.reading_total_pages ||
+          book.total_pages ||
+          getPageCount(book) ||
+          0
+      )
+    )
+    const rawCurrent = Number(
+      src.current_page ||
+        book.reading_current_page ||
+        book.current_page ||
+        0
+    )
+    const currentPage = Math.max(0, Math.min(rawCurrent, totalPages || rawCurrent))
     setTrackerBook(book)
     setTrackerStatusOpen(false)
     setTrackerDraft({
-      status: existing.status || 'not_started',
+      status: src.status || book.reading_status || book.status || 'not_started',
       total_pages: Number.isFinite(totalPages) ? totalPages : 0,
       current_page: Number.isFinite(currentPage) ? currentPage : 0,
-      start_date: toDateInputValue(existing.start_date),
-      finish_date: toDateInputValue(existing.finish_date),
-      notes: existing.notes || ''
+      start_date: toDateInputValue(src.start_date || book.reading_start_date || book.start_date),
+      finish_date: toDateInputValue(src.finish_date || book.reading_finish_date || book.finish_date),
+      notes: src.notes || existing.notes || ''
+    })
+  }
+
+  const normalizeNonNegativeInt = (raw) => {
+    const digits = String(raw ?? '').replace(/[^\d]/g, '')
+    if (!digits) return 0
+    return Number.parseInt(digits, 10)
+  }
+
+  const updateTrackerCurrentPage = (rawValue) => {
+    setTrackerDraft((prev) => {
+      if (!prev) return prev
+      const nextCurrent = normalizeNonNegativeInt(rawValue)
+      const total = Math.max(0, Number(prev.total_pages || 0))
+      const cappedCurrent = total > 0 ? Math.min(nextCurrent, total) : nextCurrent
+      return { ...prev, current_page: cappedCurrent }
+    })
+  }
+
+  const updateTrackerTotalPages = (rawValue) => {
+    setTrackerDraft((prev) => {
+      if (!prev) return prev
+      const nextTotalRaw = normalizeNonNegativeInt(rawValue)
+      const bookTotal = Math.max(0, Number(getPageCount(trackerBook) || 0))
+      const nextTotal = bookTotal > 0 ? Math.min(nextTotalRaw, bookTotal) : nextTotalRaw
+      const nextCurrent = Math.min(Math.max(0, Number(prev.current_page || 0)), nextTotal || Number(prev.current_page || 0))
+      return { ...prev, total_pages: nextTotal, current_page: nextCurrent }
     })
   }
 
@@ -588,6 +707,7 @@ export default function App() {
       return false
     }
     setReadingProgressById(d.entries || {})
+    await refreshSyncedAllBooks()
     return true
   }
 
@@ -674,7 +794,8 @@ export default function App() {
     }
   }
 
-  const getPageLength = (b) => b?.num_pages ?? b?.book_pages ?? b?.pages ?? null
+  const getPageLength = (b) =>
+    b?.num_pages ?? b?.book_pages ?? b?.pages ?? b?.total_pages ?? b?.reading_total_pages ?? null
   const getRatingCount = (b) => parseNumberish(b?.book_rating_count ?? b?.rating_count ?? b?.ratings_count)
   const getAvgRating = (b) => parseNumberish(b?.book_rating ?? b?.average_rating ?? b?.rating)
   const getReviewCount = (b) => parseNumberish(b?.book_review_count ?? b?.review_count ?? b?.reviews_count)
@@ -792,15 +913,7 @@ export default function App() {
     setReadingLists(d.lists || [])
   }
 
-  const allListBooks = useMemo(() => {
-    const m = new Map()
-    for (const list of readingLists) {
-      for (const b of (list.books || [])) {
-        if (!m.has(b.id)) m.set(b.id, b)
-      }
-    }
-    return Array.from(m.values())
-  }, [readingLists])
+  const allListBooks = syncedAllBooks
 
   const visibleLists = useMemo(() => {
     const q = listsQuery.trim().toLowerCase()
@@ -814,6 +927,119 @@ export default function App() {
   }, [readingLists, activeListName])
 
   const visibleBooks = activeList ? (activeList.books || []) : allListBooks
+
+  const statsProfile = {
+    initials: 'ER',
+    name: 'Eshaan Rawat'
+  }
+
+  const emptyStats = { totalBooksRead: 0, totalPagesRead: 0, daysReadStreak: 0, daysRead: 0, daysPassed: 0 }
+
+  const statPeriods = [
+    { key: 'daily', label: 'Daily', data: statsByPeriod.daily || emptyStats },
+    { key: 'monthly', label: 'Monthly', data: statsByPeriod.monthly || emptyStats },
+    { key: 'yearly', label: 'Yearly', data: statsByPeriod.yearly || emptyStats },
+    { key: 'all', label: 'All', data: statsByPeriod.all || emptyStats }
+  ]
+  const activeStatsData = statPeriods.find((period) => period.key === activeStatsPeriod)?.data || emptyStats
+  const heatmapData = useMemo(() => buildHeatmapGrid(statsActivity.days || []), [statsActivity.days])
+
+  const fetchReadingStats = async () => {
+    try {
+      const r = await fetch(`${API}/reading-stats`)
+      const d = await r.json()
+      if (r.ok && d?.periods) {
+        setStatsByPeriod(d.periods)
+        setStatsActivity(d.activity || { days: [], summary: { activeDays: 0, currentStreak: 0, longestStreak: 0, totalPagesYear: 0 } })
+      }
+    } catch {
+      // Keep placeholders if API is unavailable.
+    }
+  }
+
+  const syncStatsFromObsidian = async () => {
+    try {
+      setSyncingStats(true)
+      const r = await fetch(`${API}/sync/obsidian?dry_run=true`, { method: 'POST' })
+      const d = await r.json()
+      if (!r.ok) {
+        showToast(d?.detail || 'Sync failed')
+        return
+      }
+      if (d?.periods) setStatsByPeriod(d.periods)
+      if (d?.activity) setStatsActivity(d.activity)
+      const proposed = (d?.proposed_books || []).filter((b) => b?.id)
+      if (proposed.length) {
+        setSyncPreviewBooks(proposed)
+        setSyncSelectedBookIds(proposed.map((b) => b.id))
+        setSyncPickerOpen(true)
+        showToast(`Review ${proposed.length} proposed books`)
+      } else {
+        showToast('No new books to add')
+      }
+    } catch {
+      showToast('Could not reach sync service')
+    } finally {
+      setSyncingStats(false)
+    }
+  }
+
+  const applySelectedSyncBooks = async () => {
+    try {
+      setApplyingSyncSelection(true)
+      const r = await fetch(`${API}/sync/obsidian/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book_ids: syncSelectedBookIds })
+      })
+      const d = await r.json()
+      if (!r.ok) {
+        showToast(d?.detail || 'Could not apply selected books')
+        return
+      }
+      if (d?.periods) setStatsByPeriod(d.periods)
+      if (d?.activity) setStatsActivity(d.activity)
+      await refreshSyncedAllBooks()
+      setSyncPickerOpen(false)
+      setSyncPreviewBooks([])
+      setSyncSelectedBookIds([])
+      showToast(`Added ${d?.applied_count || 0} books`)
+    } catch {
+      showToast('Could not apply selected books')
+    } finally {
+      setApplyingSyncSelection(false)
+    }
+  }
+
+  const toggleSyncSelection = (bookId) => {
+    setSyncSelectedBookIds((prev) => (
+      prev.includes(bookId) ? prev.filter((id) => id !== bookId) : [...prev, bookId]
+    ))
+  }
+
+  const ignoreBookSuggestion = async (book) => {
+    try {
+      const r = await fetch(`${API}/sync/obsidian/ignore`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: book?.title || '', author: book?.author || '' })
+      })
+      const d = await r.json()
+      if (!r.ok) {
+        showToast(d?.detail || 'Could not ignore this suggestion')
+        return
+      }
+      setSyncPreviewBooks((prev) => prev.filter((x) => x.id !== book.id))
+      setSyncSelectedBookIds((prev) => prev.filter((id) => id !== book.id))
+      showToast('Will not suggest this book again')
+    } catch {
+      showToast('Could not ignore this suggestion')
+    }
+  }
+
+  useEffect(() => {
+    fetchReadingStats()
+  }, [])
 
   const stars = (rating) => {
     const n = Math.max(0, Math.min(5, Math.round(Number(rating || 0))))
@@ -830,6 +1056,54 @@ export default function App() {
     while (taken.has(`collection ${n}`)) n += 1
     return `Collection ${n}`
   }, [readingLists])
+
+  const renderCollectionPicker = ({
+    bookId,
+    draftValue,
+    onDraftChange,
+    onAfterAdd = () => {},
+    onAfterCreate = () => {},
+    title = 'Save to Collection',
+    subtitle = null,
+    rootClassName = 'collectionPickerCard'
+  }) => (
+    <div className={rootClassName} onClick={(e) => e.stopPropagation()}>
+      <div className="collectionPickerHeader">{title}</div>
+      {subtitle && <div className="collectionPickerSub">{subtitle}</div>}
+      <div className="collectionPickerList">
+        {readingLists.map((list) => (
+          <button
+            key={`picker-add-${bookId}-${list.name}`}
+            onClick={async () => {
+              await addBookToList(list.name, bookId, true)
+              onAfterAdd()
+            }}
+          >
+            {list.name}
+          </button>
+        ))}
+        {!readingLists.length && <div className="emptyList">No collections yet. Create one below.</div>}
+      </div>
+      <div className="collectionPickerCreate">
+        <input
+          value={draftValue}
+          onChange={(e) => onDraftChange(e.target.value)}
+          placeholder={nextCollectionName}
+        />
+        <button
+          onClick={async () => {
+            const name = (draftValue || nextCollectionName).trim()
+            if (!name) return
+            await createReadingList(name, bookId)
+            onAfterCreate()
+          }}
+          aria-label="Create collection"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  )
 
   useEffect(() => {
     if (tab !== 'feed') return
@@ -899,6 +1173,15 @@ export default function App() {
             </span>
             <span>Liked</span>
           </button>
+          <button className={`menuTab ${tab === 'stats' ? 'active' : ''}`} onClick={() => setTab('stats')}>
+            <span className="appleIcon" aria-hidden>
+              <svg className="appleIconSvg" viewBox="0 0 24 24" fill="none">
+                <path d="M5 18V9.5M12 18V6M19 18v-4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                <path d="M3.5 18.5h17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+              </svg>
+            </span>
+            <span>Stats</span>
+          </button>
         </div>
         <div className="appleSectionTitle collectionsHeader">My Collections</div>
         <div className="appleCollections">
@@ -913,7 +1196,7 @@ export default function App() {
                   <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </span>
-              <span>All Books</span>
+              <span>My Books</span>
             </span>
             <span className="collectionActions">
               <span>{allListBooks.length}</span>
@@ -1221,7 +1504,7 @@ export default function App() {
               const pageCount = getPageCount(b)
               return (
               <section key={b.id || `${b.title}-${idx}`} className="feedItem feedItemFull">
-                <article className={`feedTikTokCard feedCardFull ${b.image_url ? 'hasImage' : ''} ${feedSimilarBookId === b.id ? 'similarOpen' : ''}`}>
+                <article className={`feedTikTokCard feedCardFull ${b.image_url ? 'hasImage' : ''} ${feedSimilarBookId === b.id ? 'similarOpen' : ''} ${feedCollectionMenuBookId === b.id ? 'collectionOpen' : ''}`}>
                   {b.image_url && <img className="feedPosterImg feedPosterImgFull" src={b.image_url} alt="" loading="lazy" />}
                   <div className="feedCardGradientFull" />
 
@@ -1280,35 +1563,6 @@ export default function App() {
                           <path d="M7 3h10a1 1 0 0 1 1 1v17l-6-3-6 3V4a1 1 0 0 1 1-1Z" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </button>
-                      {feedCollectionMenuBookId === b.id && (
-                        <div className="collectionDropdown collectionDropdownModern">
-                          <div className="collectionDropdownHeader">Save to Collection</div>
-                          <div className="collectionDropdownList">
-                            {readingLists.map((list) => (
-                              <button key={`feed-add-${b.id}-${list.name}`} onClick={() => addFromFeedMenu(list.name, b.id)}>
-                                {list.name}
-                              </button>
-                            ))}
-                          </div>
-                          <div className="collectionDropdownCreate">
-                            <input
-                              value={feedNewCollectionDraft}
-                              onChange={(e) => setFeedNewCollectionDraft(e.target.value)}
-                              placeholder={nextCollectionName}
-                            />
-                            <button
-                              onClick={async () => {
-                                const name = (feedNewCollectionDraft || nextCollectionName).trim()
-                                await createReadingList(name, b.id)
-                                setFeedCollectionMenuBookId('')
-                                setFeedNewCollectionDraft('')
-                              }}
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                      )}
                     </div>
                     <div className="feedActionBtn">
                       <button
@@ -1322,6 +1576,21 @@ export default function App() {
                       </button>
                     </div>
                   </div>
+
+                  {feedCollectionMenuBookId === b.id && renderCollectionPicker({
+                    bookId: b.id,
+                    draftValue: feedNewCollectionDraft,
+                    onDraftChange: setFeedNewCollectionDraft,
+                    onAfterAdd: () => {
+                      setFeedCollectionMenuBookId('')
+                      setFeedNewCollectionDraft('')
+                    },
+                    onAfterCreate: () => {
+                      setFeedCollectionMenuBookId('')
+                      setFeedNewCollectionDraft('')
+                    },
+                    rootClassName: 'collectionPickerCard feedCollectionPanel'
+                  })}
 
                   {feedSimilarBookId === b.id && (
                     <div className="feedSimilarDrawer feedSimilarDrawerModern">
@@ -1530,7 +1799,7 @@ export default function App() {
             <section className="listsContent">
               <div className="listsTopBar">
                 <div>
-                  <h2>{activeList ? activeList.name : 'All Books'}</h2>
+                  <h2>{activeList ? activeList.name : 'My Books'}</h2>
                 </div>
                 <div className="listsActions">
                   <div className="listsTotalBooks">{visibleBooks.length} books</div>
@@ -1556,27 +1825,215 @@ export default function App() {
         </div>
       )}
 
+      {tab === 'stats' && (
+        <div className="statsShell">
+          <section className="statsSection">
+            <header className="statsHeader">
+              <div className="statsIdentity">
+                <div className="statsAvatar" aria-hidden>{statsProfile.initials}</div>
+                <div>
+                  <h2>{statsProfile.name}</h2>
+                </div>
+              </div>
+              <button
+                className="statsSyncBtn"
+                type="button"
+                aria-label="Sync stats"
+                onClick={syncStatsFromObsidian}
+                disabled={syncingStats}
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <path d="M12 6V3L8 7l4 4V8c2.76 0 5 2.24 5 5 0 1.01-.3 1.95-.82 2.74l1.46 1.46A6.96 6.96 0 0 0 19 13c0-3.87-3.13-7-7-7Zm-5.18.26L5.36 4.8A6.96 6.96 0 0 0 5 8c0 3.87 3.13 7 7 7v3l4-4-4-4v3c-2.76 0-5-2.24-5-5 0-.63.12-1.23.34-1.74Z"/>
+                </svg>
+                <span>{syncingStats ? 'Syncing...' : 'Sync'}</span>
+              </button>
+            </header>
+            <div className="statsPeriods">
+              <div className="statsTabs" role="tablist" aria-label="Stats period">
+                {statPeriods.map((period) => (
+                  <button
+                    key={period.key}
+                    role="tab"
+                    aria-selected={activeStatsPeriod === period.key}
+                    className={`statsTab ${activeStatsPeriod === period.key ? 'active' : ''}`}
+                    onClick={() => setActiveStatsPeriod(period.key)}
+                  >
+                    {period.label}
+                  </button>
+                ))}
+              </div>
+              <article className="statsPeriodCard">
+                <div className="statsPeriodTitle">{statPeriods.find((p) => p.key === activeStatsPeriod)?.label || 'Monthly'}</div>
+                <div className="statsGrid">
+                  <div className="statTile">
+                    <div className="statIcon books" aria-hidden>
+                      <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 1 2-2h14V4a2 2 0 0 0-2-2Zm0 14H6V4h12v12Z"/>
+                      </svg>
+                    </div>
+                    <div className="statValue">{formatCount(activeStatsData.totalBooksRead)}</div>
+                    <div className="statLabel">Total Books Read</div>
+                  </div>
+                  <div className="statTile">
+                    <div className="statIcon pages" aria-hidden>
+                      <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M21 3H7a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14V3Zm-2 12H9v-2h10v2Zm0-3H9v-2h10v2Zm0-3H9V7h10v2ZM3 5v16a2 2 0 0 1-2-2V5h2Z"/>
+                      </svg>
+                    </div>
+                    <div className="statValue">{formatCount(activeStatsData.totalPagesRead)}</div>
+                    <div className="statLabel">Pages Read</div>
+                  </div>
+                  <div className="statTile">
+                    <div className="statIcon streak" aria-hidden>
+                      <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M13.5 2s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73L7.23 6A8.9 8.9 0 0 0 4 12.03C4 16.43 7.58 20 12 20s8-3.57 8-7.97C20 7.9 17.2 4.29 13.5 2ZM12 18a4 4 0 0 1-4-4c0-1.57.88-2.91 2.17-3.58 0 0 .59 1.11 2.01 1.11 1.26 0 1.85-.81 1.85-.81A4.02 4.02 0 0 1 16 14a4 4 0 0 1-4 4Z"/>
+                      </svg>
+                    </div>
+                    <div className="statValue">{formatCount(activeStatsData.daysReadStreak)}</div>
+                    <div className="statLabel">Day Read Streak</div>
+                  </div>
+                  <div className="statTile">
+                    <div className="statIcon days" aria-hidden>
+                      <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 3h-1V1h-2v2H8V1H6v2H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Zm0 16H5V10h14v9Zm-9.3-1.7 5.6-5.6-1.4-1.4-4.2 4.2-1.9-1.9-1.4 1.4 3.3 3.3Z"/>
+                      </svg>
+                    </div>
+                    <div className="statValue">{formatCount(activeStatsData.daysRead)} / {formatCount(activeStatsData.daysPassed)}</div>
+                    <div className="statLabel">Days Read</div>
+                  </div>
+                </div>
+                <section className="statsActivityCard">
+                  <div className="statsActivityHead">
+                    <div>
+                      <h3>Reading Activity</h3>
+                      <p>{formatCount(statsActivity?.summary?.activeDays || 0)} active days in the past year</p>
+                    </div>
+                    <div className="statsActivityStreak">
+                      <strong>{formatCount(statsActivity?.summary?.currentStreak || 0)} day streak</strong>
+                    </div>
+                  </div>
+                  <div className="statsHeatmapWrap">
+                    <div className="statsHeatmapMonths">
+                      {heatmapData.monthTicks.map((tick) => (
+                        <span key={`m-${tick.col}`} style={{ gridColumn: `${tick.col + 1}` }}>
+                          {new Date(new Date().getFullYear(), tick.monthIdx, 1).toLocaleString(undefined, { month: 'short' })}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="statsHeatmapBody">
+                      <div className="statsHeatmapWeekdays">
+                        <span>Mon</span>
+                        <span>Wed</span>
+                        <span>Fri</span>
+                      </div>
+                      <div className="statsHeatmapGrid">
+                        {heatmapData.columns.map((col, colIdx) => (
+                          <div key={`col-${colIdx}`} className="statsHeatmapCol">
+                            {col.week.map((day, rowIdx) => {
+                              const level = day?.intensityLevel || 0
+                              return (
+                                <div
+                                  key={`cell-${colIdx}-${rowIdx}`}
+                                  className={`statsHeatmapCell l${level} ${day ? '' : 'empty'}`}
+                                  title={day
+                                    ? `${formatShortDate(day.date)}: ${formatCount(day.pagesRead)} pages, ${formatCount(day.booksCompleted)} completed`
+                                    : 'Outside range'}
+                                />
+                              )
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="statsHeatmapLegend">
+                      <span>Less</span>
+                      <i className="statsHeatmapCell l0" />
+                      <i className="statsHeatmapCell l1" />
+                      <i className="statsHeatmapCell l2" />
+                      <i className="statsHeatmapCell l3" />
+                      <i className="statsHeatmapCell l4" />
+                      <i className="statsHeatmapCell l5" />
+                      <span>More</span>
+                    </div>
+                  </div>
+                </section>
+              </article>
+            </div>
+          </section>
+        </div>
+      )}
+
       {addModalBook && (
         <div className="addListLayer">
           <div className="addListBackdrop" onClick={() => setAddModalBook(null)} />
-          <div className="addListModal">
-            <div className="addListTitle">Add "{addModalBook.title}"</div>
-            <div className="addListSub">Select a collection or create a new one.</div>
-            <div className="addListButtons">
-              {readingLists.map((list) => (
-                <button key={list.name} onClick={() => addBookToList(list.name, addModalBook.id)}>
-                  {list.name}
-                </button>
-              ))}
-              {!readingLists.length && <div className="emptyList">No collections yet. Create one below.</div>}
+          {renderCollectionPicker({
+            bookId: addModalBook.id,
+            draftValue: listDraftByName,
+            onDraftChange: setListDraftByName,
+            onAfterAdd: () => setAddModalBook(null),
+            onAfterCreate: () => setAddModalBook(null),
+            title: `Add "${addModalBook.title}"`,
+            subtitle: 'Select a collection or create a new one.',
+            rootClassName: 'collectionPickerCard addListModal'
+          })}
+        </div>
+      )}
+      {syncPickerOpen && (
+        <div className="addListLayer">
+          <div
+            className="addListBackdrop"
+            onClick={() => {
+              if (applyingSyncSelection) return
+              setSyncPickerOpen(false)
+            }}
+          />
+          <div className="syncPickerModal">
+            <div className="syncPickerHead">
+              <h3>Review Proposed Books</h3>
+              <p>Deselect any books already present. All are selected by default.</p>
             </div>
-            <div className="addListCreate">
-              <input
-                value={listDraftByName}
-                onChange={(e) => setListDraftByName(e.target.value)}
-                placeholder="New collection name"
-              />
-              <button onClick={() => createReadingList(listDraftByName, addModalBook.id)}>Create + Add</button>
+            <div className="syncPickerList">
+              {syncPreviewBooks.map((book) => (
+                <label key={`sync-pick-${book.id}`} className="syncPickerRow">
+                  <input
+                    type="checkbox"
+                    checked={syncSelectedBookIds.includes(book.id)}
+                    onChange={() => toggleSyncSelection(book.id)}
+                    disabled={applyingSyncSelection}
+                  />
+                  <span className="syncPickerMeta">
+                    <strong>{book.title || 'Untitled'}</strong>
+                    <em>{book.author || 'Unknown author'}</em>
+                  </span>
+                  <button
+                    type="button"
+                    className="syncPickerIgnoreBtn"
+                    onClick={() => ignoreBookSuggestion(book)}
+                    disabled={applyingSyncSelection}
+                    title="Don't suggest in the future"
+                    aria-label={`Don't suggest ${book.title || 'this book'} in the future`}
+                  >
+                    ×
+                  </button>
+                </label>
+              ))}
+              {!syncPreviewBooks.length && <div className="emptyList">No proposed books found.</div>}
+            </div>
+            <div className="syncPickerActions">
+              <button
+                className="syncPickerCancel"
+                onClick={() => setSyncPickerOpen(false)}
+                disabled={applyingSyncSelection}
+              >
+                Cancel
+              </button>
+              <button
+                className="syncPickerApply"
+                onClick={applySelectedSyncBooks}
+                disabled={applyingSyncSelection || !syncSelectedBookIds.length}
+              >
+                {applyingSyncSelection ? 'Applying...' : `Add Selected (${syncSelectedBookIds.length})`}
+              </button>
             </div>
           </div>
         </div>
@@ -1585,123 +2042,106 @@ export default function App() {
         <div className="readTrackerLayer">
           <div className="addListBackdrop" onClick={closeTracker} />
           <div className="readTrackerModal">
-            <button className="searchDetailClose" onClick={closeTracker} aria-label="Close tracker">×</button>
-            <div className="readTrackerHead">
+
+            {/* Blurred artwork background */}
+            {trackerBook.image_url && (
+              <img className="readTrackerBg" src={trackerBook.image_url} alt="" aria-hidden />
+            )}
+            <div className="readTrackerScrim" />
+
+            <button className="readTrackerClose" onClick={closeTracker} aria-label="Close">
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
+              </svg>
+            </button>
+
+            {/* Left — cover */}
+            <div className="readTrackerLeft">
               <div className="readTrackerCover">
-                {trackerBook.image_url ? <img src={trackerBook.image_url} alt="" loading="lazy" /> : <div className="listBookImageFallback" />}
+                {trackerBook.image_url
+                  ? <img src={trackerBook.image_url} alt="" loading="lazy" />
+                  : <div className="listBookImageFallback" />}
               </div>
-              <div className="readTrackerTitleBlock">
-                <h3>{trackerBook.title || 'Untitled'}</h3>
-                <p>{formatAuthors(trackerBook.author) || 'Unknown author'}</p>
-                <div className="readTrackerMiniProgress">
-                  <div
-                    className="readTrackerRing"
-                    style={{
-                      '--pct': `${Math.max(
-                        0,
-                        Math.min(
-                          100,
-                          trackerDraft.total_pages > 0 ? (trackerDraft.current_page / trackerDraft.total_pages) * 100 : 0
-                        )
-                      )}%`
-                    }}
-                  >
-                    <span>
-                      {Math.max(
-                        0,
-                        Math.min(
-                          100,
-                          Math.round(trackerDraft.total_pages > 0 ? (trackerDraft.current_page / trackerDraft.total_pages) * 100 : 0)
-                        )
-                      )}
-                      %
-                    </span>
-                  </div>
-                  <div className="readTrackerMiniProgressText">
-                    <strong>{trackerDraft.current_page} of {trackerDraft.total_pages || 0}</strong>
-                    <span>pages read</span>
-                  </div>
+
+              {/* Progress arc */}
+              <div className="readTrackerRingWrap">
+                <div className="readTrackerRing" style={{
+                  '--pct': `${Math.max(0, Math.min(100, trackerDraft.total_pages > 0
+                    ? (trackerDraft.current_page / trackerDraft.total_pages) * 100 : 0))}%`
+                }}>
+                  <span>
+                    {Math.max(0, Math.min(100, Math.round(trackerDraft.total_pages > 0
+                      ? (trackerDraft.current_page / trackerDraft.total_pages) * 100 : 0)))}%
+                  </span>
+                </div>
+                <div className="readTrackerRingLabel">
+                  <strong>{trackerDraft.current_page}<em> / {trackerDraft.total_pages || '–'}</em></strong>
+                  <span>pages read</span>
                 </div>
               </div>
             </div>
-            <div className="readTrackerRule" />
-            <div className="readTrackerStatusWrap">
-              <button
-                className="readTrackerStatusBtn"
-                onClick={() => setTrackerStatusOpen((v) => !v)}
-                aria-expanded={trackerStatusOpen}
-              >
-                <span className="readTrackerStatusIcon" aria-hidden>
-                  <span className={`readTrackerStatusDot ${trackerDraft.status}`} />
-                </span>
-                <span>
-                  {trackerDraft.status === 'done' ? 'Finished' : trackerDraft.status === 'reading' ? 'Currently Reading' : 'Want to Read'}
-                </span>
-                <span className={`readTrackerStatusChevron ${trackerStatusOpen ? 'open' : ''}`} aria-hidden>
-                  <svg viewBox="0 0 20 20">
-                    <path d="M5 8l5 5 5-5" />
-                  </svg>
-                </span>
-              </button>
-              {trackerStatusOpen && (
-                <div className="readTrackerStatusMenu">
-                  <button onClick={() => { setTrackerDraft((prev) => ({ ...prev, status: 'not_started' })); setTrackerStatusOpen(false) }}>
-                    <span className="readTrackerMenuLabel">Want to Read</span>{trackerDraft.status === 'not_started' && <span>✓</span>}
-                  </button>
-                  <button onClick={() => { setTrackerDraft((prev) => ({ ...prev, status: 'reading' })); setTrackerStatusOpen(false) }}>
-                    <span className="readTrackerMenuLabel">Currently Reading</span>{trackerDraft.status === 'reading' && <span>✓</span>}
-                  </button>
-                  <button onClick={() => { setTrackerDraft((prev) => ({ ...prev, status: 'done' })); setTrackerStatusOpen(false) }}>
-                    <span className="readTrackerMenuLabel">Finished</span>{trackerDraft.status === 'done' && <span>✓</span>}
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className="readTrackerGrid">
-              <label>
-                <span>Current Page</span>
-                <input
-                  type="number"
-                  min="0"
-                  max={trackerDraft.total_pages || undefined}
-                  value={trackerDraft.current_page}
-                  onChange={(e) => setTrackerDraft((prev) => ({ ...prev, current_page: Number(e.target.value || 0) }))}
-                />
-              </label>
-              <label>
-                <span>Total Pages</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={trackerDraft.total_pages}
-                  onChange={(e) => setTrackerDraft((prev) => ({ ...prev, total_pages: Number(e.target.value || 0) }))}
-                />
-              </label>
-              <label>
-                <span>Started</span>
-                <input
-                  type="date"
-                  value={trackerDraft.start_date}
-                  onChange={(e) => setTrackerDraft((prev) => ({ ...prev, start_date: e.target.value }))}
-                />
-              </label>
-              <label>
-                <span>Finished</span>
-                <input
-                  type="date"
-                  value={trackerDraft.finish_date}
-                  onChange={(e) => setTrackerDraft((prev) => ({ ...prev, finish_date: e.target.value }))}
-                />
+
+            {/* Right — info + form */}
+            <div className="readTrackerRight">
+              <div className="readTrackerMeta">
+                <h3 className="readTrackerTitle">{trackerBook.title || 'Untitled'}</h3>
+                <p className="readTrackerAuthor">{formatAuthors(trackerBook.author) || 'Unknown author'}</p>
+              </div>
+
+              {/* Status select */}
+              <div className="readTrackerSelectWrap">
+                <select
+                  className="readTrackerSelect"
+                  value={trackerDraft.status}
+                  onChange={(e) => setTrackerDraft((prev) => ({ ...prev, status: e.target.value }))}
+                >
+                  <option value="not_started">Want to Read</option>
+                  <option value="reading">Currently Reading</option>
+                  <option value="done">Finished</option>
+                </select>
+                <span className={`readTrackerStatusDot ${trackerDraft.status}`} />
+              </div>
+
+              {/* Stat rows */}
+              <div className="readTrackerRows">
+                <label className="readTrackerRow">
+                  <span className="readTrackerRowLabel">Progress</span>
+                  <div className="readTrackerPagePair">
+                    <input className="readTrackerRowInput" type="number" min="0"
+                      max={trackerDraft.total_pages || undefined}
+                      value={trackerDraft.current_page}
+                      onChange={(e) => updateTrackerCurrentPage(e.target.value)} />
+                    <span className="readTrackerPageSep">/</span>
+                    <input className="readTrackerRowInput" type="number" min="0"
+                      max={getPageCount(trackerBook) || undefined}
+                      value={trackerDraft.total_pages}
+                      onChange={(e) => updateTrackerTotalPages(e.target.value)} />
+                    <span className="readTrackerPageUnit">pages</span>
+                  </div>
+                </label>
+                <label className="readTrackerRow readTrackerRowDates">
+                  <div className="readTrackerDatePair">
+                    <span className="readTrackerDateLabel">Start</span>
+                    <input className="readTrackerRowInput" type="date"
+                      value={trackerDraft.start_date}
+                      onChange={(e) => setTrackerDraft((prev) => ({ ...prev, start_date: e.target.value }))} />
+                    <span className="readTrackerDateLabel">End</span>
+                    <input className="readTrackerRowInput" type="date"
+                      value={trackerDraft.finish_date}
+                      onChange={(e) => setTrackerDraft((prev) => ({ ...prev, finish_date: e.target.value }))} />
+                  </div>
+                </label>
+              </div>
+
+              <label className="readTrackerNotes">
+                <span className="readTrackerRowLabel">Notes</span>
+                <textarea
+                  value={trackerDraft.notes}
+                  onChange={(e) => setTrackerDraft((prev) => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Write your thoughts here…" />
               </label>
             </div>
-            <label className="readTrackerNotes">
-              <span>Notes</span>
-              <textarea
-                value={trackerDraft.notes}
-                onChange={(e) => setTrackerDraft((prev) => ({ ...prev, notes: e.target.value }))}
-                placeholder="Write your thoughts here..."
-              />
-            </label>
+
           </div>
         </div>
       )}
