@@ -7,13 +7,13 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
-ARTIFACTS = ROOT / "artifacts"
-RAW_DATA = ROOT / "data" / "raw"
-USER_DATA = ROOT / "user_data"
+RUNTIME_CATALOG = ROOT / "data" / "runtime" / "catalog"
+RUNTIME_VECTOR = ROOT / "data" / "runtime" / "vector"
 
 
 class AtlasStore:
     def __init__(self) -> None:
+        self._artifact_stamp: tuple[float, float, float] = (0.0, 0.0, 0.0)
         self.points: list[dict] = []
         self.point_by_id: dict[str, dict] = {}
         self.books_by_id: dict[str, dict] = {}
@@ -30,6 +30,25 @@ class AtlasStore:
     def reload(self) -> None:
         self._load()
 
+    @staticmethod
+    def _mtime_or_zero(path: Path) -> float:
+        try:
+            return float(path.stat().st_mtime)
+        except Exception:
+            return 0.0
+
+    def _current_artifact_stamp(self) -> tuple[float, float, float]:
+        return (
+            self._mtime_or_zero(RUNTIME_CATALOG / "books_globe.json"),
+            self._mtime_or_zero(RUNTIME_VECTOR / "book_ids.npy"),
+            self._mtime_or_zero(RUNTIME_VECTOR / "embeddings.npy"),
+        )
+
+    def _maybe_reload(self) -> None:
+        stamp = self._current_artifact_stamp()
+        if stamp != self._artifact_stamp:
+            self._load()
+
     def _load(self) -> None:
         self.points = []
         self.point_by_id = {}
@@ -43,56 +62,26 @@ class AtlasStore:
         self.embeddings = None
         self.faiss_index = None
 
-        points_path = ARTIFACTS / "books_globe.json"
+        points_path = RUNTIME_CATALOG / "books_globe.json"
         if points_path.exists():
             with points_path.open("r", encoding="utf-8") as f:
                 payload = json.load(f)
             self.points = payload.get("points", [])
-            self._hydrate_point_metadata()
             self.point_by_id = {p["id"]: p for p in self.points}
 
         self.books_by_id = dict(self.point_by_id)
-        obsidian_books_path = USER_DATA / "obsidian_books.json"
-        if obsidian_books_path.exists():
-            try:
-                with obsidian_books_path.open("r", encoding="utf-8") as f:
-                    obsidian_payload = json.load(f)
-                books = (obsidian_payload or {}).get("books", {})
-                if isinstance(books, dict):
-                    for book_id, row in books.items():
-                        if not book_id or not isinstance(row, dict):
-                            continue
-                        normalized = {
-                            "id": str(book_id),
-                            "title": row.get("title") or str(book_id),
-                            "author": row.get("author") or "",
-                            "description": row.get("description") or "",
-                            "genre": (
-                                row.get("genre")
-                                or ((row.get("genres") or ["unknown"])[0] if isinstance(row.get("genres"), list) else (row.get("genres") or "unknown"))
-                            ),
-                            "genres": row.get("genres") if isinstance(row.get("genres"), list) else [],
-                            "image_url": row.get("image_url") or "",
-                            "book_rating": row.get("book_rating"),
-                            "book_rating_count": row.get("book_rating_count"),
-                            "book_review_count": row.get("book_review_count"),
-                            "book_pages": row.get("total_pages") or 0,
-                        }
-                        self.books_by_id[str(book_id)] = normalized
-            except Exception:
-                pass
 
         self.catalog = list(self.books_by_id.values())
         self._build_point_indexes()
 
-        ids_path = ARTIFACTS / "book_ids.npy"
-        emb_path = ARTIFACTS / "embeddings.npy"
+        ids_path = RUNTIME_VECTOR / "book_ids.npy"
+        emb_path = RUNTIME_VECTOR / "embeddings.npy"
         if ids_path.exists() and emb_path.exists():
             self.ids = np.load(ids_path, allow_pickle=True).tolist()
             self.id_to_index = {book_id: i for i, book_id in enumerate(self.ids)}
             self.embeddings = np.load(emb_path).astype(np.float32)
 
-        faiss_path = ARTIFACTS / "books.faiss"
+        faiss_path = RUNTIME_VECTOR / "books.faiss"
         if faiss_path.exists():
             try:
                 import faiss
@@ -100,42 +89,11 @@ class AtlasStore:
                 self.faiss_index = faiss.read_index(str(faiss_path))
             except Exception:
                 self.faiss_index = None
+        self._artifact_stamp = self._current_artifact_stamp()
 
     def has_data(self) -> bool:
+        self._maybe_reload()
         return bool(self.points)
-
-    def _hydrate_point_metadata(self) -> None:
-        if not self.points:
-            return
-        raw_path = RAW_DATA / "books_from_csv.jsonl"
-        if not raw_path.exists():
-            raw_path = RAW_DATA / "sample_books.jsonl"
-        if not raw_path.exists():
-            return
-
-        extra_by_id: dict[str, dict] = {}
-        with raw_path.open("r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    row = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                book_id = row.get("id")
-                if not book_id:
-                    continue
-                extra_by_id[book_id] = row
-
-        for p in self.points:
-            src = extra_by_id.get(p.get("id"))
-            if not src:
-                continue
-            p["book_rating"] = src.get("book_rating")
-            p["book_rating_count"] = src.get("book_rating_count")
-            p["book_review_count"] = src.get("book_review_count")
-            p["book_pages"] = src.get("book_pages")
 
     def _build_point_indexes(self) -> None:
         self.clusters = {}
@@ -156,6 +114,7 @@ class AtlasStore:
         return [items[int(i * step)] for i in range(target)]
 
     def points_for_zoom(self, zoom: str, max_points: int = 12000) -> list[dict]:
+        self._maybe_reload()
         cache_key = (zoom, max_points)
         if cache_key in self.points_cache:
             return self.points_cache[cache_key]
@@ -199,9 +158,11 @@ class AtlasStore:
         return out
 
     def get_book(self, book_id: str) -> dict | None:
+        self._maybe_reload()
         return self.books_by_id.get(book_id)
 
     def search(self, query: str, limit: int = 10) -> list[dict]:
+        self._maybe_reload()
         q = query.lower().strip()
         if not q:
             return []
@@ -234,6 +195,7 @@ class AtlasStore:
         return out
 
     def suggest_titles(self, query: str, limit: int = 8) -> list[str]:
+        self._maybe_reload()
         q = query.lower().strip()
         if not q:
             return []
@@ -255,6 +217,7 @@ class AtlasStore:
         return merged
 
     def recommend(self, book_id: str, limit: int = 5) -> list[dict]:
+        self._maybe_reload()
         if self.embeddings is None or book_id not in self.id_to_index:
             return []
 
@@ -272,6 +235,7 @@ class AtlasStore:
         return [self.point_by_id[n] for n in neighbors if n in self.point_by_id]
 
     def random_cluster_point(self) -> dict | None:
+        self._maybe_reload()
         if not self.points:
             return None
 

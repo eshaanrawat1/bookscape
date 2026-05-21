@@ -5,6 +5,8 @@ import re
 import unicodedata
 from pathlib import Path
 
+import yaml
+
 from .common import DATA_PROCESSED, PipelineStats, read_jsonl, write_jsonl
 from .genres import load_genre_keywords, normalize_or_infer_genre
 
@@ -28,27 +30,11 @@ NON_ENGLISH_MARKERS = (
     "français",
     "deutsch",
     "italiano",
-    "рус",
 )
 
 EN_STOPWORDS = {
     "the", "and", "to", "of", "in", "a", "for", "is", "on", "with", "that", "as",
     "her", "his", "she", "he", "their", "this", "from", "at", "by", "an", "be",
-}
-
-NON_EN_STOPWORDS = {
-    # Dutch / Afrikaans
-    "de", "het", "een", "en", "van", "voor", "met", "op", "in", "te", "zijn",
-    # Spanish / Portuguese
-    "el", "la", "los", "las", "una", "un", "con", "para", "por", "que", "como",
-    "mais", "uma", "dos", "das",
-    # French / German / Italian
-    "les", "des", "une", "dans", "und", "der", "die", "das", "mit", "per", "che",
-}
-
-DUTCH_STRONG_MARKERS = {
-    "heeft", "maar", "samen", "ooit", "meer", "zijn", "haar", "hun", "komt", "arena",
-    "regels", "winnaar", "district",
 }
 
 
@@ -108,26 +94,54 @@ def likely_non_english_entry(title: str, desc: str) -> bool:
         if non_ascii >= 1:
             return True
 
-    # Description-level language heuristic (stronger than title for latin-script languages).
+    # Description-level language heuristic: require some English glue words in larger samples.
     d_norm = normalize_token(d)
     tokens = [w for w in d_norm.split() if len(w) >= 2]
     if tokens:
         en_hits = sum(1 for w in tokens if w in EN_STOPWORDS)
-        non_en_hits = sum(1 for w in tokens if w in NON_EN_STOPWORDS)
-        dutch_hits = sum(1 for w in tokens if w in DUTCH_STRONG_MARKERS)
         sample = min(len(tokens), 120)
-        # If a decent sample has almost no English glue words but many non-English glue words,
-        # treat as non-English description.
-        if sample >= 25 and en_hits <= max(1, int(sample * 0.01)) and non_en_hits >= max(3, int(sample * 0.04)):
-            return True
-        # Strong Dutch lexical signal (helps cases like "Vlammen").
-        if sample >= 25 and dutch_hits >= 4:
+        if sample >= 25 and en_hits <= max(1, int(sample * 0.01)):
             return True
     return False
 
 
+def load_subgenre_taxonomy(path: Path | None = None) -> dict[str, dict[str, list[str]]]:
+    file_path = path or Path(__file__).resolve().parents[1] / "config" / "subgenre_taxonomy.yaml"
+    with file_path.open("r", encoding="utf-8") as f:
+        raw = yaml.safe_load(f) or {}
+    out: dict[str, dict[str, list[str]]] = {}
+    for genre, sub_map in raw.items():
+        if not isinstance(sub_map, dict):
+            continue
+        out[str(genre)] = {str(sub): [str(x).lower() for x in (words or [])] for sub, words in sub_map.items()}
+    return out
+
+
+def infer_subgenre(genre: str, title: str, description: str, taxonomy: dict[str, dict[str, list[str]]]) -> str:
+    sub_map = taxonomy.get(genre, {})
+    if not sub_map:
+        return "general"
+    text = f"{title or ''} {description or ''}".lower()
+    best_name = "general"
+    best_score = 0
+    for subgenre, keywords in sub_map.items():
+        score = 0
+        for kw in keywords:
+            if not kw:
+                continue
+            if re.search(rf"\b{re.escape(kw)}\b", text):
+                score += 2
+            elif kw in text:
+                score += 1
+        if score > best_score:
+            best_score = score
+            best_name = subgenre
+    return best_name if best_score > 0 else "general"
+
+
 def preprocess(rows: list[dict]) -> tuple[list[dict], PipelineStats]:
     genre_keywords = load_genre_keywords()
+    subgenre_taxonomy = load_subgenre_taxonomy()
     staged: list[dict] = []
 
     for row in rows:
@@ -141,6 +155,7 @@ def preprocess(rows: list[dict]) -> tuple[list[dict], PipelineStats]:
         genre = normalize_or_infer_genre(row.get("genres"), description, genre_keywords)
         if not genre:
             continue
+        subgenre = infer_subgenre(genre, title, description, subgenre_taxonomy)
 
         # Global language gate: remove clearly non-English entries even when no close duplicate exists.
         if likely_non_english_entry(title, description):
@@ -153,6 +168,7 @@ def preprocess(rows: list[dict]) -> tuple[list[dict], PipelineStats]:
                 "author": author,
                 "description": description,
                 "genre": genre,
+                "subgenre": subgenre,
                 "book_pages": row.get("book_pages"),
                 "book_rating": row.get("book_rating"),
                 "book_rating_count": row.get("book_rating_count"),

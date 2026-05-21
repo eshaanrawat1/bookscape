@@ -11,12 +11,10 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 DATA_RAW = ROOT / "data" / "raw"
 DATA_PROCESSED = ROOT / "data" / "processed"
-ARTIFACTS = ROOT / "artifacts"
-
-
-def ensure_dirs() -> None:
-    DATA_PROCESSED.mkdir(parents=True, exist_ok=True)
-    ARTIFACTS.mkdir(parents=True, exist_ok=True)
+DATA_RUNTIME = ROOT / "data" / "runtime"
+DATA_BUILD = ROOT / "data" / "build"
+RUNTIME_CATALOG = DATA_RUNTIME / "catalog"
+RUNTIME_VECTOR = DATA_RUNTIME / "vector"
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:

@@ -2720,9 +2720,75 @@ h1 {
 }
 
 .coverOnlyCard .listBookImageWrap {
+  position: relative;
+  overflow: hidden;
   height: 280px;
   border-radius: 6px;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+.myBooksManageCard {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.myBookManageBtn {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  height: 34px;
+  border-radius: 11px;
+  border: 0;
+  background: rgba(20, 24, 32, 0.22);
+  backdrop-filter: blur(10px) saturate(1.02);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0 10px;
+  text-align: center;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  transition: opacity 160ms ease, background 160ms ease;
+  opacity: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.myBookLinkedBadge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  height: 22px;
+  border-radius: 999px;
+  padding: 0 9px;
+  border: 1px solid rgba(155, 231, 196, 0.55);
+  background: rgba(14, 88, 58, 0.66);
+  color: rgba(233, 255, 245, 0.96);
+  font-size: 11px;
+  font-weight: 620;
+  letter-spacing: 0.01em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px) saturate(1.04);
+  pointer-events: none;
+}
+
+.myBooksManageCard:hover .myBookManageBtn,
+.myBookManageBtn:focus-visible {
+  opacity: 1;
+}
+
+.myBookManageBtn:hover {
+  background: rgba(34, 40, 52, 0.4);
+}
+
+.myBookManageText {
+  font-size: 12px;
 }
 
 .searchTabShell {
@@ -2778,123 +2844,227 @@ h1 {
   cursor: default;
 }
 
-.syncPickerModal {
-  position: relative;
+.managePopupCard {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   z-index: 12;
-  width: min(620px, 88vw);
-  max-height: 78vh;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: #11161f;
-  box-shadow: 0 20px 54px rgba(0, 0, 0, 0.46);
-  padding: 16px;
-  display: grid;
-  gap: 12px;
+  width: min(560px, calc(100vw - 30px));
+  max-height: min(72vh, 600px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.56);
+  backdrop-filter: blur(20px) saturate(1.02);
 }
 
-.syncPickerHead h3 {
+.managePopupHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 2px 6px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 6px;
+}
+
+.managePopupCover {
+  width: 44px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.managePopupCover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.managePopupTitleWrap h3 {
   margin: 0;
-  font-size: 20px;
+  font-size: 22px;
+  font-weight: 650;
   color: rgba(255, 255, 255, 0.96);
 }
 
-.syncPickerHead p {
-  margin: 6px 0 0;
-  color: rgba(255, 255, 255, 0.66);
+.managePopupTitleWrap p {
+  margin: 4px 0 0;
   font-size: 13px;
+  color: rgba(255, 255, 255, 0.66);
 }
 
-.syncPickerList {
-  max-height: 48vh;
-  overflow: auto;
-  display: grid;
+.managePickerList {
+  max-height: min(40vh, 260px);
   gap: 6px;
-  padding-right: 4px;
 }
 
-.syncPickerRow {
-  display: grid;
-  grid-template-columns: 18px 1fr auto;
-  align-items: start;
-  gap: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.managePrimaryAction {
+  height: 36px;
+  border: 1px solid rgba(102, 157, 255, 0.48);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  padding: 10px;
-}
-
-.syncPickerRow input {
-  margin-top: 2px;
-}
-
-.syncPickerMeta {
-  display: grid;
-  gap: 4px;
-}
-
-.syncPickerMeta strong {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.95);
-  font-weight: 590;
-}
-
-.syncPickerMeta em {
-  font-style: normal;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.62);
-}
-
-.syncPickerIgnoreBtn {
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  border: 1px solid rgba(239, 68, 68, 0.45);
-  background: rgba(239, 68, 68, 0.18);
-  color: rgba(255, 220, 220, 0.96);
-  font-size: 16px;
-  line-height: 1;
-  display: inline-grid;
-  place-items: center;
+  background: linear-gradient(180deg, rgba(74, 144, 255, 0.42), rgba(48, 109, 224, 0.35));
+  color: rgba(245, 250, 255, 0.98);
+  font-size: 13px;
+  font-weight: 560;
+  text-align: left;
+  padding: 0 12px;
   cursor: pointer;
-  margin-top: 1px;
-}
-
-.syncPickerIgnoreBtn:hover {
-  background: rgba(239, 68, 68, 0.3);
-}
-
-.syncPickerIgnoreBtn:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.syncPickerActions {
-  display: flex;
-  justify-content: flex-end;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
 }
 
-.syncPickerCancel,
-.syncPickerApply {
+.managePrimaryAction:hover {
+  background: linear-gradient(180deg, rgba(85, 153, 255, 0.52), rgba(52, 118, 238, 0.44));
+  border-color: rgba(118, 171, 255, 0.62);
+  color: #fff;
+}
+
+.managePrimaryAction:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.manageSectionLabel p {
+  margin: 8px 4px 2px;
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 12px;
+}
+
+.manageMatchRow {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  border-radius: 10px;
+  padding: 8px;
+  transition: background 140ms ease;
+}
+
+.manageMatchRow:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.manageMatchThumb {
+  width: 32px;
+  height: 44px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.manageMatchThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.manageMatchMeta {
+  display: grid;
+  gap: 3px;
+}
+
+.manageMatchMeta strong {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 570;
+}
+
+.manageMatchMeta em {
+  font-style: normal;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.manageLinkBtn {
+  height: 26px;
+  min-width: 62px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0 10px;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.manageLinkBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.manageLinkBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.manageLinkBtnLinked,
+.manageLinkBtnLinked:hover {
+  opacity: 0.72;
+  background: rgba(67, 130, 103, 0.2);
+  border-color: rgba(126, 206, 171, 0.48);
+  color: rgba(220, 252, 236, 0.96);
+}
+
+.manageLinkBtnLinked:hover {
+  opacity: 1;
+  cursor: pointer;
+  background: rgba(142, 38, 45, 0.54) !important;
+  border-color: rgba(247, 124, 128, 0.84) !important;
+  color: rgba(255, 226, 228, 0.98) !important;
+}
+
+.manageLinkBtnLinked:hover .manageLinkBtnLabel {
+  display: none;
+}
+
+.manageLinkBtnLinked:hover::after {
+  content: "Unlink";
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.managePickerActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.manageCloseBtn {
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 12px;
+  padding: 0 10px;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.manageCloseBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.manageSearchInput {
+  width: 100%;
   height: 36px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.92);
-  padding: 0 12px;
+  background: rgba(10, 14, 20, 0.9);
+  color: rgba(255, 255, 255, 0.94);
+  padding: 0 10px;
   font-size: 13px;
-  cursor: pointer;
-}
-
-.syncPickerApply {
-  background: rgba(59, 130, 246, 0.24);
-  border-color: rgba(59, 130, 246, 0.52);
-}
-
-.syncPickerCancel:disabled,
-.syncPickerApply:disabled {
-  opacity: 0.6;
-  cursor: default;
+  outline: none;
 }
 
 .statsSyncBtn svg {
@@ -3048,22 +3218,24 @@ h1 {
 
 .statsActivityCard {
   margin-top: 14px;
-  border: 0;
-  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
   padding: 16px;
-  background: transparent;
+  background: linear-gradient(180deg, rgba(6, 8, 12, 0.96), rgba(4, 6, 10, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .statsActivityHead {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
 }
 
-.statsActivityHead h3 {
+.statsActivityHead h4 {
   margin: 0;
-  font-size: 38px;
+  font-size: 20px;
+  line-height: 1.28;
   letter-spacing: -0.02em;
   color: rgba(255, 255, 255, 0.96);
 }
@@ -3071,19 +3243,40 @@ h1 {
 .statsActivityHead p {
   margin: 6px 0 0;
   font-size: 15px;
-  color: rgba(255, 255, 255, 0.58);
+  color: rgba(255, 255, 255, 0.54);
 }
 
 .statsActivityStreak {
-  color: rgba(244, 196, 59, 0.96);
-  font-size: 20px;
+  color: rgba(255, 198, 66, 0.98);
+  font-size: 16px;
   white-space: nowrap;
+  background: linear-gradient(180deg, rgba(78, 49, 7, 0.52), rgba(54, 34, 6, 0.58));
+  border: 1px solid rgba(252, 185, 43, 0.16);
+  border-radius: 16px;
+  padding: 8px 12px;
+}
+
+.statsActivityStreak strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.statsActivityStreak strong svg {
+  width: 14px;
+  height: 14px;
 }
 
 .statsHeatmapWrap {
   margin-top: 14px;
   overflow-x: auto;
   padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.statsHeatmapWrap::-webkit-scrollbar {
+  display: none;
 }
 
 .statsHeatmapMonths {
@@ -3137,38 +3330,63 @@ h1 {
 }
 
 .statsHeatmapCell {
+  position: relative;
   width: 12px;
   height: 12px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  background: #111319;
+  border: 0;
+}
+
+.statsHeatmapCell.hasDay::after {
+  content: attr(data-pages);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: rgba(14, 18, 25, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(248, 250, 255, 0.95);
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+  z-index: 3;
+}
+
+.statsHeatmapCell.hasDay:hover::after {
+  opacity: 1;
 }
 
 .statsHeatmapCell.empty {
-  opacity: 0.35;
+  opacity: 1;
 }
 
 .statsHeatmapCell.l0 {
-  background: rgba(255, 255, 255, 0.08);
+  background: #111319;
 }
 
 .statsHeatmapCell.l1 {
-  background: #392e0c;
+  background: #352607;
 }
 
 .statsHeatmapCell.l2 {
-  background: #5c4811;
+  background: #63440a;
 }
 
 .statsHeatmapCell.l3 {
-  background: #816417;
+  background: #906007;
 }
 
 .statsHeatmapCell.l4 {
-  background: #a9851e;
+  background: #b37400;
 }
 
 .statsHeatmapCell.l5 {
-  background: #e2b327;
+  background: #ffc100;
 }
 
 .statsHeatmapLegend {
@@ -3179,6 +3397,23 @@ h1 {
   margin-top: 14px;
   color: rgba(255, 255, 255, 0.54);
   font-size: 13px;
+}
+
+.statsHeatmapLegend .statsHeatmapCell {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+@media (max-width: 980px) {
+  .statsActivityHead h4 {
+    font-size: 30px;
+  }
+
+  .statsActivityStreak {
+    font-size: 16px;
+    padding: 8px 12px;
+  }
 }
 
 .searchHero {
@@ -3547,6 +3782,119 @@ h1 {
 .feedToolbarModern {
   padding: 0 8px;
   margin-bottom: 16px;
+  align-items: center;
+}
+
+.feedToolbarHead {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+
+.feedFilterIconBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.88);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.feedFilterIconBtn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.feedFilterIconBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+.feedFilterIconBtn.active {
+  background: rgba(95, 150, 255, 0.22);
+  border-color: rgba(112, 162, 255, 0.58);
+}
+
+.feedFilterPopover {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: min(260px, calc(100vw - 32px));
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(6, 8, 12, 0.96);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.46);
+  padding: 14px 14px 12px;
+  display: grid;
+  gap: 10px;
+  z-index: 24;
+}
+
+.feedFilterModalHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.feedFilterModalHead h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.feedFilterModalHead button {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 12px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.feedFilterPopover label {
+  display: grid;
+  gap: 6px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.58);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.feedFilterSelect {
+  height: 34px;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.94);
+  padding: 0 18px 5px 0;
+  font-size: 12px;
+  font-weight: 560;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.62) 50%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.62) 50%, transparent 50%);
+  background-position:
+    calc(100% - 11px) calc(50% + 1px),
+    calc(100% - 7px) calc(50% + 1px);
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+}
+
+.feedFilterSelect:focus {
+  outline: none;
+  border-bottom-color: rgba(255, 255, 255, 0.58);
 }
 
 .feedToolbarModern .feedToolbarLabel {
@@ -3564,8 +3912,8 @@ h1 {
   height: 36px;
   padding: 0 14px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid transparent;
+  background: transparent;
   color: rgba(255, 255, 255, 0.88);
   font-size: 13px;
   font-weight: 500;
@@ -3579,8 +3927,7 @@ h1 {
 }
 
 .feedShuffleBtnModern:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
   transform: translateY(-1px);
 }
 
@@ -4466,6 +4813,10 @@ h1 {
 
 /* Mobile adjustments for modern feed */
 @media (max-width: 640px) {
+  .feedFilterPopover {
+    width: min(280px, calc(100vw - 20px));
+  }
+
   .feedCardModern {
     width: calc(100vw - 32px);
     height: calc(100vh - 180px);
@@ -4660,12 +5011,8 @@ h1 {
     justify-content: flex-start;
   }
 
-  .statsActivityHead h3 {
+  .statsActivityHead h4 {
     font-size: 30px;
-  }
-
-  .statsActivityStreak {
-    font-size: 16px;
   }
 }
 

@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
+import sys
 import unicodedata
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -11,7 +13,8 @@ from pathlib import Path
 import numpy as np
 import yaml
 
-from pipeline.embed_books import build_text_block, generate_embeddings
+from .data_repository import DataRepository
+from pipeline.embed_books import generate_embeddings
 
 DEFAULT_OBSIDIAN_VAULT = Path("~/Obsidian/Books")
 
@@ -221,7 +224,7 @@ def _extract_book(path: Path, fm: dict) -> dict:
 
 def _load_existing_norm_keys(root: Path) -> set[str]:
     keys: set[str] = set()
-    points_path = root / "artifacts" / "books_globe.json"
+    points_path = root / "data" / "runtime" / "catalog" / "books_globe.json"
     if points_path.exists():
         try:
             with points_path.open("r", encoding="utf-8") as f:
@@ -260,8 +263,8 @@ def _load_existing_norm_keys(root: Path) -> set[str]:
 
 
 def _load_existing_embeddings(root: Path) -> tuple[np.ndarray | None, list[str]]:
-    emb_path = root / "artifacts" / "embeddings.npy"
-    ids_path = root / "artifacts" / "book_ids.npy"
+    emb_path = root / "data" / "runtime" / "vector" / "embeddings.npy"
+    ids_path = root / "data" / "runtime" / "vector" / "book_ids.npy"
     if not emb_path.exists() or not ids_path.exists():
         return None, []
     try:
@@ -274,7 +277,7 @@ def _load_existing_embeddings(root: Path) -> tuple[np.ndarray | None, list[str]]
 
 def _load_book_by_id(root: Path) -> dict[str, dict]:
     out: dict[str, dict] = {}
-    points_path = root / "artifacts" / "books_globe.json"
+    points_path = root / "data" / "runtime" / "catalog" / "books_globe.json"
     if points_path.exists():
         try:
             with points_path.open("r", encoding="utf-8") as f:
@@ -362,12 +365,15 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
     if not vault_path.exists():
         raise FileNotFoundError(f"Obsidian vault not found at: {vault_path}")
 
+    repo = DataRepository(root)
     user_dir = root / "user_data"
     user_dir.mkdir(parents=True, exist_ok=True)
     books_path = user_dir / "obsidian_books.json"
-    progress_path = user_dir / "reading_progress.json"
     preview_path = user_dir / "obsidian_sync_preview.json"
-    all_books_path = user_dir / "all_books.json"
+    existing_snapshot = repo.read_obsidian_books_snapshot()
+    existing_snapshot_books = existing_snapshot.get("books", {})
+    if not isinstance(existing_snapshot_books, dict):
+        existing_snapshot_books = {}
 
     books_payload = {"books": {}}
     if books_path.exists():
@@ -377,11 +383,8 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
     books_map, removed_bracket_author_entries = _clean_bracket_author_entries(books_map)
     books_payload["books"] = books_map
 
-    progress_payload = {"entries": {}}
-    if progress_path.exists():
-        with progress_path.open("r", encoding="utf-8") as f:
-            progress_payload = json.load(f) or {"entries": {}}
-    progress_entries = progress_payload.setdefault("entries", {})
+    user_state = repo.load_user_state()
+    progress_entries = user_state.setdefault("reading_progress", {})
 
     existing_keys = _load_existing_norm_keys(root)
     ignored_keys = _load_ignored_keys(root)
@@ -419,6 +422,9 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
         }
         progress_entries[book["id"]] = progress_row
         all_synced_progress_entries[book["id"]] = progress_row
+        prior_snapshot_row = existing_snapshot_books.get(book["id"], {})
+        if not isinstance(prior_snapshot_row, dict):
+            prior_snapshot_row = {}
         all_synced_books_map[book["id"]] = {
             **book,
             "reading_status": progress_row["status"],
@@ -426,6 +432,10 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
             "reading_current_page": progress_row["current_page"],
             "reading_start_date": progress_row["start_date"],
             "reading_finish_date": progress_row["finish_date"],
+            # Preserve lightweight linkage metadata across sync refreshes.
+            "dataset_book_id": str(prior_snapshot_row.get("dataset_book_id") or ""),
+            "dataset_link_type": str(prior_snapshot_row.get("dataset_link_type") or ""),
+            "dataset_linked_at": str(prior_snapshot_row.get("dataset_linked_at") or ""),
         }
         updated_progress_entries += 1
 
@@ -500,14 +510,12 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
         "books": all_synced_books_map,
         "count": len(all_synced_books_map),
     }
-    with all_books_path.open("w", encoding="utf-8") as f:
-        json.dump(all_books_payload, f, indent=2)
+    repo.write_obsidian_books_snapshot(all_books_payload)
 
     if not dry_run:
         with books_path.open("w", encoding="utf-8") as f:
             json.dump(books_payload, f, indent=2)
-        with progress_path.open("w", encoding="utf-8") as f:
-            json.dump(progress_payload, f, indent=2)
+        repo.save_user_state(user_state)
 
     return SyncResult(
         scanned_files=scanned_files,
@@ -524,10 +532,145 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
     )
 
 
+def _append_raw_dataset_row(root: Path, book: dict) -> None:
+    raw_jsonl = root / "data" / "raw" / "books_from_csv.jsonl"
+    raw_jsonl.parent.mkdir(parents=True, exist_ok=True)
+    row = {
+        "id": str(book.get("id") or ""),
+        "title": str(book.get("title") or ""),
+        "author": str(book.get("author") or ""),
+        "description": str(book.get("description") or ""),
+        "genres": book.get("genres") or [str(book.get("genre") or "unknown")],
+        "book_pages": int(book.get("total_pages") or 0),
+        "book_rating": float(book.get("book_rating") or 0) if str(book.get("book_rating") or "").strip() else None,
+        "book_rating_count": int(book.get("book_rating_count") or 0) if str(book.get("book_rating_count") or "").strip() else None,
+        "book_review_count": int(book.get("book_review_count") or 0) if str(book.get("book_review_count") or "").strip() else None,
+        "image_url": str(book.get("image_url") or ""),
+    }
+    with raw_jsonl.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def _run_full_rebuild(root: Path) -> None:
+    cmd = [
+        sys.executable,
+        "scripts/rebuild_dashboard_data.py",
+        "--input",
+        "data/raw/books_from_csv.jsonl",
+    ]
+    subprocess.run(cmd, check=True, cwd=root)
+
+
+def _rebuild_status_path(root: Path) -> Path:
+    return root / "user_data" / "dataset_rebuild_status.json"
+
+
+def _is_pid_running(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except Exception:
+        return False
+
+
+def _run_full_rebuild_async(root: Path, *, requested_by_book_id: str) -> dict:
+    status_path = _rebuild_status_path(root)
+    if status_path.exists():
+        try:
+            existing = json.loads(status_path.read_text(encoding="utf-8"))
+        except Exception:
+            existing = {}
+        existing_pid = int(existing.get("pid") or 0)
+        if str(existing.get("status") or "") == "running" and _is_pid_running(existing_pid):
+            return {"status": "running", "pid": existing_pid, "started_at": existing.get("started_at", "")}
+
+    log_path = root / "user_data" / "dataset_rebuild.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        sys.executable,
+        "scripts/rebuild_dashboard_data.py",
+        "--input",
+        "data/raw/books_from_csv.jsonl",
+    ]
+    with log_path.open("ab") as logf:
+        proc = subprocess.Popen(
+            cmd,
+            cwd=root,
+            stdout=logf,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+    payload = {
+        "status": "running",
+        "pid": int(proc.pid),
+        "started_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "requested_by_book_id": requested_by_book_id,
+        "log_path": str(log_path),
+    }
+    status_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return payload
+
+
+def add_snapshot_book_to_dataset(root: Path, book_id: str) -> dict:
+    repo = DataRepository(root)
+    payload = repo.read_obsidian_books_snapshot()
+    books = payload.get("books", {})
+    if not isinstance(books, dict) or book_id not in books or not isinstance(books.get(book_id), dict):
+        raise FileNotFoundError(f"Snapshot book not found: {book_id}")
+
+    book = books[book_id]
+    _append_raw_dataset_row(root, book)
+    rebuild = _run_full_rebuild_async(root, requested_by_book_id=book_id)
+
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    book["dataset_book_id"] = book_id
+    book["dataset_link_type"] = "added_pending_rebuild"
+    book["dataset_linked_at"] = now
+    books[book_id] = book
+    payload["books"] = books
+    repo.write_obsidian_books_snapshot(payload)
+    return {"book_id": book_id, "dataset_book_id": book_id, "link_type": "added_pending_rebuild", "rebuild": rebuild}
+
+
+def merge_snapshot_book_with_dataset(root: Path, snapshot_book_id: str, dataset_book_id: str) -> dict:
+    repo = DataRepository(root)
+    payload = repo.read_obsidian_books_snapshot()
+    books = payload.get("books", {})
+    if not isinstance(books, dict) or snapshot_book_id not in books or not isinstance(books.get(snapshot_book_id), dict):
+        raise FileNotFoundError(f"Snapshot book not found: {snapshot_book_id}")
+    row = books[snapshot_book_id]
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    row["dataset_book_id"] = str(dataset_book_id or "")
+    row["dataset_link_type"] = "merged"
+    row["dataset_linked_at"] = now
+    books[snapshot_book_id] = row
+    payload["books"] = books
+    repo.write_obsidian_books_snapshot(payload)
+    return {"book_id": snapshot_book_id, "dataset_book_id": row["dataset_book_id"], "link_type": "merged"}
+
+
+def unlink_snapshot_book_from_dataset(root: Path, snapshot_book_id: str) -> dict:
+    repo = DataRepository(root)
+    payload = repo.read_obsidian_books_snapshot()
+    books = payload.get("books", {})
+    if not isinstance(books, dict) or snapshot_book_id not in books or not isinstance(books.get(snapshot_book_id), dict):
+        raise FileNotFoundError(f"Snapshot book not found: {snapshot_book_id}")
+    row = books[snapshot_book_id]
+    row["dataset_book_id"] = ""
+    row["dataset_link_type"] = ""
+    row["dataset_linked_at"] = ""
+    books[snapshot_book_id] = row
+    payload["books"] = books
+    repo.write_obsidian_books_snapshot(payload)
+    return {"book_id": snapshot_book_id, "dataset_book_id": "", "link_type": "unlinked"}
+
+
 def apply_sync_selection(root: Path, selected_book_ids: list[str]) -> dict:
+    repo = DataRepository(root)
     user_dir = root / "user_data"
     books_path = user_dir / "obsidian_books.json"
-    progress_path = user_dir / "reading_progress.json"
     preview_path = user_dir / "obsidian_sync_preview.json"
 
     if not preview_path.exists():
@@ -549,11 +692,8 @@ def apply_sync_selection(root: Path, selected_book_ids: list[str]) -> dict:
             books_payload = json.load(f) or {"books": {}}
     books_map = books_payload.setdefault("books", {})
 
-    progress_payload = {"entries": {}}
-    if progress_path.exists():
-        with progress_path.open("r", encoding="utf-8") as f:
-            progress_payload = json.load(f) or {"entries": {}}
-    progress_entries = progress_payload.setdefault("entries", {})
+    user_state = repo.load_user_state()
+    progress_entries = user_state.setdefault("reading_progress", {})
 
     selected_books = [proposed_by_id[book_id] for book_id in selected_ids]
     for book in selected_books:
@@ -570,8 +710,7 @@ def apply_sync_selection(root: Path, selected_book_ids: list[str]) -> dict:
 
     with books_path.open("w", encoding="utf-8") as f:
         json.dump(books_payload, f, indent=2)
-    with progress_path.open("w", encoding="utf-8") as f:
-        json.dump(progress_payload, f, indent=2)
+    repo.save_user_state(user_state)
 
     # Once a proposed book is accepted, add it to ignore rules so it won't be re-suggested.
     if selected_books:
@@ -599,7 +738,7 @@ def apply_sync_selection(root: Path, selected_book_ids: list[str]) -> dict:
                     merged_ids.append(book_id)
                     id_to_idx[book_id] = len(merged_ids) - 1
 
-        artifacts = root / "artifacts"
+        artifacts = root / "data" / "runtime" / "vector"
         artifacts.mkdir(parents=True, exist_ok=True)
         np.save(artifacts / "embeddings.npy", merged_embs.astype(np.float32))
         np.save(artifacts / "book_ids.npy", np.array(merged_ids, dtype=object))

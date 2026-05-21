@@ -1,14 +1,22 @@
 from __future__ import annotations
 
 from pathlib import Path
-import json
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from .data_repository import DataRepository
 from .reading_lists import LikedBooksStore, ReadingListStore, ReadingProgressStore
-from .obsidian_sync import apply_sync_selection, ignore_future_suggestion, load_obsidian_progress_entries, run_obsidian_sync
+from .obsidian_sync import (
+    add_snapshot_book_to_dataset,
+    apply_sync_selection,
+    ignore_future_suggestion,
+    load_obsidian_progress_entries,
+    merge_snapshot_book_with_dataset,
+    run_obsidian_sync,
+    unlink_snapshot_book_from_dataset,
+)
 from .reading_stats import ReadingDailyStatsStore, build_activity_payload, compute_reading_stats
 from .store import AtlasStore
 
@@ -18,6 +26,7 @@ lists = ReadingListStore(Path(__file__).resolve().parents[2])
 liked = LikedBooksStore(Path(__file__).resolve().parents[2])
 progress = ReadingProgressStore(Path(__file__).resolve().parents[2])
 ROOT = Path(__file__).resolve().parents[2]
+repo = DataRepository(ROOT)
 daily_stats = ReadingDailyStatsStore(ROOT)
 
 app.add_middleware(
@@ -33,6 +42,11 @@ app.add_middleware(
 @app.get("/api/health")
 def health() -> dict:
     return {"ok": True, "has_data": store.has_data()}
+
+
+@app.get("/data-health")
+def data_health() -> dict:
+    return repo.data_health()
 
 
 def _load_vault_entries_or_skip(mode: str) -> tuple[dict[str, dict], dict] | tuple[None, dict]:
@@ -115,6 +129,10 @@ class SyncIgnoreIn(BaseModel):
     author: str = ""
 
 
+class MergeSnapshotBookIn(BaseModel):
+    dataset_book_id: str = ""
+
+
 def _hydrate_liked(book_ids: list[str]) -> dict:
     books = []
     for book_id in book_ids:
@@ -139,26 +157,10 @@ def _hydrate_lists(rows: list[dict]) -> list[dict]:
 def _book_exists_for_progress(book_id: str) -> bool:
     if store.get_book(book_id):
         return True
-    all_books_path = ROOT / "user_data" / "all_books.json"
-    if all_books_path.exists():
-        try:
-            with all_books_path.open("r", encoding="utf-8") as f:
-                payload = json.load(f) or {}
-            books_map = payload.get("books", {})
-            if isinstance(books_map, dict) and book_id in books_map:
-                return True
-        except Exception:
-            return False
-    obsidian_books_path = ROOT / "user_data" / "obsidian_books.json"
-    if obsidian_books_path.exists():
-        try:
-            with obsidian_books_path.open("r", encoding="utf-8") as f:
-                payload = json.load(f) or {}
-            books_map = payload.get("books", {})
-            if isinstance(books_map, dict) and book_id in books_map:
-                return True
-        except Exception:
-            return False
+    obsidian = repo.read_obsidian_books_snapshot()
+    books_map = obsidian.get("books", {})
+    if isinstance(books_map, dict) and book_id in books_map:
+        return True
     return False
 
 
@@ -247,38 +249,20 @@ def get_reading_progress() -> dict:
 
 @app.get("/my-books")
 def get_my_books() -> dict:
-    user_dir = Path(__file__).resolve().parents[2] / "user_data"
-    all_books_path = user_dir / "all_books.json"
-    obsidian_books_path = user_dir / "obsidian_books.json"
     progress_entries = progress.list_all()
     books: list[dict] = []
     books_map: dict = {}
 
-    # Primary source: full Obsidian sync snapshot ("My Books").
-    if all_books_path.exists():
-        try:
-            with all_books_path.open("r", encoding="utf-8") as f:
-                payload = json.load(f) or {}
-            raw_books = payload.get("books", {})
-            if isinstance(raw_books, dict):
-                books_map = raw_books
-        except Exception:
-            books_map = {}
-
-    # Fallback for pre-snapshot installs.
-    if not books_map and obsidian_books_path.exists():
-        try:
-            with obsidian_books_path.open("r", encoding="utf-8") as f:
-                payload = json.load(f) or {}
-            raw_books = payload.get("books", {})
-            if isinstance(raw_books, dict):
-                books_map = raw_books
-        except Exception:
-            books_map = {}
+    obsidian_payload = repo.read_obsidian_books_snapshot()
+    raw_books = obsidian_payload.get("books", {})
+    if isinstance(raw_books, dict):
+        books_map = raw_books
 
     for book_id, row in books_map.items():
         if not isinstance(row, dict):
             continue
+        linked_dataset_book_id = str(row.get("dataset_book_id") or "")
+        linked_dataset_book = store.get_book(linked_dataset_book_id) if linked_dataset_book_id else None
         prog = progress_entries.get(str(book_id), {}) or {}
         books.append({
             **row,
@@ -287,6 +271,7 @@ def get_my_books() -> dict:
             "reading_total_pages": int(prog.get("total_pages") or row.get("total_pages") or 0),
             "reading_finish_date": (prog.get("finish_date") or row.get("finish_date") or ""),
             "reading_start_date": (prog.get("start_date") or row.get("start_date") or ""),
+            "linked_dataset_book": linked_dataset_book,
         })
 
     books.sort(
@@ -428,4 +413,54 @@ def ignore_obsidian_suggestion(payload: SyncIgnoreIn) -> dict:
     if not title and not author:
         raise HTTPException(status_code=400, detail="title or author is required")
     out = ignore_future_suggestion(Path(__file__).resolve().parents[2], title=title, author=author)
+    return {"ok": True, **out}
+
+
+@app.post("/my-books/{book_id}/add-to-dataset")
+def add_my_book_to_dataset(book_id: str) -> dict:
+    try:
+        out = add_snapshot_book_to_dataset(Path(__file__).resolve().parents[2], book_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"dataset add failed: {e}") from e
+    return {"ok": True, **out}
+
+
+@app.get("/my-books/{book_id}/add-to-dataset")
+def add_my_book_to_dataset_get_compat(book_id: str) -> dict:
+    # Compatibility path for proxy stacks that downgrade redirected POST -> GET.
+    try:
+        out = add_snapshot_book_to_dataset(Path(__file__).resolve().parents[2], book_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"dataset add failed: {e}") from e
+    return {"ok": True, **out, "method_compat": "GET"}
+
+
+@app.post("/my-books/{book_id}/merge")
+def merge_my_book(book_id: str, payload: MergeSnapshotBookIn) -> dict:
+    dataset_book_id = (payload.dataset_book_id or "").strip()
+    if not dataset_book_id:
+        raise HTTPException(status_code=400, detail="dataset_book_id is required")
+    if not store.get_book(dataset_book_id):
+        raise HTTPException(status_code=404, detail="dataset book not found")
+    try:
+        out = merge_snapshot_book_with_dataset(Path(__file__).resolve().parents[2], book_id, dataset_book_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"merge failed: {e}") from e
+    return {"ok": True, **out}
+
+
+@app.post("/my-books/{book_id}/unlink")
+def unlink_my_book(book_id: str) -> dict:
+    try:
+        out = unlink_snapshot_book_from_dataset(Path(__file__).resolve().parents[2], book_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"unlink failed: {e}") from e
     return {"ok": True, **out}

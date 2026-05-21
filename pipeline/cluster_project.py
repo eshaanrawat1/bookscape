@@ -8,7 +8,7 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 
-from .common import ARTIFACTS
+from .common import RUNTIME_VECTOR, DATA_BUILD
 
 
 def cluster_embeddings(embeddings: np.ndarray) -> np.ndarray:
@@ -42,8 +42,9 @@ def project_to_sphere(xyz: np.ndarray, radius: float = 1.0) -> np.ndarray:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--embeddings", default=str(ARTIFACTS / "embeddings.npy"))
-    parser.add_argument("--out-dir", default=str(ARTIFACTS))
+    parser.add_argument("--embeddings", default=str(RUNTIME_VECTOR / "embeddings.npy"))
+    parser.add_argument("--out-dir", default=str(DATA_BUILD))
+    parser.add_argument("--write-meta", action="store_true", help="Write cluster metadata JSON")
     args = parser.parse_args()
 
     embs = np.load(Path(args.embeddings))
@@ -55,8 +56,9 @@ def main() -> None:
     np.save(out_dir / "cluster_labels.npy", labels)
     np.save(out_dir / "points_xyz.npy", sphere)
 
-    with (out_dir / "cluster_meta.json").open("w", encoding="utf-8") as f:
-        json.dump({"cluster_count": int(len(set(labels.tolist())))}, f, indent=2)
+    if args.write_meta:
+        with (out_dir / "cluster_meta.json").open("w", encoding="utf-8") as f:
+            json.dump({"cluster_count": int(len(set(labels.tolist())))}, f, indent=2)
 
     print(f"saved cluster labels + 3D points for {len(labels)} books")
 

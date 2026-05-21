@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-// prod 
-const API = '/api'
-
-// dev
-// const API = 'http://127.0.0.1:8000'
+// Same-origin `/api` → Caddy (prod) or Vite proxy (dev) → app-gate :3100 → lazy uvicorn :8000
+// const API = '/api'
+const API = 'http://127.0.0.1:8000'
 const W = 1600
 const H = 900
 const PAD = 120
@@ -153,6 +151,11 @@ function isLikelyNonEnglishEdition(book) {
   return /edici[oó]n|espa[ñn]ol|versi[oó]n|traducci[oó]n|idioma|portugu[eê]s|fran[cç]ais|deutsch|italiano/.test(text)
 }
 
+function hasSpecificSubgenre(book) {
+  const s = `${book?.subgenre || ''}`.trim().toLowerCase()
+  return !!s && s !== 'general'
+}
+
 function downsampleBooksByGrid(books, target = 450) {
   if (books.length <= target) return { visible: books, hiddenCount: 0 }
   const minX = Math.min(...books.map((b) => b.mx))
@@ -235,6 +238,10 @@ export default function App() {
   const [tab, setTab] = useState('explorer')
   const [points, setPoints] = useState([])
   const [feedOrder, setFeedOrder] = useState([])
+  const [feedGenreFilter, setFeedGenreFilter] = useState('all')
+  const [feedSubgenreFilter, setFeedSubgenreFilter] = useState('all')
+  const [feedLikesMode, setFeedLikesMode] = useState('all')
+  const [feedFilterOpen, setFeedFilterOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [recs, setRecs] = useState([])
@@ -272,16 +279,17 @@ export default function App() {
   const [statsByPeriod, setStatsByPeriod] = useState({})
   const [statsActivity, setStatsActivity] = useState({ days: [], summary: { activeDays: 0, currentStreak: 0, longestStreak: 0, totalPagesYear: 0 } })
   const [syncingStats, setSyncingStats] = useState(false)
-  const [syncPreviewBooks, setSyncPreviewBooks] = useState([])
-  const [syncSelectedBookIds, setSyncSelectedBookIds] = useState([])
-  const [syncPickerOpen, setSyncPickerOpen] = useState(false)
-  const [applyingSyncSelection, setApplyingSyncSelection] = useState(false)
+  const [manageBook, setManageBook] = useState(null)
+  const [manageQuery, setManageQuery] = useState('')
+  const [manageResults, setManageResults] = useState([])
+  const [managingDataset, setManagingDataset] = useState(false)
 
   const [mode, setMode] = useState('genres')
   const [activeGenre, setActiveGenre] = useState(null)
   const [activeSub, setActiveSub] = useState(null)
   const [feedIndex, setFeedIndex] = useState(0)
   const feedScrollerRef = useRef(null)
+  const feedFilterRef = useRef(null)
 
   useEffect(() => {
     fetch(`${API}/points?zoom=near&max_points=22000`).then((r) => r.json()).then((d) => setPoints(d.points || []))
@@ -326,10 +334,19 @@ export default function App() {
     refreshReadingLists()
   }, [])
 
+  const refreshReadingProgress = async () => {
+    try {
+      const r = await fetch(`${API}/reading-progress`)
+      const d = await r.json()
+      if (!r.ok) return
+      setReadingProgressById(d.entries || {})
+    } catch {
+      // Best effort only.
+    }
+  }
+
   useEffect(() => {
-    fetch(`${API}/reading-progress`)
-      .then((r) => r.json())
-      .then((d) => setReadingProgressById(d.entries || {}))
+    refreshReadingProgress()
   }, [])
 
   const refreshSyncedAllBooks = async () => {
@@ -395,7 +412,32 @@ export default function App() {
     setSearchDetailBook(null)
   }, [tab])
 
-  const mapped = useMemo(() => project(points), [points])
+  const mapped = useMemo(() => {
+    const base = project(points)
+    if (!base.length) return base
+
+    const byGenreCluster = byKey(base, (p) => `${p.genre || 'unknown'}::${p.cluster ?? -1}`)
+    const inferred = new Map()
+
+    for (const [key, items] of byGenreCluster.entries()) {
+      const genre = `${items[0]?.genre || 'unknown'}`
+      const clusterId = items[0]?.cluster ?? -1
+      const explicit = items
+        .map((x) => `${x?.subgenre || ''}`.trim())
+        .filter((x) => x && x.toLowerCase() !== 'general')
+      const label = explicit.length
+        ? explicit.sort((a, b) => a.localeCompare(b))[0]
+        : inferSubgenreName(items, genre, clusterId)
+      inferred.set(key, label || 'General')
+    }
+
+    return base.map((p) => {
+      const current = `${p?.subgenre || ''}`.trim()
+      if (current && current.toLowerCase() !== 'general') return p
+      const key = `${p.genre || 'unknown'}::${p.cluster ?? -1}`
+      return { ...p, subgenre: inferred.get(key) || 'General' }
+    })
+  }, [points])
 
   const genres = useMemo(() => {
     const m = byKey(mapped, (p) => p.genre || 'unknown')
@@ -464,39 +506,82 @@ export default function App() {
   }, [mapped, activeGenre, activeSub])
   const booksRender = useMemo(() => downsampleBooksByGrid(books, 520), [books])
   const topFeedBooks = useMemo(() => {
-    const ranked = [...points].sort((a, b) => Number(b.book_rating_count || 0) - Number(a.book_rating_count || 0))
+    const ranked = [...mapped].sort((a, b) => Number(b.book_rating_count || 0) - Number(a.book_rating_count || 0))
     const uniq = []
-    const seen = new Set()
+    const idxByKey = new Map()
     for (const b of ranked) {
       const key = `${normalizeForDedup(b.title)}::${normalizeForDedup((b.author || '').split('|')[0])}`
-      if (seen.has(key)) continue
-      seen.add(key)
       if (isLikelyNonEnglishEdition(b)) {
         // Prefer the first higher-ranked edition and skip likely translated duplicates.
         continue
       }
-      uniq.push(b)
-      if (uniq.length >= 100) break
+      const existingIdx = idxByKey.get(key)
+      if (existingIdx == null) {
+        idxByKey.set(key, uniq.length)
+        uniq.push(b)
+        continue
+      }
+      const existing = uniq[existingIdx]
+      // If we first captured a generic edition, upgrade to the same title/author entry
+      // that has a concrete subgenre from taxonomy.
+      if (!hasSpecificSubgenre(existing) && hasSpecificSubgenre(b)) {
+        uniq[existingIdx] = b
+      }
     }
     // Backfill in case filter was too aggressive.
     if (uniq.length < 100) {
       for (const b of ranked) {
         const key = `${normalizeForDedup(b.title)}::${normalizeForDedup((b.author || '').split('|')[0])}`
-        if (uniq.find((x) => `${normalizeForDedup(x.title)}::${normalizeForDedup((x.author || '').split('|')[0])}` === key)) continue
+        if (idxByKey.has(key)) continue
+        idxByKey.set(key, uniq.length)
         uniq.push(b)
-        if (uniq.length >= 100) break
       }
     }
-    return uniq
-  }, [points])
+    return uniq.slice(0, 100)
+  }, [mapped])
+
+  const feedGenreOptions = useMemo(() => {
+    const uniq = new Set(topFeedBooks.map((b) => `${b.genre || 'unknown'}`))
+    return Array.from(uniq).sort((a, b) => a.localeCompare(b))
+  }, [topFeedBooks])
+
+  const feedSubgenreOptions = useMemo(() => {
+    const pool = feedGenreFilter === 'all'
+      ? topFeedBooks
+      : topFeedBooks.filter((b) => `${b.genre || 'unknown'}` === feedGenreFilter)
+    const uniq = new Set(pool.map((b) => `${b.subgenre || 'General'}`))
+    return Array.from(uniq).sort((a, b) => a.localeCompare(b))
+  }, [topFeedBooks, feedGenreFilter])
+
+  const feedCandidateBooks = useMemo(() => {
+    let pool = [...topFeedBooks]
+    if (feedGenreFilter !== 'all') {
+      pool = pool.filter((b) => `${b.genre || 'unknown'}` === feedGenreFilter)
+    }
+    if (feedSubgenreFilter !== 'all') {
+      pool = pool.filter((b) => `${b.subgenre || 'General'}` === feedSubgenreFilter)
+    }
+    if (feedLikesMode === 'liked_only') {
+      pool = pool.filter((b) => likedBookIds.includes(b.id))
+    } else if (feedLikesMode === 'liked_first') {
+      pool.sort((a, b) => {
+        const la = likedBookIds.includes(a.id) ? 1 : 0
+        const lb = likedBookIds.includes(b.id) ? 1 : 0
+        if (lb !== la) return lb - la
+        return Number(b.book_rating_count || 0) - Number(a.book_rating_count || 0)
+      })
+    }
+    return pool
+  }, [topFeedBooks, feedGenreFilter, feedSubgenreFilter, feedLikesMode, likedBookIds])
+
   const feedBooks = useMemo(() => {
-    if (!feedOrder.length) return topFeedBooks
-    const byId = new Map(topFeedBooks.map((b) => [b.id, b]))
+    if (!feedOrder.length) return feedCandidateBooks
+    const byId = new Map(feedCandidateBooks.map((b) => [b.id, b]))
     const ordered = feedOrder.map((id) => byId.get(id)).filter(Boolean)
     const present = new Set(ordered.map((b) => b.id))
-    const missing = topFeedBooks.filter((b) => !present.has(b.id))
+    const missing = feedCandidateBooks.filter((b) => !present.has(b.id))
     return [...ordered, ...missing]
-  }, [topFeedBooks, feedOrder])
+  }, [feedCandidateBooks, feedOrder])
   const likedBooks = useMemo(() => points.filter((p) => likedBookIds.includes(p.id)), [points, likedBookIds])
 
   const selectedBook = useMemo(() => points.find((p) => p.id === selected?.id) || selected, [points, selected])
@@ -816,7 +901,7 @@ export default function App() {
   }
 
   const shuffleFeed = () => {
-    const ids = topFeedBooks.map((b) => b.id)
+    const ids = feedCandidateBooks.map((b) => b.id)
     for (let i = ids.length - 1; i > 0; i -= 1) {
       const j = Math.floor(Math.random() * (i + 1))
       const tmp = ids[i]
@@ -827,6 +912,17 @@ export default function App() {
     setFeedIndex(0)
     if (feedScrollerRef.current) feedScrollerRef.current.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  useEffect(() => {
+    if (feedSubgenreFilter === 'all') return
+    if (!feedSubgenreOptions.includes(feedSubgenreFilter)) setFeedSubgenreFilter('all')
+  }, [feedSubgenreFilter, feedSubgenreOptions])
+
+  useEffect(() => {
+    setFeedOrder([])
+    setFeedIndex(0)
+    if (feedScrollerRef.current) feedScrollerRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [feedGenreFilter, feedSubgenreFilter, feedLikesMode])
 
   const createReadingList = async (name, addBookId = null) => {
     const clean = (name || '').trim()
@@ -960,7 +1056,7 @@ export default function App() {
   const syncStatsFromObsidian = async () => {
     try {
       setSyncingStats(true)
-      const r = await fetch(`${API}/sync/obsidian?dry_run=true`, { method: 'POST' })
+      const r = await fetch(`${API}/sync/obsidian?dry_run=false`, { method: 'POST' })
       const d = await r.json()
       if (!r.ok) {
         showToast(d?.detail || 'Sync failed')
@@ -968,15 +1064,9 @@ export default function App() {
       }
       if (d?.periods) setStatsByPeriod(d.periods)
       if (d?.activity) setStatsActivity(d.activity)
-      const proposed = (d?.proposed_books || []).filter((b) => b?.id)
-      if (proposed.length) {
-        setSyncPreviewBooks(proposed)
-        setSyncSelectedBookIds(proposed.map((b) => b.id))
-        setSyncPickerOpen(true)
-        showToast(`Review ${proposed.length} proposed books`)
-      } else {
-        showToast('No new books to add')
-      }
+      await refreshSyncedAllBooks()
+      await refreshReadingProgress()
+      showToast(`Synced ${d?.parsed_books || 0} books from Obsidian`)
     } catch {
       showToast('Could not reach sync service')
     } finally {
@@ -984,58 +1074,141 @@ export default function App() {
     }
   }
 
-  const applySelectedSyncBooks = async () => {
-    try {
-      setApplyingSyncSelection(true)
-      const r = await fetch(`${API}/sync/obsidian/apply`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_ids: syncSelectedBookIds })
-      })
-      const d = await r.json()
-      if (!r.ok) {
-        showToast(d?.detail || 'Could not apply selected books')
-        return
+  const addMyBookToDataset = async (book) => {
+    if (!book?.id) return
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    const verifyPersisted = async () => {
+      for (let i = 0; i < 6; i += 1) {
+        try {
+          const rr = await fetch(`${API}/my-books`)
+          const dd = await rr.json()
+          if (rr.ok) {
+            const books = dd.books || []
+            setSyncedAllBooks(books)
+            const persisted = books.find((b) => b.id === book.id)
+            if (persisted?.dataset_link_type?.startsWith('added')) return true
+          }
+        } catch {
+          // noop
+        }
+        await sleep(600)
       }
-      if (d?.periods) setStatsByPeriod(d.periods)
-      if (d?.activity) setStatsActivity(d.activity)
+      return false
+    }
+
+    try {
+      setManagingDataset(true)
+      const r = await fetch(`${API}/my-books/${encodeURIComponent(book.id)}/add-to-dataset`, { method: 'POST' })
+      let d = {}
+      try {
+        d = await r.json()
+      } catch {
+        d = {}
+      }
+      if (!r.ok) {
+        const okAfterRetry = await verifyPersisted()
+        if (!okAfterRetry) {
+          showToast(d?.detail || 'Could not add this book to dataset')
+          return
+        }
+      }
       await refreshSyncedAllBooks()
-      setSyncPickerOpen(false)
-      setSyncPreviewBooks([])
-      setSyncSelectedBookIds([])
-      showToast(`Added ${d?.applied_count || 0} books`)
+      setManageBook(null)
+      if (d?.rebuild?.status === 'running') {
+        showToast('Added. Rebuild already running in background.')
+      } else {
+        showToast(`Added "${book.title || 'book'}". Rebuild started in background.`)
+      }
     } catch {
-      showToast('Could not apply selected books')
+      const okAfterRetry = await verifyPersisted()
+      if (okAfterRetry) {
+        setManageBook(null)
+        showToast(`Added "${book.title || 'book'}". Rebuild is running.`)
+      } else {
+        showToast('Could not add this book to dataset')
+      }
     } finally {
-      setApplyingSyncSelection(false)
+      setManagingDataset(false)
     }
   }
 
-  const toggleSyncSelection = (bookId) => {
-    setSyncSelectedBookIds((prev) => (
-      prev.includes(bookId) ? prev.filter((id) => id !== bookId) : [...prev, bookId]
-    ))
-  }
-
-  const ignoreBookSuggestion = async (book) => {
+  const mergeMyBookToDataset = async (book, datasetBookId) => {
+    if (!book?.id || !datasetBookId) return
     try {
-      const r = await fetch(`${API}/sync/obsidian/ignore`, {
+      setManagingDataset(true)
+      const r = await fetch(`${API}/my-books/${encodeURIComponent(book.id)}/merge`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: book?.title || '', author: book?.author || '' })
+        body: JSON.stringify({ dataset_book_id: datasetBookId })
       })
       const d = await r.json()
       if (!r.ok) {
-        showToast(d?.detail || 'Could not ignore this suggestion')
+        showToast(d?.detail || 'Could not merge with this dataset book')
         return
       }
-      setSyncPreviewBooks((prev) => prev.filter((x) => x.id !== book.id))
-      setSyncSelectedBookIds((prev) => prev.filter((id) => id !== book.id))
-      showToast('Will not suggest this book again')
+      await refreshSyncedAllBooks()
+      setManageBook(null)
+      showToast('Linked to existing dataset book')
     } catch {
-      showToast('Could not ignore this suggestion')
+      showToast('Could not merge with this dataset book')
+    } finally {
+      setManagingDataset(false)
     }
   }
+
+  const unlinkMyBookFromDataset = async (book) => {
+    if (!book?.id) return
+    try {
+      setManagingDataset(true)
+      const r = await fetch(`${API}/my-books/${encodeURIComponent(book.id)}/unlink`, { method: 'POST' })
+      const d = await r.json()
+      if (!r.ok) {
+        showToast(d?.detail || 'Could not unlink this book')
+        return
+      }
+      await refreshSyncedAllBooks()
+      const updated = {
+        ...book,
+        dataset_book_id: '',
+        dataset_link_type: '',
+        dataset_linked_at: ''
+      }
+      setManageBook(updated)
+      setManageQuery('')
+      showToast('Unlinked. You can link this book again.')
+    } catch {
+      showToast('Could not unlink this book')
+    } finally {
+      setManagingDataset(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!manageBook) return
+    const baseTitle = String(manageBook.title || '').trim()
+    const q = String(manageQuery || baseTitle).trim()
+    if (!q) {
+      setManageResults([])
+      return
+    }
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`${API}/search?q=${encodeURIComponent(q)}&limit=8`)
+        const d = await r.json()
+        if (!r.ok) return
+        const rawResults = d.results || []
+        const linkedDatasetBookId = String(manageBook.dataset_book_id || '')
+        if (linkedDatasetBookId) {
+          setManageResults(rawResults.filter((book) => String(book?.id || '') === linkedDatasetBookId))
+          return
+        }
+        setManageResults(rawResults)
+      } catch {
+        setManageResults([])
+      }
+    }, 130)
+    return () => clearTimeout(t)
+  }, [manageBook, manageQuery, manageBook?.dataset_book_id])
 
   useEffect(() => {
     fetchReadingStats()
@@ -1131,6 +1304,15 @@ export default function App() {
     return () => el.removeEventListener('scroll', onScroll)
   }, [tab, feedBooks.length])
 
+  useEffect(() => {
+    if (!feedFilterOpen) return
+    const onDocClick = (e) => {
+      if (!feedFilterRef.current?.contains(e.target)) setFeedFilterOpen(false)
+    }
+    document.addEventListener('click', onDocClick)
+    return () => document.removeEventListener('click', onDocClick)
+  }, [feedFilterOpen])
+
   return (
     <div className="scene minimalScene appleShell" style={sceneStyle}>
       <aside className="appleSidebar">
@@ -1171,7 +1353,7 @@ export default function App() {
                 <path d="M12 20.2s-6.8-4.4-8.8-8C1.4 8.7 3.1 5.5 6.5 5.5c2 0 3.2 1 4 2 0.8-1 2-2 4-2 3.4 0 5.1 3.2 3.3 6.7-2 3.6-8.8 8-8.8 8Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
               </svg>
             </span>
-            <span>Liked</span>
+            <span>Wishlist</span>
           </button>
           <button className={`menuTab ${tab === 'stats' ? 'active' : ''}`} onClick={() => setTab('stats')}>
             <span className="appleIcon" aria-hidden>
@@ -1490,7 +1672,67 @@ export default function App() {
       {tab === 'feed' && (
         <div className="feedShell feedShellModern">
           <div className="feedToolbar feedToolbarModern">
-            <div className="feedToolbarLabel">Discover</div>
+            <div className="feedToolbarHead" ref={feedFilterRef}>
+              <div className="feedToolbarLabel">Discover</div>
+              <button
+                className={`feedFilterIconBtn ${(feedGenreFilter !== 'all' || feedSubgenreFilter !== 'all' || feedLikesMode !== 'all') ? 'active' : ''}`}
+                onClick={() => setFeedFilterOpen((v) => !v)}
+                aria-label="Open feed filters"
+              >
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M4 7h16M7 12h10M10 17h4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                </svg>
+              </button>
+              {feedFilterOpen && (
+                <div className="feedFilterPopover" onClick={(e) => e.stopPropagation()}>
+                  <div className="feedFilterModalHead">
+                    <h3>Filters</h3>
+                    <button onClick={() => setFeedFilterOpen(false)} aria-label="Close filters">Close</button>
+                  </div>
+                  <label>
+                    Genre
+                    <select
+                      className="feedFilterSelect"
+                      value={feedGenreFilter}
+                      onChange={(e) => { setFeedGenreFilter(e.target.value); setFeedSubgenreFilter('all') }}
+                      aria-label="Filter feed by genre"
+                    >
+                      <option value="all">All genres</option>
+                      {feedGenreOptions.map((g) => (
+                        <option key={`feed-genre-${g}`} value={g}>{formatGenreLabel(g)}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Subgenre
+                    <select
+                      className="feedFilterSelect"
+                      value={feedSubgenreFilter}
+                      onChange={(e) => setFeedSubgenreFilter(e.target.value)}
+                      aria-label="Filter feed by subgenre"
+                    >
+                      <option value="all">All subgenres</option>
+                      {feedSubgenreOptions.map((s) => (
+                        <option key={`feed-sub-${s}`} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Ranking
+                    <select
+                      className="feedFilterSelect"
+                      value={feedLikesMode}
+                      onChange={(e) => setFeedLikesMode(e.target.value)}
+                      aria-label="Sort feed by likes"
+                    >
+                      <option value="all">All books</option>
+                      <option value="liked_first">Liked first</option>
+                      <option value="liked_only">Top by likes</option>
+                    </select>
+                  </label>
+                </div>
+              )}
+            </div>
             <button className="feedShuffleBtn feedShuffleBtnModern" onClick={shuffleFeed}>
               <svg viewBox="0 0 20 20" fill="none" aria-hidden>
                 <path d="M3 7h2.5a4 4 0 013.2 1.6L10 10.5m0 0l1.3 1.9A4 4 0 0014.5 14H17m-7-3.5l-1.3-1.9A4 4 0 005.5 7H3m14 7l-2 2m2-2l-2-2M3 14h2.5a4 4 0 003.2-1.6L10 10.5m7-3.5h-2.5a4 4 0 00-3.2 1.6L10 10.5m7-3.5l-2-2m2 2l-2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -1499,6 +1741,11 @@ export default function App() {
             </button>
           </div>
           <div className="feedScroller feedScrollerModern" ref={feedScrollerRef}>
+            {!feedBooks.length && (
+              <div className="feedSimilarEmpty" style={{ margin: '24px auto' }}>
+                No books match this filter yet.
+              </div>
+            )}
             {feedBooks.map((b, idx) => {
               const avgRating = getAvgRating(b)
               const pageCount = getPageCount(b)
@@ -1768,7 +2015,7 @@ export default function App() {
             <section className="listsContent">
               <div className="listsTopBar">
                 <div>
-                  <h2>Liked</h2>
+                  <h2>Wishlist</h2>
                 </div>
                 <div className="listsActions">
                   <div className="listsTotalBooks">{likedBooks.length} books</div>
@@ -1810,12 +2057,32 @@ export default function App() {
                 {visibleBooks.map((b) => (
                   <article
                     key={`${activeListName}-${b.id}`}
-                    className="listBookCard coverOnlyCard"
+                    className={`listBookCard coverOnlyCard ${!activeList ? 'myBooksManageCard' : ''}`}
                     title={b.title || 'Untitled'}
                     onClick={() => openTracker(b)}
                   >
                     <div className="listBookImageWrap">
                       {b.image_url ? <img src={b.image_url} alt="" loading="lazy" /> : <div className="listBookImageFallback" />}
+                      {!activeList && b.dataset_link_type === 'merged' && (
+                        <span className="myBookLinkedBadge" title="Linked to an existing dataset book">
+                          Linked
+                        </span>
+                      )}
+                      {!activeList && (
+                        <button
+                          type="button"
+                          className="myBookManageBtn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setManageBook(b)
+                            setManageQuery('')
+                            setManageResults([])
+                          }}
+                          aria-label={`Manage ${b.title || 'book'}`}
+                        >
+                          <span className="myBookManageText">Manage</span>
+                        </button>
+                      )}
                     </div>
                   </article>
                 ))}
@@ -1905,11 +2172,16 @@ export default function App() {
                 <section className="statsActivityCard">
                   <div className="statsActivityHead">
                     <div>
-                      <h3>Reading Activity</h3>
+                      <h4>Reading Activity</h4>
                       <p>{formatCount(statsActivity?.summary?.activeDays || 0)} active days in the past year</p>
                     </div>
                     <div className="statsActivityStreak">
-                      <strong>{formatCount(statsActivity?.summary?.currentStreak || 0)} day streak</strong>
+                      <strong>
+                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                          <path d="M13.5 2s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73L7.23 6A8.9 8.9 0 0 0 4 12.03C4 16.43 7.58 20 12 20s8-3.57 8-7.97C20 7.9 17.2 4.29 13.5 2ZM12 18a4 4 0 0 1-4-4c0-1.57.88-2.91 2.17-3.58 0 0 .59 1.11 2.01 1.11 1.26 0 1.85-.81 1.85-.81A4.02 4.02 0 0 1 16 14a4 4 0 0 1-4 4Z"/>
+                        </svg>
+                        {formatCount(statsActivity?.summary?.currentStreak || 0)} day streak
+                      </strong>
                     </div>
                   </div>
                   <div className="statsHeatmapWrap">
@@ -1934,7 +2206,8 @@ export default function App() {
                               return (
                                 <div
                                   key={`cell-${colIdx}-${rowIdx}`}
-                                  className={`statsHeatmapCell l${level} ${day ? '' : 'empty'}`}
+                                  className={`statsHeatmapCell l${level} ${day ? 'hasDay' : 'empty'}`}
+                                  data-pages={day ? `${formatCount(day.pagesRead)} pages` : ''}
                                   title={day
                                     ? `${formatShortDate(day.date)}: ${formatCount(day.pagesRead)} pages, ${formatCount(day.booksCompleted)} completed`
                                     : 'Outside range'}
@@ -1978,61 +2251,91 @@ export default function App() {
           })}
         </div>
       )}
-      {syncPickerOpen && (
+      {manageBook && (
         <div className="addListLayer">
           <div
             className="addListBackdrop"
             onClick={() => {
-              if (applyingSyncSelection) return
-              setSyncPickerOpen(false)
+              if (managingDataset) return
+              setManageBook(null)
             }}
           />
-          <div className="syncPickerModal">
-            <div className="syncPickerHead">
-              <h3>Review Proposed Books</h3>
-              <p>Deselect any books already present. All are selected by default.</p>
+          <div className="collectionPickerCard managePopupCard">
+            <div className="managePopupHead">
+              <div className="managePopupCover">
+                {manageBook.image_url ? <img src={manageBook.image_url} alt="" loading="lazy" /> : <div className="listBookImageFallback" />}
+              </div>
+              <div className="managePopupTitleWrap">
+                <h3>Manage Book</h3>
+                <p>{manageBook.title || 'Untitled'} by {manageBook.author || 'Unknown author'}</p>
+              </div>
             </div>
-            <div className="syncPickerList">
-              {syncPreviewBooks.map((book) => (
-                <label key={`sync-pick-${book.id}`} className="syncPickerRow">
-                  <input
-                    type="checkbox"
-                    checked={syncSelectedBookIds.includes(book.id)}
-                    onChange={() => toggleSyncSelection(book.id)}
-                    disabled={applyingSyncSelection}
-                  />
-                  <span className="syncPickerMeta">
+            <div className="collectionPickerList managePickerList">
+              <button
+                className="managePrimaryAction"
+                onClick={() => addMyBookToDataset(manageBook)}
+                disabled={managingDataset}
+              >
+                <span aria-hidden>＋</span>
+                {managingDataset ? 'Working...' : 'Add To Dataset (Full Rebuild)'}
+              </button>
+              <div className="manageSectionLabel">
+                <p>Or match this to an existing dataset book:</p>
+              </div>
+              <input
+                className="manageSearchInput"
+                value={manageQuery}
+                onChange={(e) => setManageQuery(e.target.value)}
+                placeholder={manageBook.title || 'Search by title'}
+                disabled={managingDataset}
+              />
+              {(manageResults || []).map((book) => (
+                <label key={`manage-match-${book.id}`} className="manageMatchRow">
+                  <div className="manageMatchThumb">
+                    {book.image_url ? <img src={book.image_url} alt="" loading="lazy" /> : <div className="listBookImageFallback" />}
+                  </div>
+                  <span className="manageMatchMeta">
                     <strong>{book.title || 'Untitled'}</strong>
                     <em>{book.author || 'Unknown author'}</em>
                   </span>
+                  {String(manageBook.dataset_book_id || '') === String(book.id || '') ? (
+                    <button
+                      type="button"
+                      className="manageLinkBtn manageLinkBtnLinked"
+                      onClick={() => {
+                        if (managingDataset) return
+                        unlinkMyBookFromDataset(manageBook)
+                      }}
+                      disabled={managingDataset}
+                      title="Click to unlink this dataset match"
+                      aria-label={`Unlink ${book.title || 'this book'}`}
+                    >
+                      <span className="manageLinkBtnLabel">Linked</span>
+                    </button>
+                  ) : (
                   <button
                     type="button"
-                    className="syncPickerIgnoreBtn"
-                    onClick={() => ignoreBookSuggestion(book)}
-                    disabled={applyingSyncSelection}
-                    title="Don't suggest in the future"
-                    aria-label={`Don't suggest ${book.title || 'this book'} in the future`}
+                    className="manageLinkBtn"
+                    onClick={() => mergeMyBookToDataset(manageBook, book.id)}
+                    disabled={managingDataset}
+                    title="Merge with this book"
+                    aria-label={`Merge with ${book.title || 'this book'}`}
                   >
-                    ×
+                    <span aria-hidden>↗</span>
+                    Link
                   </button>
+                  )}
                 </label>
               ))}
-              {!syncPreviewBooks.length && <div className="emptyList">No proposed books found.</div>}
+              {!manageResults.length && <div className="emptyList">No matching dataset books found.</div>}
             </div>
-            <div className="syncPickerActions">
+            <div className="managePickerActions">
               <button
-                className="syncPickerCancel"
-                onClick={() => setSyncPickerOpen(false)}
-                disabled={applyingSyncSelection}
+                className="manageCloseBtn"
+                onClick={() => setManageBook(null)}
+                disabled={managingDataset}
               >
-                Cancel
-              </button>
-              <button
-                className="syncPickerApply"
-                onClick={applySelectedSyncBooks}
-                disabled={applyingSyncSelection || !syncSelectedBookIds.length}
-              >
-                {applyingSyncSelection ? 'Applying...' : `Add Selected (${syncSelectedBookIds.length})`}
+                Close
               </button>
             </div>
           </div>

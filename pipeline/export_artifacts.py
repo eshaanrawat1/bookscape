@@ -6,20 +6,21 @@ from pathlib import Path
 
 import numpy as np
 
-from .common import ARTIFACTS, read_jsonl
+from .common import RUNTIME_VECTOR, RUNTIME_CATALOG, DATA_BUILD, read_jsonl
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--books", required=True)
-    parser.add_argument("--out", default=str(ARTIFACTS / "books_globe.json"))
-    parser.add_argument("--out-manifest", default=str(ARTIFACTS / "manifest.json"))
+    parser.add_argument("--out", default=str(RUNTIME_CATALOG / "books_globe.json"))
+    parser.add_argument("--out-manifest", default=str(DATA_BUILD / "manifest.json"))
+    parser.add_argument("--write-manifest", action="store_true", help="Write build manifest JSON")
     args = parser.parse_args()
 
     books = read_jsonl(Path(args.books))
-    ids = np.load(ARTIFACTS / "book_ids.npy", allow_pickle=True).tolist()
-    labels = np.load(ARTIFACTS / "cluster_labels.npy").tolist()
-    xyz = np.load(ARTIFACTS / "points_xyz.npy").tolist()
+    ids = np.load(RUNTIME_VECTOR / "book_ids.npy", allow_pickle=True).tolist()
+    labels = np.load(DATA_BUILD / "cluster_labels.npy").tolist()
+    xyz = np.load(DATA_BUILD / "points_xyz.npy").tolist()
 
     by_id = {b["id"]: b for b in books}
     points = []
@@ -32,6 +33,7 @@ def main() -> None:
                 "author": b["author"],
                 "description": b["description"],
                 "genre": b["genre"],
+                "subgenre": b.get("subgenre"),
                 "book_pages": b.get("book_pages"),
                 "book_rating": b.get("book_rating"),
                 "book_rating_count": b.get("book_rating_count"),
@@ -47,22 +49,23 @@ def main() -> None:
     with Path(args.out).open("w", encoding="utf-8") as f:
         json.dump({"points": points}, f, indent=2)
 
-    with Path(args.out_manifest).open("w", encoding="utf-8") as f:
-        json.dump(
-            {
-                "dataset": "books_v1",
-                "points": len(points),
-                "files": [
-                    "embeddings.npy",
-                    "book_ids.npy",
-                    "cluster_labels.npy",
-                    "points_xyz.npy",
-                    "books_globe.json",
-                ],
-            },
-            f,
-            indent=2,
-        )
+    if args.write_manifest:
+        with Path(args.out_manifest).open("w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "dataset": "books_v1",
+                    "points": len(points),
+                    "files": [
+                        "embeddings.npy",
+                        "book_ids.npy",
+                        "cluster_labels.npy",
+                        "points_xyz.npy",
+                        "books_globe.json",
+                    ],
+                },
+                f,
+                indent=2,
+            )
 
     print(f"exported {len(points)} points to {args.out}")
 

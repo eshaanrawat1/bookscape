@@ -7,8 +7,7 @@ Minimal vertical slice for a 3D book discovery engine.
 - `pipeline/`: offline data + ML pipeline
 - `api/`: FastAPI backend for search/recommendations/points
 - `web/`: React + Three.js frontend globe
-- `data/`: raw + processed datasets
-- `artifacts/`: pipeline outputs used by API/web
+- `data/`: unified data root (`raw/`, `processed/`, `runtime/`, `build/`)
 
 ## Quickstart (minimal sample)
 
@@ -16,7 +15,7 @@ Minimal vertical slice for a 3D book discovery engine.
   - `python3 -m venv .venv && source .venv/bin/activate`
   - `pip install -r requirements.txt` 
 2. Build artifacts from bundled sample books:
-  - `python scripts/run_mvp_pipeline.py --use-sample --limit 10`
+  - `python scripts/rebuild_dashboard_data.py --input data/raw/sample_books.jsonl`
 3. Run API:
   - `uvicorn api.app.main:app --reload --port 8000`
 4. Run web app (in separate shell):
@@ -32,4 +31,3 @@ Minimal vertical slice for a 3D book discovery engine.
 - Embeddings: attempts `all-MiniLM-L6-v2`, falls back to deterministic hashing embeddings if unavailable.
 - Vector store: attempts FAISS, falls back to numpy cosine search for local verification.
 - User state is intentionally local-only (MVP, no auth).
-

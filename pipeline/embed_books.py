@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .common import ARTIFACTS, read_jsonl, stable_hash_vector
+from .common import RUNTIME_VECTOR, DATA_BUILD, read_jsonl, stable_hash_vector
 
 
 def build_text_block(book: dict) -> str:
@@ -42,19 +42,24 @@ def generate_embeddings(books: list[dict]) -> tuple[np.ndarray, list[str], str]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
-    parser.add_argument("--out-dir", default=str(ARTIFACTS))
+    parser.add_argument("--out-dir", default=str(RUNTIME_VECTOR))
+    parser.add_argument("--meta-out-dir", default=str(DATA_BUILD))
+    parser.add_argument("--write-meta", action="store_true", help="Write embedding metadata JSON")
     args = parser.parse_args()
 
     books = read_jsonl(Path(args.input))
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    meta_out = Path(args.meta_out_dir)
+    meta_out.mkdir(parents=True, exist_ok=True)
 
     embs, ids, method = generate_embeddings(books)
     np.save(out_dir / "embeddings.npy", embs)
     np.save(out_dir / "book_ids.npy", np.array(ids, dtype=object))
 
-    with (out_dir / "embedding_meta.json").open("w", encoding="utf-8") as f:
-        json.dump({"method": method, "dim": int(embs.shape[1]), "count": int(embs.shape[0])}, f, indent=2)
+    if args.write_meta:
+        with (meta_out / "embedding_meta.json").open("w", encoding="utf-8") as f:
+            json.dump({"method": method, "dim": int(embs.shape[1]), "count": int(embs.shape[0])}, f, indent=2)
 
     print(f"saved embeddings count={len(ids)} method={method}")
 
