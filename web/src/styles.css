@@ -20,12 +20,15 @@ body,
 #root {
   width: 100%;
   height: 100%;
+  min-height: 100%;
   margin: 0;
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', sans-serif;
   background: var(--bg-primary);
+  overflow-x: hidden;
+  overflow-y: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -33,11 +36,14 @@ body {
 .scene {
   position: relative;
   width: 100%;
-  height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  height: auto;
   color: #f5f7ff;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 18px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   --bg-core: rgba(92, 64, 168, 0.38);
   --bg-mid: rgba(34, 25, 61, 0.78);
   background: radial-gradient(920px 760px at 55% 55%, var(--bg-core), var(--bg-mid) 62%, #000 100%);
@@ -85,6 +91,7 @@ body {
   inset: 64px 0 0;
   z-index: 4;
   padding: 10px 14px 14px;
+  min-height: 0;
 }
 
 .feedToolbar {
@@ -119,6 +126,7 @@ body {
 
 .feedScroller {
   height: calc(100% - 48px);
+  min-height: 0;
   overflow-y: auto;
   scroll-snap-type: y mandatory;
   scroll-behavior: smooth;
@@ -135,7 +143,7 @@ body {
   width: 100%;
   max-width: 1240px;
   margin: 0;
-  min-height: calc(100vh - 165px);
+  min-height: calc(100dvh - 165px);
   max-height: none;
   scroll-snap-align: start;
   display: flex;
@@ -147,7 +155,7 @@ body {
 
 .feedTikTokCard {
   width: min(560px, 88vw);
-  height: min(84vh, 840px);
+  height: min(84dvh, 840px);
   border-radius: 14px;
   background: #0d121b;
   position: relative;
@@ -827,7 +835,7 @@ h1 {
   border-radius: 24px;
   padding: 22px 24px 28px;
   width: min(680px, 70vw);
-  max-height: min(72vh, 760px);
+  max-height: min(72dvh, 760px);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
   overflow: hidden;
   display: flex;
@@ -914,7 +922,7 @@ h1 {
   font-size: 15px;
   line-height: 1.45;
   color: rgba(255, 255, 255, 0.6);
-  max-height: min(38vh, 360px);
+  max-height: min(38dvh, 360px);
   min-height: 120px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -1100,6 +1108,7 @@ h1 {
   inset: 64px 0 0;
   z-index: 4;
   padding: 12px 18px 14px;
+  min-height: 0;
 }
 
 .listsToolbar {
@@ -1109,7 +1118,7 @@ h1 {
 .listsScreen {
   width: min(980px, 90vw);
   margin: 0 auto;
-  height: calc(100% - 48px);
+  min-height: calc(100% - 48px);
   display: grid;
   grid-template-columns: 286px 1fr;
   border: 0;
@@ -1509,7 +1518,7 @@ h1 {
   top: 50%;
   transform: translate(-50%, -50%);
   width: min(580px, 92vw);
-  height: min(500px, 88vh);
+  height: min(500px, 88dvh);
   border-radius: 20px;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,0.06);
@@ -2060,7 +2069,7 @@ h1 {
   }
 
   .feedPoster {
-    min-height: 42vh;
+    min-height: 42dvh;
   }
 }
 
@@ -2118,13 +2127,13 @@ h1 {
   }
 
   .feedItem {
-    min-height: calc(100vh - 106px);
+    min-height: calc(100dvh - 106px);
     max-height: none;
     width: 100%;
   }
 
   .feedPoster {
-    min-height: 36vh;
+    min-height: 36dvh;
     padding: 14px;
     border-radius: 14px;
   }
@@ -2153,14 +2162,14 @@ h1 {
   .listsScreen {
     grid-template-columns: 1fr;
     width: 100%;
-    height: calc(100% - 44px);
+    min-height: calc(100% - 44px);
     border-radius: 14px;
   }
 
   .listsSidebar {
     border-right: 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    max-height: 42vh;
+    max-height: 42dvh;
   }
 
   .listsTopBar {
@@ -2386,6 +2395,8 @@ h1 {
 /* Apple Books style shell */
 .appleShell {
   display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
   border-radius: 0;
   border: 0;
   background: #08090c;
@@ -2612,7 +2623,9 @@ h1 {
 .appleMain {
   position: relative;
   flex: 1;
-  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
 }
 
 .appleMain .headerLeft {
@@ -2795,18 +2808,20 @@ h1 {
   position: absolute;
   inset: 20px 24px 20px;
   overflow: auto;
+  min-height: 0;
 }
 
 .statsShell {
   position: absolute;
-  inset: 14px 18px 14px;
+  inset: 10px 12px 10px;
   overflow: auto;
+  min-height: 0;
 }
 
 .statsSection {
-  max-width: 1100px;
+  max-width: 980px;
   margin: 0 auto;
-  padding: 8px 8px 18px;
+  padding: 4px 4px 12px;
   background: #000;
 }
 
@@ -2851,7 +2866,7 @@ h1 {
   transform: translate(-50%, -50%);
   z-index: 12;
   width: min(560px, calc(100vw - 30px));
-  max-height: min(72vh, 600px);
+  max-height: min(72dvh, 600px);
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 28px 72px rgba(0, 0, 0, 0.56);
@@ -2896,7 +2911,7 @@ h1 {
 }
 
 .managePickerList {
-  max-height: min(40vh, 260px);
+  max-height: min(40dvh, 260px);
   gap: 6px;
 }
 
@@ -3108,7 +3123,7 @@ h1 {
 }
 
 .statsPeriods {
-  margin-top: 24px;
+  margin-top: 16px;
   display: grid;
   gap: 16px;
 }
@@ -3163,7 +3178,7 @@ h1 {
 
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -3171,26 +3186,26 @@ h1 {
   position: relative;
   border: 0;
   border-radius: 18px;
-  padding: 14px;
+  padding: 12px;
   background: transparent;
-  min-height: 132px;
+  min-height: 96px;
 }
 
 .statIcon {
   position: absolute;
   top: 14px;
   right: 14px;
-  width: 56px;
-  height: 56px;
-  border-radius: 18px;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
   display: grid;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .statIcon svg {
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   display: block;
 }
 
@@ -3203,24 +3218,24 @@ h1 {
 }
 
 .statValue {
-  font-size: 26px;
+  font-size: 22px;
   letter-spacing: -0.02em;
   color: rgba(255, 255, 255, 0.96);
   font-weight: 620;
 }
 
 .statLabel {
-  margin-top: 6px;
+  margin-top: 4px;
   font-size: 12px;
   letter-spacing: 0.01em;
   color: rgba(255, 255, 255, 0.62);
 }
 
 .statsActivityCard {
-  margin-top: 14px;
+  margin-top: 8px;
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 16px;
-  padding: 16px;
+  padding: 10px;
   background: linear-gradient(180deg, rgba(6, 8, 12, 0.96), rgba(4, 6, 10, 0.98));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
@@ -3234,26 +3249,26 @@ h1 {
 
 .statsActivityHead h4 {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1.28;
   letter-spacing: -0.02em;
   color: rgba(255, 255, 255, 0.96);
 }
 
 .statsActivityHead p {
-  margin: 6px 0 0;
-  font-size: 15px;
+  margin: 4px 0 0;
+  font-size: 13px;
   color: rgba(255, 255, 255, 0.54);
 }
 
 .statsActivityStreak {
   color: rgba(255, 198, 66, 0.98);
-  font-size: 16px;
+  font-size: 13px;
   white-space: nowrap;
   background: linear-gradient(180deg, rgba(78, 49, 7, 0.52), rgba(54, 34, 6, 0.58));
   border: 1px solid rgba(252, 185, 43, 0.16);
   border-radius: 16px;
-  padding: 8px 12px;
+  padding: 7px 10px;
 }
 
 .statsActivityStreak strong {
@@ -3269,10 +3284,14 @@ h1 {
 }
 
 .statsHeatmapWrap {
-  margin-top: 14px;
+  margin-top: 10px;
   overflow-x: auto;
   padding-bottom: 4px;
   scrollbar-width: none;
+  --heatmap-cell: 9px;
+  --heatmap-gap: 3px;
+  --heatmap-step: calc(var(--heatmap-cell) + var(--heatmap-gap));
+  --heatmap-gutter: 30px;
 }
 
 .statsHeatmapWrap::-webkit-scrollbar {
@@ -3280,22 +3299,31 @@ h1 {
 }
 
 .statsHeatmapMonths {
-  display: grid;
-  grid-template-columns: repeat(54, 1fr);
-  margin-left: 30px;
+  position: relative;
+  height: 18px;
+  width: calc(var(--heatmap-gutter) + (var(--heatmap-cols) * var(--heatmap-step)) - var(--heatmap-gap));
+  margin-left: 0;
   margin-bottom: 8px;
-  min-width: 760px;
+  min-width: max-content;
+  overflow: visible;
 }
 
 .statsHeatmapMonths span {
+  position: absolute;
+  left: calc(var(--heatmap-gutter) + (var(--tick-index) * var(--heatmap-step)) + (var(--heatmap-cell) / 2));
+  transform: translateX(-50%);
   font-size: 12px;
   color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .statsHeatmapBody {
-  display: flex;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
   gap: 8px;
-  min-width: 760px;
+  min-width: max-content;
+  width: max-content;
 }
 
 .statsHeatmapWeekdays {
@@ -3320,19 +3348,25 @@ h1 {
 
 .statsHeatmapGrid {
   display: flex;
-  gap: 4px;
+  gap: var(--heatmap-gap);
+  min-width: max-content;
+  width: max-content;
+  justify-content: flex-start;
 }
 
 .statsHeatmapCol {
+  flex: 0 0 auto;
+  min-width: var(--heatmap-cell);
+  width: var(--heatmap-cell);
   display: grid;
-  grid-template-rows: repeat(7, 12px);
-  gap: 4px;
+  grid-template-rows: repeat(7, var(--heatmap-cell));
+  gap: var(--heatmap-gap);
 }
 
 .statsHeatmapCell {
   position: relative;
-  width: 12px;
-  height: 12px;
+  width: var(--heatmap-cell);
+  height: var(--heatmap-cell);
   border-radius: 3px;
   background: #111319;
   border: 0;
@@ -3394,7 +3428,7 @@ h1 {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 10px;
   color: rgba(255, 255, 255, 0.54);
   font-size: 13px;
 }
@@ -3413,6 +3447,12 @@ h1 {
   .statsActivityStreak {
     font-size: 16px;
     padding: 8px 12px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
   }
 }
 
@@ -3559,7 +3599,7 @@ h1 {
   padding: 28px;
   max-width: 780px;
   width: 100%;
-  max-height: 80vh;
+  max-height: 80dvh;
   overflow: hidden;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
 }
@@ -3723,7 +3763,7 @@ h1 {
     grid-template-columns: 1fr;
     gap: 20px;
     padding: 20px;
-    max-height: 90vh;
+    max-height: 90dvh;
   }
 
   .searchDetailCover {
@@ -3938,13 +3978,13 @@ h1 {
 }
 
 .feedItemModern {
-  min-height: calc(100vh - 140px);
+  min-height: calc(100dvh - 140px);
   scroll-snap-align: center;
 }
 
 .feedCardModern {
   width: min(480px, 90vw);
-  height: min(82vh, 780px);
+  height: min(82dvh, 780px);
   border-radius: 24px;
   background: #0d1117;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -4161,7 +4201,7 @@ h1 {
   right: 0;
   bottom: calc(100% + 10px);
   width: min(280px, calc(100vw - 32px));
-  max-height: min(58vh, 360px);
+  max-height: min(58dvh, 360px);
   display: flex;
   flex-direction: column;
   border-radius: 14px;
@@ -4188,7 +4228,7 @@ h1 {
 }
 
 .collectionDropdownModern .collectionDropdownList {
-  max-height: min(30vh, 190px);
+  max-height: min(30dvh, 190px);
   padding-right: 4px;
 }
 
@@ -4255,7 +4295,7 @@ h1 {
 /* Shared add-to-collection picker */
 .collectionPickerCard {
   --collection-picker-width: min(320px, calc(100vw - 32px));
-  --collection-picker-max-height: min(56vh, 360px);
+  --collection-picker-max-height: min(56dvh, 360px);
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background:
@@ -4293,7 +4333,7 @@ h1 {
 .collectionPickerList {
   display: grid;
   gap: 8px;
-  max-height: min(30vh, 190px);
+  max-height: min(30dvh, 190px);
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -4376,7 +4416,7 @@ h1 {
     right: auto;
     transform: translate(-50%, -50%);
     width: var(--collection-picker-width);
-    max-height: min(78vh, 520px);
+    max-height: min(78dvh, 520px);
   }
 }
 
@@ -4679,7 +4719,7 @@ h1 {
   -webkit-line-clamp: unset;
   -webkit-box-orient: unset;
   overflow: auto;
-  max-height: 30vh;
+  max-height: 30dvh;
 }
 
 .feedReadMoreBtn {
@@ -4819,7 +4859,7 @@ h1 {
 
   .feedCardModern {
     width: calc(100vw - 32px);
-    height: calc(100vh - 180px);
+    height: calc(100dvh - 180px);
     border-radius: 20px;
   }
 
@@ -4962,7 +5002,7 @@ h1 {
 .feedDetailModalWrap {
   position: relative;
   width: min(420px, 84vw);
-  height: calc(100vh - 110px);
+  height: calc(100dvh - 110px);
   z-index: 9;
   margin: 0 auto;
 }
@@ -4997,15 +5037,11 @@ h1 {
 @media (max-width: 640px) {
   .feedDetailModalWrap {
     width: min(360px, 86vw);
-    height: calc(100vh - 130px);
+    height: calc(100dvh - 130px);
   }
 }
 
 @media (max-width: 980px) {
-  .statsGrid {
-    grid-template-columns: repeat(2, minmax(160px, 1fr));
-  }
-
   .statsTabs {
     overflow-x: auto;
     justify-content: flex-start;
@@ -5017,6 +5053,13 @@ h1 {
 }
 
 @media (max-width: 640px) {
+  .statsHeatmapWrap {
+    --heatmap-cell: 8px;
+    --heatmap-gap: 2px;
+    --heatmap-step: calc(var(--heatmap-cell) + var(--heatmap-gap));
+    --heatmap-gutter: 24px;
+  }
+
   .statsIdentity h2 {
     font-size: 28px;
   }
@@ -5027,5 +5070,36 @@ h1 {
 
   .statsTabs {
     justify-content: flex-start;
+  }
+
+  .statsHeatmapBody {
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .statsHeatmapMonths {
+    height: 16px;
+  }
+
+  .statsHeatmapWeekdays {
+    width: 18px;
+    grid-template-rows: repeat(7, 8px);
+    row-gap: 2px;
+  }
+
+  .statsHeatmapGrid {
+    gap: 2px;
+  }
+
+  .statsHeatmapCol {
+    gap: 2px;
+    min-width: 8px;
+    width: 8px;
+    grid-template-rows: repeat(7, 8px);
+  }
+
+  .statsHeatmapCell {
+    width: 8px;
+    height: 8px;
   }
 }

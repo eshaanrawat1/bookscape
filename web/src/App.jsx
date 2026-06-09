@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 // Same-origin `/api` → Caddy (prod) or Vite proxy (dev) → app-gate :3100 → lazy uvicorn :8000
-// const API = '/api'
-const API = 'http://127.0.0.1:8000'
+const API = '/api'
+// const API = 'http://127.0.0.1:8000'
 const W = 1600
 const H = 900
 const PAD = 120
@@ -2184,10 +2184,10 @@ export default function App() {
                       </strong>
                     </div>
                   </div>
-                  <div className="statsHeatmapWrap">
+                  <div className="statsHeatmapWrap" style={{ '--heatmap-cols': heatmapData.columns.length }}>
                     <div className="statsHeatmapMonths">
                       {heatmapData.monthTicks.map((tick) => (
-                        <span key={`m-${tick.col}`} style={{ gridColumn: `${tick.col + 1}` }}>
+                        <span key={`m-${tick.col}`} style={{ '--tick-index': tick.col }}>
                           {new Date(new Date().getFullYear(), tick.monthIdx, 1).toLocaleString(undefined, { month: 'short' })}
                         </span>
                       ))}
