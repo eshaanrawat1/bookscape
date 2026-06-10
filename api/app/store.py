@@ -25,6 +25,7 @@ class AtlasStore:
         self.ids: list[str] = []
         self.embeddings: np.ndarray | None = None
         self.faiss_index = None
+        self._global_library_cache: list[dict] | None = None
         self._load()
 
     def reload(self) -> None:
@@ -61,6 +62,7 @@ class AtlasStore:
         self.id_to_index = {}
         self.embeddings = None
         self.faiss_index = None
+        self._global_library_cache = None
 
         points_path = RUNTIME_CATALOG / "books_globe.json"
         if points_path.exists():
@@ -242,3 +244,61 @@ class AtlasStore:
         cluster_items = sorted(self.clusters.items(), key=lambda x: len(x[1]), reverse=True)
         selected = cluster_items[0][1] if cluster_items else self.points
         return selected[0] if selected else None
+
+    def get_global_library(self) -> list[dict]:
+        self._maybe_reload()
+        if self._global_library_cache is not None:
+            return self._global_library_cache
+
+        books_file = ROOT / "data" / "books.json"
+        if not books_file.exists():
+            return []
+            
+        with books_file.open("r", encoding="utf-8") as f:
+            all_books = json.load(f)
+            if isinstance(all_books, dict):
+                all_books = list(all_books.values())
+                
+        # Exclude unhelpful/broad genres
+        exclude = {"...more", "audiobook", "book club", "adult", "fiction", "nonfiction", "novels", "literature"}
+        
+        genre_counts = {}
+        for b in all_books:
+            for g in b.get("genres", []):
+                g_lower = g.lower()
+                if g_lower not in exclude:
+                    genre_counts[g] = genre_counts.get(g, 0) + 1
+                    
+        # Top 5 genres
+        top_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+        top_genre_names = [g[0] for g in top_genres]
+        
+        library = []
+        for genre in top_genre_names:
+            genre_books = [b for b in all_books if genre in b.get("genres", [])]
+            # Sort by popularity (rating_count)
+            genre_books.sort(key=lambda x: int(x.get("rating_count", 0)), reverse=True)
+            top_30 = genre_books[:30]
+            
+            # Map to expected UI format
+            mapped = []
+            for b in top_30:
+                mapped.append({
+                    "id": b.get("uid", ""),
+                    "title": b.get("title", "Untitled"),
+                    "author": b.get("author", ""),
+                    "cover": b.get("image_url", ""),
+                    "tint": "220 30% 45%",
+                    "genre": genre,
+                    "book_rating": b.get("avg_rating", 0),
+                    "description": b.get("description", ""),
+                    "total_pages": b.get("page_count", 0),
+                    "status": "not_started"
+                })
+            library.append({
+                "genre": genre,
+                "books": mapped
+            })
+            
+        self._global_library_cache = library
+        return library

@@ -1,9 +1,5 @@
 import { useState, useEffect } from 'react'
 
-// ---------------------------------------------------------------------------
-// API helpers
-// ---------------------------------------------------------------------------
-
 const BASE = '/api'
 
 async function apiFetch(path) {
@@ -12,7 +8,6 @@ async function apiFetch(path) {
   return res.json()
 }
 
-// Normalise a book from the /my-books response into the shape the UI expects.
 function normaliseBook(raw) {
   const totalPages = raw.reading_total_pages || raw.total_pages || 0
   const currentPage = raw.reading_current_page || raw.current_page || 0
@@ -73,6 +68,7 @@ export default function App() {
   // Live data from the API
   const [books, setBooks] = useState([])
   const [collections, setCollections] = useState([])
+  const [globalLibrary, setGlobalLibrary] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -80,9 +76,10 @@ export default function App() {
     let cancelled = false
     async function load() {
       try {
-        const [myBooksRes, listsRes] = await Promise.all([
+        const [myBooksRes, listsRes, globalRes] = await Promise.all([
           apiFetch('/my-books'),
           apiFetch('/reading-lists'),
+          apiFetch('/global-library'),
         ])
 
         if (cancelled) return
@@ -99,6 +96,7 @@ export default function App() {
           bookIds: (list.book_ids || []),
         }))
         setCollections(mappedCollections)
+        setGlobalLibrary(globalRes.genres || [])
       } catch (err) {
         if (!cancelled) setError(err.message)
       } finally {
@@ -180,7 +178,7 @@ export default function App() {
                 currentlyReading={currentlyReading}
                 wantToRead={wantToRead}
                 finished={finished}
-                heroBook={heroBook}
+                globalLibrary={globalLibrary}
               />
             )}
           </div>
@@ -263,7 +261,7 @@ function NavButton({ item, active, onSelect }) {
 // View routing
 // ---------------------------------------------------------------------------
 
-function ViewContent({ view, activeCollection, onOpen, books, booksByIds, currentlyReading, wantToRead, finished, heroBook }) {
+function ViewContent({ view, activeCollection, onOpen, books, booksByIds, currentlyReading, wantToRead, finished, globalLibrary }) {
   if (activeCollection) {
     return <BookGrid books={booksByIds(activeCollection.bookIds)} onOpen={onOpen} />
   }
@@ -278,10 +276,19 @@ function ViewContent({ view, activeCollection, onOpen, books, booksByIds, curren
   }
 
   if (view === 'library') {
+    if (!globalLibrary || globalLibrary.length === 0) {
+      return <div className="emptyState"><p>Loading library...</p></div>
+    }
     return (
       <div className="stack">
-        <Shelf title="Currently reading" books={currentlyReading} onOpen={onOpen} />
-        <Shelf title="All books" books={books} onOpen={onOpen} />
+        {globalLibrary.map((genreSection) => (
+          <Shelf
+            key={genreSection.genre}
+            title={genreSection.genre}
+            books={genreSection.books}
+            onOpen={onOpen}
+          />
+        ))}
       </div>
     )
   }

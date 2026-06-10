@@ -247,6 +247,11 @@ def get_reading_progress() -> dict:
     return {"entries": progress.list_all()}
 
 
+@app.get("/global-library")
+def get_global_library() -> dict:
+    return {"genres": store.get_global_library()}
+
+
 @app.get("/my-books")
 def get_my_books() -> dict:
     progress_entries = progress.list_all()
@@ -528,6 +533,11 @@ def api_remove_liked_book(book_id: str) -> dict:
 @api_router.get("/reading-progress")
 def api_get_reading_progress() -> dict:
     return get_reading_progress()
+
+
+@api_router.get("/global-library")
+def api_get_global_library() -> dict:
+    return get_global_library()
 
 
 @api_router.put("/reading-progress/{book_id}")
