@@ -64,7 +64,11 @@ html {
 
 body {
   overflow: hidden;
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.5;
   background: var(--background);
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
@@ -147,9 +151,10 @@ svg {
 }
 
 .brandName {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: 'Playfair Display', Georgia, serif;
   font-size: 2.05rem;
-  font-weight: 800;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   line-height: 1;
   color: var(--sidebar-foreground);
 }
@@ -157,6 +162,7 @@ svg {
 .brandTag {
   margin-top: 0.35rem;
   font-size: 1.23rem;
+  font-weight: 400;
   color: var(--muted-foreground);
 }
 
@@ -178,8 +184,8 @@ svg {
   padding: 0 1.2rem;
   color: var(--muted-foreground);
   font-size: 1.18rem;
-  font-weight: 700;
-  letter-spacing: 0.07em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -200,7 +206,8 @@ svg {
   color: color-mix(in oklch, var(--sidebar-foreground) 86%, transparent);
   padding: 0 1.55rem;
   font-size: 1.45rem;
-  font-weight: 650;
+  font-weight: 500;
+  letter-spacing: 0.005em;
   text-align: left;
   cursor: pointer;
   transition: background 160ms ease, color 160ms ease, transform 160ms ease;
@@ -225,7 +232,7 @@ svg {
 .collectionButton {
   min-height: 3.9rem;
   font-size: 1.32rem;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .collectionButton.active {
@@ -270,7 +277,7 @@ svg {
   min-height: 7.6rem;
   border-bottom: 1px solid var(--border);
   background: color-mix(in oklch, var(--background) 86%, transparent);
-  padding: 1.4rem 2.2rem;
+  padding: 3.2rem 2.2rem 1.4rem;
   backdrop-filter: blur(14px);
 }
 
@@ -283,8 +290,10 @@ svg {
 .titleGroup h1 {
   margin: 0;
   color: var(--foreground);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: 'Playfair Display', Georgia, serif;
   font-size: clamp(2.5rem, 3vw, 3.15rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
   line-height: 1;
 }
 
@@ -292,6 +301,8 @@ svg {
   margin: 0.55rem 0 0;
   color: var(--muted-foreground);
   font-size: 1.35rem;
+  font-weight: 400;
+  letter-spacing: 0.005em;
 }
 
 .lampButton,
@@ -380,6 +391,42 @@ svg {
   gap: 0.75rem;
 }
 
+.heroHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.carouselControls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.carouselButton {
+  display: grid;
+  width: 2.8rem;
+  height: 2.8rem;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.carouselButton:hover {
+  background: var(--secondary);
+  transform: translateY(-1px);
+}
+
+.carouselButton svg {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+
 .pill {
   display: inline-flex;
   width: fit-content;
@@ -390,7 +437,8 @@ svg {
   color: var(--accent-foreground);
   padding: 0.55rem 1.45rem;
   font-size: 1.12rem;
-  font-weight: 700;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .pill svg {
@@ -403,13 +451,18 @@ svg {
 .emptyState h2,
 .bookDialog h2 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   color: var(--foreground);
 }
 
 .heroCopy h2 {
   font-size: clamp(2.6rem, 4vw, 3.7rem);
   line-height: 1.02;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .bookMeta,
@@ -417,12 +470,18 @@ svg {
   margin: 0;
   color: var(--muted-foreground);
   font-size: 1.22rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
 }
 
 .heroBlurb {
   max-width: 47rem;
   color: color-mix(in oklch, var(--foreground) 78%, transparent);
-  line-height: 1.4;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .progressBlock {
@@ -473,7 +532,8 @@ svg {
   border-radius: 999px;
   padding: 0 2rem;
   font-size: 1.08rem;
-  font-weight: 800;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   cursor: pointer;
   transition: opacity 160ms ease, background 160ms ease, transform 160ms ease;
 }
@@ -525,12 +585,15 @@ svg {
 
 .shelfHeader h2 {
   font-size: 2rem;
+  letter-spacing: -0.015em;
 }
 
 .shelfHeader p {
   margin: 0.35rem 0 0;
   color: var(--muted-foreground);
   font-size: 1.08rem;
+  font-weight: 400;
+  letter-spacing: 0.005em;
 }
 
 .shelfHeader button {
@@ -538,7 +601,8 @@ svg {
   background: transparent;
   color: var(--primary);
   font-size: 1.02rem;
-  font-weight: 800;
+  font-weight: 600;
+  letter-spacing: 0.005em;
   cursor: pointer;
 }
 
@@ -549,6 +613,11 @@ svg {
   padding: 0.2rem 0.1rem 1.2rem;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
+}
+
+.shelfScroll .bookCard {
+  flex: 0 0 12.5rem;
+  width: 12.5rem;
 }
 
 .bookGrid {
@@ -582,8 +651,10 @@ svg {
   overflow: hidden;
   margin-top: 0.72rem;
   color: var(--foreground);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: 'Playfair Display', Georgia, serif;
   font-size: 1.18rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   line-height: 1.1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -594,6 +665,8 @@ svg {
   margin-top: 0.16rem;
   color: var(--muted-foreground);
   font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.005em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -738,13 +811,15 @@ svg {
 
 .dialogCopy h2 {
   font-size: 1.85rem;
+  letter-spacing: -0.02em;
   line-height: 1.1;
 }
 
 .dialogCopy p {
   margin: 0;
   color: var(--muted-foreground);
-  line-height: 1.45;
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
 .dialogStats {
@@ -753,6 +828,8 @@ svg {
   gap: 0.7rem;
   color: var(--muted-foreground);
   font-size: 0.88rem;
+  font-weight: 400;
+  letter-spacing: 0.005em;
 }
 
 .mobileDrawer {

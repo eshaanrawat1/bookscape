@@ -1,156 +1,53 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
-const books = [
-  {
-    id: 'lantern-keeper',
-    title: 'The Lantern Keeper',
-    author: 'Mara Ellison',
-    cover: '/covers/lantern-keeper.png',
-    tint: '30 90% 55%',
-    genre: 'Literary Fiction',
-    pages: 312,
-    rating: 4.6,
-    progress: 64,
-    format: ['ebook', 'audiobook'],
-    blurb:
-      'On the last inhabited island of a fading archipelago, a woman tends the light that keeps the ships-and her memories-from running aground.'
-  },
-  {
-    id: 'letters-from-the-pines',
-    title: 'Letters from the Pines',
-    author: 'Theo Hartwell',
-    cover: '/covers/letters-from-the-pines.png',
-    tint: '150 35% 35%',
-    genre: 'Literary Fiction',
-    pages: 274,
-    rating: 4.3,
-    progress: 28,
-    format: ['ebook']
-  },
-  {
-    id: 'a-quiet-kitchen',
-    title: 'A Quiet Kitchen',
-    author: 'Iris Moreau',
-    cover: '/covers/a-quiet-kitchen.png',
-    tint: '25 75% 50%',
-    genre: 'Memoir & Food',
-    pages: 248,
-    rating: 4.8,
-    progress: 0,
-    format: ['ebook', 'audiobook']
-  },
-  {
-    id: 'tidewater',
-    title: 'Tidewater',
-    author: 'Soren Vale',
-    cover: '/covers/tidewater.png',
-    tint: '200 45% 40%',
-    genre: 'Literary Fiction',
-    pages: 356,
-    rating: 4.1,
-    progress: 100,
-    format: ['ebook', 'audiobook']
-  },
-  {
-    id: 'the-wool-road',
-    title: 'The Wool Road',
-    author: 'Edith Caraway',
-    cover: '/covers/the-wool-road.png',
-    tint: '35 80% 50%',
-    genre: 'Historical Fiction',
-    pages: 402,
-    rating: 4.5,
-    progress: 0,
-    format: ['ebook']
-  },
-  {
-    id: 'midnight-almanac',
-    title: 'The Midnight Almanac',
-    author: 'Cyrus Bell',
-    cover: '/covers/midnight-almanac.png',
-    tint: '250 40% 45%',
-    genre: 'Nature & Science',
-    pages: 288,
-    rating: 4.7,
-    progress: 12,
-    format: ['ebook', 'audiobook']
-  },
-  {
-    id: 'saffron-house',
-    title: 'The Saffron House',
-    author: 'Nadia Khoury',
-    cover: '/covers/saffron-house.png',
-    tint: '45 85% 55%',
-    genre: 'Contemporary Fiction',
-    pages: 330,
-    rating: 4.4,
-    progress: 0,
-    format: ['ebook', 'audiobook']
-  },
-  {
-    id: 'winter-orchard',
-    title: 'Winter Orchard',
-    author: 'Lewis Ashby',
-    cover: '/covers/winter-orchard.png',
-    tint: '120 20% 45%',
-    genre: 'Poetry',
-    pages: 96,
-    rating: 4.2,
-    progress: 0,
-    format: ['ebook']
-  },
-  {
-    id: 'the-cartographer',
-    title: "The Cartographer's Daughter",
-    author: 'Beatrix Lowe',
-    cover: '/covers/the-cartographer.png',
-    tint: '20 50% 45%',
-    genre: 'Adventure',
-    pages: 388,
-    rating: 4.6,
-    progress: 0,
-    format: ['ebook', 'audiobook']
-  },
-  {
-    id: 'slow-mornings',
-    title: 'Slow Mornings',
-    author: 'Priya Anand',
-    cover: '/covers/slow-mornings.png',
-    tint: '30 60% 60%',
-    genre: 'Wellbeing',
-    pages: 210,
-    rating: 4.0,
-    progress: 0,
-    format: ['ebook', 'audiobook']
-  }
-]
+// ---------------------------------------------------------------------------
+// API helpers
+// ---------------------------------------------------------------------------
 
-const collections = [
-  {
-    id: 'rainy-day',
-    name: 'Rainy Day Reads',
-    description: 'For grey afternoons and a second cup of tea.',
-    bookIds: ['lantern-keeper', 'letters-from-the-pines', 'tidewater']
-  },
-  {
-    id: 'comfort',
-    name: 'Comfort Shelf',
-    description: 'Books that feel like a warm blanket.',
-    bookIds: ['a-quiet-kitchen', 'slow-mornings', 'winter-orchard']
-  },
-  {
-    id: 'wanderlust',
-    name: 'Armchair Travels',
-    description: 'Go somewhere without leaving the chair.',
-    bookIds: ['the-cartographer', 'the-wool-road', 'saffron-house']
+const BASE = '/api'
+
+async function apiFetch(path) {
+  const res = await fetch(`${BASE}${path}`)
+  if (!res.ok) throw new Error(`API ${path} → ${res.status}`)
+  return res.json()
+}
+
+// Normalise a book from the /my-books response into the shape the UI expects.
+function normaliseBook(raw) {
+  const totalPages = raw.reading_total_pages || raw.total_pages || 0
+  const currentPage = raw.reading_current_page || raw.current_page || 0
+  const progress =
+    totalPages > 0 ? Math.min(100, Math.round((currentPage / totalPages) * 100)) : 0
+
+  const status = raw.reading_status || raw.status || 'not_started'
+
+  return {
+    id: raw.id,
+    title: raw.title || 'Untitled',
+    author: raw.author || '',
+    cover: raw.image_url || '',
+    tint: '220 30% 45%', // neutral fallback tint — image_url is used for actual cover art
+    genre: raw.genre || (Array.isArray(raw.genres) && raw.genres[0]) || '',
+    pages: totalPages,
+    rating: parseFloat(raw.book_rating) || 0,
+    progress,
+    status,
+    format: [], // not tracked in our dataset; omit audio badge
+    blurb: raw.description || '',
+    // keep raw fields for completeness
+    _raw: raw,
   }
-]
+}
+
+// ---------------------------------------------------------------------------
+// Static navigation metadata (no data dependency)
+// ---------------------------------------------------------------------------
 
 const viewMeta = {
   'reading-now': { title: 'Reading Now', subtitle: 'Pick up where you left off.' },
   library: { title: 'Library', subtitle: 'Everything on your shelves.' },
   'want-to-read': { title: 'Want to Read', subtitle: 'Saved for a rainy day.' },
-  finished: { title: 'Finished', subtitle: "Books you've loved and closed." }
+  finished: { title: 'Finished', subtitle: "Books you've loved and closed." },
 }
 
 const mainNav = [
@@ -160,15 +57,12 @@ const mainNav = [
 
 const shelfNav = [
   { id: 'want-to-read', label: 'Want to Read', icon: BookmarkIcon },
-  { id: 'finished', label: 'Finished', icon: CheckIcon }
+  { id: 'finished', label: 'Finished', icon: CheckIcon },
 ]
 
-const bookById = new Map(books.map((book) => [book.id, book]))
-const booksByIds = (ids) => ids.map((id) => bookById.get(id)).filter(Boolean)
-const currentlyReading = books.filter((book) => book.progress > 0 && book.progress < 100)
-const wantToRead = books.filter((book) => book.progress === 0)
-const finished = books.filter((book) => book.progress === 100)
-const heroBook = bookById.get('lantern-keeper')
+// ---------------------------------------------------------------------------
+// Root component
+// ---------------------------------------------------------------------------
 
 export default function App() {
   const [view, setView] = useState('reading-now')
@@ -176,8 +70,55 @@ export default function App() {
   const [mobileNav, setMobileNav] = useState(false)
   const [selected, setSelected] = useState(null)
 
+  // Live data from the API
+  const [books, setBooks] = useState([])
+  const [collections, setCollections] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const [myBooksRes, listsRes] = await Promise.all([
+          apiFetch('/my-books'),
+          apiFetch('/reading-lists'),
+        ])
+
+        if (cancelled) return
+
+        const normalisedBooks = (myBooksRes.books || []).map(normaliseBook)
+        setBooks(normalisedBooks)
+
+        // Map reading-list API response → sidebar collections shape
+        const rawLists = listsRes.lists || []
+        const mappedCollections = rawLists.map((list) => ({
+          id: list.name.toLowerCase().replace(/\s+/g, '-'),
+          name: list.name,
+          description: '',
+          bookIds: (list.book_ids || []),
+        }))
+        setCollections(mappedCollections)
+      } catch (err) {
+        if (!cancelled) setError(err.message)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [])
+
+  // Derived views from live books
+  const bookById = new Map(books.map((b) => [b.id, b]))
+  const booksByIds = (ids) => ids.map((id) => bookById.get(id)).filter(Boolean)
+  const currentlyReading = books.filter((b) => b.status === 'reading')
+  const wantToRead = books.filter((b) => b.status === 'not_started')
+  const finished = books.filter((b) => b.status === 'done')
+  const heroBook = currentlyReading[0] || books[0] || null
+
   const activeCollection = view.startsWith('collection:')
-    ? collections.find((collection) => `collection:${collection.id}` === view)
+    ? collections.find((c) => `collection:${c.id}` === view)
     : null
   const meta = activeCollection ? activeCollection : viewMeta[view]
 
@@ -186,6 +127,7 @@ export default function App() {
       <div className="hearthShell">
         <Sidebar
           active={view}
+          collections={collections}
           onSelect={(nextView) => {
             setView(nextView)
             setMobileNav(false)
@@ -197,6 +139,7 @@ export default function App() {
             <div className="mobileDrawer" onClick={(event) => event.stopPropagation()}>
               <Sidebar
                 active={view}
+                collections={collections}
                 onSelect={(nextView) => {
                   setView(nextView)
                   setMobileNav(false)
@@ -217,13 +160,29 @@ export default function App() {
                 <p>{meta.subtitle || meta.description}</p>
               </div>
             </div>
-            <button className="lampButton" onClick={() => setDark((value) => !value)} aria-label="Toggle dark mode">
+            <button className="lampButton" onClick={() => setDark((v) => !v)} aria-label="Toggle dark mode">
               {dark ? <SunIcon /> : <MoonIcon />}
             </button>
           </header>
 
           <div className="mainContent">
-            <ViewContent view={view} activeCollection={activeCollection} onOpen={setSelected} />
+            {loading ? (
+              <div className="emptyState"><p>Loading your books…</p></div>
+            ) : error ? (
+              <div className="emptyState"><h2>Could not load books</h2><p>{error}</p></div>
+            ) : (
+              <ViewContent
+                view={view}
+                activeCollection={activeCollection}
+                onOpen={setSelected}
+                books={books}
+                booksByIds={booksByIds}
+                currentlyReading={currentlyReading}
+                wantToRead={wantToRead}
+                finished={finished}
+                heroBook={heroBook}
+              />
+            )}
           </div>
         </main>
       </div>
@@ -233,7 +192,11 @@ export default function App() {
   )
 }
 
-function Sidebar({ active, onSelect }) {
+// ---------------------------------------------------------------------------
+// Sidebar
+// ---------------------------------------------------------------------------
+
+function Sidebar({ active, collections, onSelect }) {
   return (
     <aside className="sidebar paperGrain">
       <div className="brand">
@@ -296,7 +259,11 @@ function NavButton({ item, active, onSelect }) {
   )
 }
 
-function ViewContent({ view, activeCollection, onOpen }) {
+// ---------------------------------------------------------------------------
+// View routing
+// ---------------------------------------------------------------------------
+
+function ViewContent({ view, activeCollection, onOpen, books, booksByIds, currentlyReading, wantToRead, finished, heroBook }) {
   if (activeCollection) {
     return <BookGrid books={booksByIds(activeCollection.bookIds)} onOpen={onOpen} />
   }
@@ -304,8 +271,7 @@ function ViewContent({ view, activeCollection, onOpen }) {
   if (view === 'reading-now') {
     return (
       <div className="stack">
-        <ReadingNowHero book={heroBook} onOpen={onOpen} />
-        <Shelf title="Continue reading" subtitle="You were in the middle of these." books={currentlyReading} onOpen={onOpen} />
+        {currentlyReading.length > 0 && <ReadingNowHero books={currentlyReading} onOpen={onOpen} />}
         <Shelf title="Up next" subtitle="Saved for the right moment." books={wantToRead.slice(0, 6)} onOpen={onOpen} />
       </div>
     )
@@ -325,7 +291,22 @@ function ViewContent({ view, activeCollection, onOpen }) {
   return null
 }
 
-function ReadingNowHero({ book, onOpen }) {
+// ---------------------------------------------------------------------------
+// UI components (unchanged from original)
+// ---------------------------------------------------------------------------
+
+function ReadingNowHero({ books, onOpen }) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+
+  if (!books || books.length === 0) return null
+
+  // In case the list shrinks
+  const safeIndex = currentIndex >= books.length ? 0 : currentIndex
+  const book = books[safeIndex]
+
+  const nextBook = () => setCurrentIndex((i) => (i + 1) % books.length)
+  const prevBook = () => setCurrentIndex((i) => (i - 1 + books.length) % books.length)
+
   const pagesLeft = Math.round((book.pages * (100 - book.progress)) / 100)
 
   return (
@@ -336,10 +317,22 @@ function ReadingNowHero({ book, onOpen }) {
           <BookCover book={book} glow />
         </button>
         <div className="heroCopy">
-          <span className="pill">
-            <ClockIcon />
-            Continue reading
-          </span>
+          <div className="heroHeader">
+            <span className="pill">
+              <ClockIcon />
+              Continue reading
+            </span>
+            {books.length > 1 && (
+              <div className="carouselControls">
+                <button className="carouselButton" onClick={prevBook} aria-label="Previous book">
+                  <ChevronLeftIcon />
+                </button>
+                <button className="carouselButton" onClick={nextBook} aria-label="Next book">
+                  <ChevronRightIcon />
+                </button>
+              </div>
+            )}
+          </div>
           <h2>{book.title}</h2>
           <p className="bookMeta">
             {book.author} · {book.genre}
@@ -347,21 +340,10 @@ function ReadingNowHero({ book, onOpen }) {
           <p className="heroBlurb">{book.blurb}</p>
           <div className="progressBlock">
             <div>
-              <span>{book.progress}% · chapter 9 of 14</span>
+              <span>{book.progress}%</span>
               <span>{pagesLeft} pages left</span>
             </div>
             <Progress value={book.progress} />
-          </div>
-          <div className="actionRow">
-            <button className="primaryButton">
-              <BookOpenIcon />
-              Keep reading
-            </button>
-            <button className="secondaryButton">
-              <HeadphonesIcon />
-              Listen instead
-            </button>
-            <StarRating value={book.rating} />
           </div>
         </div>
       </div>
@@ -410,17 +392,10 @@ function BookGrid({ books, onOpen }) {
 }
 
 function BookCard({ book, onOpen }) {
-  const isAudio = book.format.includes('audiobook')
-
   return (
     <button className="bookCard" onClick={() => onOpen(book)}>
       <div className="coverWrap">
         <BookCover book={book} />
-        {isAudio && (
-          <span className="audioBadge">
-            <HeadphonesIcon />
-          </span>
-        )}
         {book.progress > 0 && book.progress < 100 && (
           <div className="coverProgress">
             <Progress value={book.progress} />
@@ -457,14 +432,14 @@ function BookDialog({ book, onClose }) {
           <BookCover book={book} glow />
         </div>
         <div className="dialogCopy">
-          <span className="pill">{book.genre}</span>
+          {book.genre && <span className="pill">{book.genre}</span>}
           <h2>{book.title}</h2>
           <p>{book.author}</p>
-          <p>{book.blurb || 'A cozy shelf pick with a warm cover, calm pacing, and a perfect spot in the evening stack.'}</p>
+          <p>{book.blurb || 'A great read from your library.'}</p>
           <div className="dialogStats">
-            <span>{book.pages} pages</span>
-            <span>{book.progress}% read</span>
-            <StarRating value={book.rating} />
+            {book.pages > 0 && <span>{book.pages} pages</span>}
+            {book.progress > 0 && <span>{book.progress}% read</span>}
+            {book.rating > 0 && <StarRating value={book.rating} />}
           </div>
           <button className="primaryButton">
             <BookOpenIcon />
@@ -492,6 +467,10 @@ function StarRating({ value }) {
     </span>
   )
 }
+
+// ---------------------------------------------------------------------------
+// Icons (unchanged from original)
+// ---------------------------------------------------------------------------
 
 function Icon({ children }) {
   return (
@@ -622,6 +601,22 @@ function CloseIcon() {
     <Icon>
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
+    </Icon>
+  )
+}
+
+function ChevronLeftIcon() {
+  return (
+    <Icon>
+      <path d="m15 18-6-6 6-6" />
+    </Icon>
+  )
+}
+
+function ChevronRightIcon() {
+  return (
+    <Icon>
+      <path d="m9 18 6-6-6-6" />
     </Icon>
   )
 }
