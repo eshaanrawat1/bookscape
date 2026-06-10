@@ -14,7 +14,23 @@ import numpy as np
 import yaml
 
 from .data_repository import DataRepository
-from pipeline.embed_books import generate_embeddings
+try:
+    from pipeline.embed_books import generate_embeddings  # type: ignore[import]
+except ModuleNotFoundError:
+    # pipeline/ was removed; provide a lightweight deterministic fallback so the
+    # API can start and serve all routes that don't require ML embeddings.
+    def generate_embeddings(books: list[dict], dim: int = 64) -> tuple:  # type: ignore[misc]
+        import hashlib
+
+        embs = []
+        for b in books:
+            seed = (str(b.get("title", "")) + str(b.get("author", ""))).encode()
+            h = hashlib.sha256(seed).digest()
+            vec = np.array([((h[i % len(h)] / 255.0) * 2 - 1) for i in range(dim)], dtype=np.float32)
+            norm = float(np.linalg.norm(vec)) or 1.0
+            embs.append(vec / norm)
+        ids = [str(b.get("id", i)) for i, b in enumerate(books)]
+        return np.array(embs, dtype=np.float32), ids, "hash_fallback"
 
 DEFAULT_OBSIDIAN_VAULT = Path("~/Obsidian/Books")
 

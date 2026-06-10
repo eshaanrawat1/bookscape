@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import APIRouter, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -464,3 +464,100 @@ def unlink_my_book(book_id: str) -> dict:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"unlink failed: {e}") from e
     return {"ok": True, **out}
+
+
+# ---------------------------------------------------------------------------
+# /api/* router — mirrors all routes the frontend calls so that both the Vite
+# dev proxy (/api → FastAPI at /api/...) and production reverse proxies work
+# without any URL rewriting on either side.
+# ---------------------------------------------------------------------------
+
+api_router = APIRouter(prefix="/api")
+
+
+@api_router.get("/my-books")
+def api_get_my_books() -> dict:
+    return get_my_books()
+
+
+@api_router.get("/reading-lists")
+def api_get_reading_lists() -> dict:
+    return get_reading_lists()
+
+
+@api_router.post("/reading-lists")
+def api_create_reading_list(payload: CreateListIn) -> dict:
+    return create_reading_list(payload)
+
+
+@api_router.delete("/reading-lists/{name}")
+def api_delete_reading_list(name: str) -> dict:
+    return delete_reading_list(name)
+
+
+@api_router.patch("/reading-lists/{name}")
+def api_rename_reading_list(name: str, payload: RenameListIn) -> dict:
+    return rename_reading_list(name, payload)
+
+
+@api_router.post("/reading-lists/{name}/books")
+def api_add_book_to_list(name: str, payload: AddBookIn) -> dict:
+    return add_book_to_list(name, payload)
+
+
+@api_router.delete("/reading-lists/{name}/books/{book_id}")
+def api_remove_book_from_list(name: str, book_id: str) -> dict:
+    return remove_book_from_list(name, book_id)
+
+
+@api_router.get("/liked-books")
+def api_get_liked_books() -> dict:
+    return get_liked_books()
+
+
+@api_router.post("/liked-books")
+def api_add_liked_book(payload: AddBookIn) -> dict:
+    return add_liked_book(payload)
+
+
+@api_router.delete("/liked-books/{book_id}")
+def api_remove_liked_book(book_id: str) -> dict:
+    return remove_liked_book(book_id)
+
+
+@api_router.get("/reading-progress")
+def api_get_reading_progress() -> dict:
+    return get_reading_progress()
+
+
+@api_router.put("/reading-progress/{book_id}")
+def api_upsert_reading_progress(book_id: str, payload: ReadingProgressIn) -> dict:
+    return upsert_reading_progress(book_id, payload)
+
+
+@api_router.get("/reading-stats")
+def api_get_reading_stats() -> dict:
+    return get_reading_stats()
+
+
+@api_router.get("/search")
+def api_search(q: str = Query(..., min_length=1), limit: int = Query(default=10, ge=1, le=50)) -> dict:
+    return search(q=q, limit=limit)
+
+
+@api_router.get("/search/suggest")
+def api_search_suggest(q: str = Query(..., min_length=1), limit: int = Query(default=8, ge=1, le=20)) -> dict:
+    return search_suggest(q=q, limit=limit)
+
+
+@api_router.get("/book/{book_id}")
+def api_get_book(book_id: str) -> dict:
+    return get_book(book_id)
+
+
+@api_router.get("/recommendations")
+def api_recommendations(book_id: str = Query(...), limit: int = Query(default=5, ge=1, le=20)) -> dict:
+    return recommendations(book_id=book_id, limit=limit)
+
+
+app.include_router(api_router)
