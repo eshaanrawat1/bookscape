@@ -26,6 +26,7 @@ class AtlasStore:
         self.embeddings: np.ndarray | None = None
         self.faiss_index = None
         self._global_library_cache: list[dict] | None = None
+        self._all_books_cache: dict[str, dict] | None = None
         self._load()
 
     def reload(self) -> None:
@@ -63,6 +64,7 @@ class AtlasStore:
         self.embeddings = None
         self.faiss_index = None
         self._global_library_cache = None
+        self._all_books_cache = None
 
         points_path = RUNTIME_CATALOG / "books_globe.json"
         if points_path.exists():
@@ -159,9 +161,41 @@ class AtlasStore:
         self.points_cache[cache_key] = out
         return out
 
+    def _ensure_all_books(self) -> None:
+        if self._all_books_cache is not None:
+            return
+            
+        books_file = ROOT / "data" / "books.json"
+        if not books_file.exists():
+            self._all_books_cache = {}
+            return
+            
+        with books_file.open("r", encoding="utf-8") as f:
+            all_books = json.load(f)
+            if isinstance(all_books, dict):
+                all_books = list(all_books.values())
+        
+        self._all_books_cache = {str(b.get("uid")): b for b in all_books}
+
     def get_book(self, book_id: str) -> dict | None:
         self._maybe_reload()
-        return self.books_by_id.get(book_id)
+        self._ensure_all_books()
+        
+        book = self._all_books_cache.get(book_id)
+        if not book:
+            return self.books_by_id.get(book_id)
+            
+        # Resolve similar books instantly
+        similar_ids = book.get("similar_book_ids", [])
+        similar_books = []
+        for sid in similar_ids:
+            if sid in self._all_books_cache:
+                similar_books.append(self._all_books_cache[sid])
+                
+        # Return a copy with similar_books populated
+        result = dict(book)
+        result["similar_books"] = similar_books
+        return result
 
     def search(self, query: str, limit: int = 10) -> list[dict]:
         self._maybe_reload()

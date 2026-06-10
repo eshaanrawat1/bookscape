@@ -428,31 +428,61 @@ function BookCover({ book, glow = false }) {
   )
 }
 
-function BookDialog({ book, onClose }) {
+function BookDialog({ book, onClose, onOpen }) {
+  const [fullBook, setFullBook] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    apiFetch(`/book/${book.id}`)
+      .then((data) => {
+        if (!cancelled && data) setFullBook(data)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [book.id])
+
+  const displayBook = fullBook || book
+  const similarBooks = fullBook?.similar_books || []
+
   return (
     <div className="dialogScrim" onClick={onClose}>
       <article className="bookDialog paperGrain" onClick={(event) => event.stopPropagation()}>
         <button className="dialogClose" onClick={onClose} aria-label="Close details">
           <CloseIcon />
         </button>
-        <div className="dialogCover">
-          <BookCover book={book} glow />
-        </div>
-        <div className="dialogCopy">
-          {book.genre && <span className="pill">{book.genre}</span>}
-          <h2>{book.title}</h2>
-          <p>{book.author}</p>
-          <p>{book.blurb || 'A great read from your library.'}</p>
-          <div className="dialogStats">
-            {book.pages > 0 && <span>{book.pages} pages</span>}
-            {book.progress > 0 && <span>{book.progress}% read</span>}
-            {book.rating > 0 && <StarRating value={book.rating} />}
+        <div className="dialogTop">
+          <div className="dialogCover">
+            <BookCover book={displayBook} glow />
           </div>
-          <button className="primaryButton">
-            <BookOpenIcon />
-            Open book
-          </button>
+          <div className="dialogCopy">
+            <h2>{displayBook.title}</h2>
+            <p className="dialogAuthor">{displayBook.author} &gt;</p>
+            
+            <div className="dialogMetaLine">
+              {displayBook.rating > 0 && <StarRating value={displayBook.rating} />}
+              {displayBook.rating > 0 && displayBook.genre && <span className="metaDot">·</span>}
+              {displayBook.genre && <span>{displayBook.genre}</span>}
+            </div>
+
+            <p className="dialogBlurb">{displayBook.blurb || displayBook.description || 'A great read from your library.'}</p>
+          </div>
         </div>
+
+        {similarBooks.length > 0 && (
+          <div className="dialogSimilar">
+            <h3>Similar Books</h3>
+            <div className="dialogSimilarScroll">
+              {similarBooks.map((simRaw) => {
+                const simBook = normaliseBook(simRaw)
+                return (
+                  <button key={simBook.id} className="similarCard" onClick={() => { if (onOpen) onOpen(simBook) }}>
+                    <BookCover book={simBook} />
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </article>
     </div>
   )
