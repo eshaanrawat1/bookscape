@@ -23,30 +23,6 @@
   --radius: 0.875rem;
 }
 
-.dark {
-  color-scheme: dark;
-  --background: oklch(0.22 0.018 50);
-  --foreground: oklch(0.92 0.02 78);
-  --card: oklch(0.26 0.02 48);
-  --card-foreground: oklch(0.92 0.02 78);
-  --primary: oklch(0.72 0.13 60);
-  --primary-foreground: oklch(0.22 0.02 50);
-  --secondary: oklch(0.3 0.022 48);
-  --secondary-foreground: oklch(0.9 0.02 78);
-  --muted: oklch(0.3 0.02 48);
-  --muted-foreground: oklch(0.72 0.025 70);
-  --accent: oklch(0.36 0.04 58);
-  --accent-foreground: oklch(0.93 0.025 80);
-  --border: oklch(0.34 0.02 50);
-  --ring: oklch(0.72 0.13 60);
-  --sidebar: oklch(0.2 0.018 50);
-  --sidebar-foreground: oklch(0.9 0.02 78);
-  --sidebar-accent: oklch(0.32 0.03 56);
-  --sidebar-border: oklch(0.3 0.02 50);
-  --shadow-warm: 0 14px 30px -12px rgba(0, 0, 0, 0.78);
-  --shadow-panel: 0 18px 42px -22px rgba(0, 0, 0, 0.78);
-}
-
 * {
   box-sizing: border-box;
 }
@@ -112,12 +88,10 @@ svg {
 
 .sidebar {
   display: flex;
-  width: 29rem;
-  max-width: 29rem;
-  flex: 0 0 29rem;
+  flex: 0 0 32rem;
   flex-direction: column;
   gap: 2.9rem;
-  overflow-y: auto;
+  overflow: hidden;
   border-right: 1px solid var(--sidebar-border);
   background-color: var(--sidebar);
   padding: 3.1rem 2.25rem 2rem;
@@ -170,6 +144,11 @@ svg {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+  min-height: 0;
+}
+
+.collectionsSection {
+  flex: 1;
 }
 
 .sectionHeader {
@@ -194,10 +173,20 @@ svg {
   margin: 0;
 }
 
+.collectionList {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.35rem;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 0.15rem;
+}
+
 .navButton,
 .collectionButton {
   display: flex;
-  min-height: 4.85rem;
+  min-height: 3.85rem;
   align-items: center;
   gap: 1.2rem;
   border: 0;
@@ -205,12 +194,16 @@ svg {
   background: transparent;
   color: color-mix(in oklch, var(--sidebar-foreground) 86%, transparent);
   padding: 0 1.55rem;
-  font-size: 1.45rem;
+  font-size: 1.30rem;
   font-weight: 500;
   letter-spacing: 0.005em;
   text-align: left;
   cursor: pointer;
   transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.collectionButton {
+  width: 100%;
 }
 
 .navButton svg {
@@ -231,7 +224,7 @@ svg {
 
 .collectionButton {
   min-height: 3.9rem;
-  font-size: 1.32rem;
+  font-size: 1.30rem;
   font-weight: 400;
 }
 
@@ -248,6 +241,48 @@ svg {
   box-shadow: 0 0 0 3px var(--card);
 }
 
+.collectionNameButton {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.collectionEditForm {
+  min-width: 0;
+  flex: 1;
+}
+
+.collectionNameInput {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid color-mix(in oklch, var(--primary) 42%, transparent);
+  border-radius: 0.65rem;
+  background: color-mix(in oklch, var(--card) 86%, transparent);
+  color: var(--sidebar-foreground);
+  padding: 0.35rem 0.55rem;
+  outline: 0;
+}
+
+.collectionNameInput:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 16%, transparent);
+}
+
+.collectionError {
+  margin: 0.2rem 1.2rem 0;
+  color: oklch(0.48 0.14 28);
+  font-size: 1.1rem;
+  line-height: 1.35;
+}
+
 .plusButton {
   display: grid;
   width: 2.25rem;
@@ -257,6 +292,11 @@ svg {
   background: transparent;
   color: var(--muted-foreground);
   cursor: pointer;
+}
+
+.plusButton:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 
 .contentPane {
@@ -287,6 +327,12 @@ svg {
   gap: 0.9rem;
 }
 
+.topBarActions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .titleGroup h1 {
   margin: 0;
   color: var(--foreground);
@@ -305,7 +351,6 @@ svg {
   letter-spacing: 0.005em;
 }
 
-.lampButton,
 .mobileMenuButton,
 .dialogClose {
   display: grid;
@@ -320,21 +365,33 @@ svg {
   transition: background 160ms ease, transform 160ms ease;
 }
 
-.lampButton:hover,
-.mobileMenuButton:hover,
-.dialogClose:hover {
-  background: color-mix(in oklch, var(--accent) 52%, transparent);
-}
-
-.lampButton svg {
-  width: 2rem;
-  height: 2rem;
-}
-
 .mobileMenuButton {
   display: none;
   width: 2.8rem;
   height: 2.8rem;
+}
+
+.deleteCollectionButton {
+  display: grid;
+  width: 3.35rem;
+  height: 3.35rem;
+  place-items: center;
+  border: 1px solid color-mix(in oklch, oklch(0.62 0.2 25) 40%, var(--border));
+  border-radius: 999px;
+  background: transparent;
+  color: oklch(0.58 0.21 25);
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease, border-color 160ms ease;
+}
+
+.deleteCollectionButton:hover {
+  background: color-mix(in oklch, oklch(0.62 0.2 25) 12%, transparent);
+  border-color: oklch(0.58 0.21 25);
+}
+
+.deleteCollectionButton svg {
+  width: 1.45rem;
+  height: 1.45rem;
 }
 
 .mainContent {
@@ -346,7 +403,7 @@ svg {
 .stack {
   display: flex;
   flex-direction: column;
-  gap: 3.2rem;
+  gap: 2.2rem;
 }
 
 .heroCard {
@@ -616,13 +673,13 @@ svg {
 }
 
 .shelfScroll .bookCard {
-  flex: 0 0 12.5rem;
-  width: 12.5rem;
+  flex: 0 0 14rem;
+  width: 14rem;
 }
 
 .bookGrid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(10.5rem, 1fr));
+  grid-template-columns: repeat(4, minmax(12rem, 1fr));
   gap: 2.4rem 1.6rem;
 }
 
@@ -782,7 +839,9 @@ svg {
   left: 50%;
   display: flex;
   flex-direction: column;
-  width: min(44rem, calc(100vw - 2rem));
+  width: min(70rem, calc(100vw - 2rem));
+  min-height: min(60rem, calc(100vh - 2rem));
+  max-height: calc(100vh - 2rem);
   gap: 1.5rem;
   transform: translate(-50%, -50%);
   border: 1px solid var(--border);
@@ -790,12 +849,18 @@ svg {
   background-color: var(--card);
   padding: 1.5rem;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+  overflow: auto;
 }
 
 .dialogTop {
   display: grid;
-  grid-template-columns: 12rem minmax(0, 1fr);
-  gap: 1.5rem;
+  grid-template-columns: minmax(20rem, 36%) minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+}
+
+.dialogCover {
+  width: 100%;
 }
 
 .dialogClose {
@@ -810,7 +875,7 @@ svg {
 .dialogCopy {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.8rem;
 }
 
 .dialogAuthor {
@@ -819,26 +884,62 @@ svg {
   font-size: 1.1rem;
 }
 
-.dialogMetaLine {
+.dialogStatsRow {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  color: var(--muted-foreground);
-  font-size: 1.1rem;
-  margin-top: 0.2rem;
+  flex-wrap: wrap;
+  gap: 1.8rem;
+  margin-top: 0.1rem;
 }
 
-.metaDot {
-  font-weight: bold;
+.dialogStatItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: color-mix(in oklch, var(--foreground) 86%, var(--muted-foreground));
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+.dialogStatItem svg {
+  width: 1.3rem;
+  height: 1.3rem;
+  color: var(--primary);
+}
+
+.dialogStatItem span:last-child {
+  white-space: nowrap;
+}
+
+.dialogGenrePills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.1rem;
+}
+
+.dialogGenrePill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid color-mix(in oklch, var(--primary) 14%, var(--border));
+  border-radius: 999px;
+  background: linear-gradient(180deg, color-mix(in oklch, var(--accent) 78%, white) 0%, color-mix(in oklch, var(--secondary) 92%, white) 100%);
+  color: color-mix(in oklch, var(--accent-foreground) 88%, var(--foreground));
+  padding: 0.42rem 0.8rem;
+  font-size: 0.96rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .dialogBlurb {
-  margin: 0.5rem 0 0;
-  font-size: 1.1rem;
-  line-height: 1.4;
+  margin: 0.2rem 0 0;
+  font-size: 1.3rem;
+  line-height: 1.55;
   color: var(--foreground);
   display: -webkit-box;
-  -webkit-line-clamp: 5;
+  -webkit-line-clamp: 6;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -860,7 +961,7 @@ svg {
 
 .dialogSimilarScroll {
   display: flex;
-  gap: 1rem;
+  gap: 1.2rem;
   overflow-x: auto;
   padding-bottom: 0.5rem;
   /* hide scrollbar */
@@ -871,7 +972,7 @@ svg {
 }
 
 .similarCard {
-  flex: 0 0 6.5rem;
+  flex: 0 0 12.75rem;
   background: none;
   border: none;
   padding: 0;
@@ -885,7 +986,7 @@ svg {
 }
 
 .dialogCopy h2 {
-  font-size: 1.85rem;
+  font-size: 2.35rem;
   letter-spacing: -0.02em;
   line-height: 1.1;
 }
@@ -893,7 +994,7 @@ svg {
 .dialogCopy p {
   margin: 0;
   color: var(--muted-foreground);
-  font-size: 1rem;
+  font-size: 1.3rem;
   line-height: 1.5;
 }
 
@@ -919,8 +1020,7 @@ svg {
 
 @media (max-width: 1280px) {
   .sidebar {
-    width: 24rem;
-    flex-basis: 24rem;
+    flex-basis: 26rem;
     padding-inline: 1.5rem;
   }
 
@@ -995,11 +1095,6 @@ svg {
 }
 
 @media (max-width: 620px) {
-  .lampButton {
-    width: 3.3rem;
-    height: 3.3rem;
-  }
-
   .sidebar {
     gap: 1.25rem;
     padding-top: 1.5rem;
@@ -1034,7 +1129,7 @@ svg {
   }
 
   .shelfScroll .bookCard {
-    flex: 0 0 9.6rem;
+    flex: 0 0 11rem;
   }
   .bookDialog {
     padding: 1rem;

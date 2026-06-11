@@ -2,10 +2,53 @@ import { useState, useEffect } from 'react'
 
 const BASE = '/api'
 
-async function apiFetch(path) {
-  const res = await fetch(`${BASE}${path}`)
-  if (!res.ok) throw new Error(`API ${path} → ${res.status}`)
+async function apiFetch(path, options) {
+  const res = await fetch(`${BASE}${path}`, options)
+  if (!res.ok) {
+    let detail = ''
+    try {
+      const payload = await res.json()
+      detail = payload?.detail ? `: ${payload.detail}` : ''
+    } catch {
+      detail = ''
+    }
+    throw new Error(`API ${path} -> ${res.status}${detail}`)
+  }
   return res.json()
+}
+
+function collectionIdFromName(name) {
+  return encodeURIComponent(name)
+}
+
+function mapReadingLists(rawLists) {
+  return rawLists.map((list) => ({
+    id: collectionIdFromName(list.name),
+    name: list.name,
+    description: '',
+    bookIds: (list.book_ids || []),
+  }))
+}
+
+function nextCollectionName(collections) {
+  const existing = new Set(collections.map((collection) => collection.name.trim().toLowerCase()))
+  let index = 1
+  while (existing.has(`collection ${index}`)) index += 1
+  return `Collection ${index}`
+}
+
+function formatCompactNumber(value) {
+  const num = Number(value)
+  if (!Number.isFinite(num) || num <= 0) return '0'
+  const compact = (divisor, suffix) => {
+    const truncated = Math.floor((Math.abs(num) / divisor) * 10) / 10
+    const text = truncated % 1 === 0 ? String(truncated.toFixed(0)) : String(truncated.toFixed(1))
+    return `${num < 0 ? '-' : ''}${text}${suffix}`
+  }
+  if (num >= 1_000_000_000) return compact(1_000_000_000, 'B')
+  if (num >= 1_000_000) return compact(1_000_000, 'M')
+  if (num >= 1_000) return compact(1_000, 'K')
+  return `${Math.round(num)}`
 }
 
 function normaliseBook(raw) {
@@ -15,16 +58,25 @@ function normaliseBook(raw) {
     totalPages > 0 ? Math.min(100, Math.round((currentPage / totalPages) * 100)) : 0
 
   const status = raw.reading_status || raw.status || 'not_started'
+  const genres = Array.isArray(raw.genres) ? raw.genres.filter(Boolean) : []
+  const primaryGenre = raw.genre || genres[0] || ''
+  const rating = parseFloat(raw.avg_rating ?? raw.book_rating) || 0
+  const pages = raw.page_count || raw.total_pages || raw.reading_total_pages || totalPages
+  const reviewCount = parseInt(raw.review_count ?? raw.book_review_count ?? 0, 10) || 0
+  const ratingCount = parseInt(raw.rating_count ?? raw.book_rating_count ?? 0, 10) || 0
 
   return {
-    id: raw.id,
+    id: raw.id || raw.uid || '',
     title: raw.title || 'Untitled',
     author: raw.author || '',
-    cover: raw.image_url || '',
+    cover: raw.cover || raw.image_url || '',
     tint: '220 30% 45%', // neutral fallback tint — image_url is used for actual cover art
-    genre: raw.genre || (Array.isArray(raw.genres) && raw.genres[0]) || '',
-    pages: totalPages,
-    rating: parseFloat(raw.book_rating) || 0,
+    genre: primaryGenre,
+    genres,
+    pages,
+    rating,
+    reviewCount,
+    ratingCount,
     progress,
     status,
     format: [], // not tracked in our dataset; omit audio badge
@@ -61,7 +113,6 @@ const shelfNav = [
 
 export default function App() {
   const [view, setView] = useState('reading-now')
-  const [dark, setDark] = useState(false)
   const [mobileNav, setMobileNav] = useState(false)
   const [selected, setSelected] = useState(null)
 
@@ -87,15 +138,7 @@ export default function App() {
         const normalisedBooks = (myBooksRes.books || []).map(normaliseBook)
         setBooks(normalisedBooks)
 
-        // Map reading-list API response → sidebar collections shape
-        const rawLists = listsRes.lists || []
-        const mappedCollections = rawLists.map((list) => ({
-          id: list.name.toLowerCase().replace(/\s+/g, '-'),
-          name: list.name,
-          description: '',
-          bookIds: (list.book_ids || []),
-        }))
-        setCollections(mappedCollections)
+        setCollections(mapReadingLists(listsRes.lists || []))
         setGlobalLibrary(globalRes.genres || [])
       } catch (err) {
         if (!cancelled) setError(err.message)
@@ -120,12 +163,52 @@ export default function App() {
     : null
   const meta = activeCollection ? activeCollection : viewMeta[view]
 
+  async function createCollection() {
+    const name = nextCollectionName(collections)
+    const data = await apiFetch('/reading-lists', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    const nextCollections = mapReadingLists(data.lists || [])
+    setCollections(nextCollections)
+    setView(`collection:${collectionIdFromName(name)}`)
+    return name
+  }
+
+  async function renameCollection(collection, name) {
+    const data = await apiFetch(`/reading-lists/${collectionIdFromName(collection.name)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    const nextCollections = mapReadingLists(data.lists || [])
+    setCollections(nextCollections)
+    const oldView = `collection:${collection.id}`
+    const newView = `collection:${collectionIdFromName(name)}`
+    if (view === oldView) setView(newView)
+    return name
+  }
+
+  async function deleteCollection(collection) {
+    const data = await apiFetch(`/reading-lists/${collectionIdFromName(collection.name)}`, {
+      method: 'DELETE',
+    })
+    const nextCollections = mapReadingLists(data.lists || [])
+    setCollections(nextCollections)
+    if (view === `collection:${collection.id}`) {
+      setView('library')
+    }
+  }
+
   return (
-    <div className={dark ? 'appRoot dark' : 'appRoot'}>
+    <div className={'appRoot'}>
       <div className="hearthShell">
         <Sidebar
           active={view}
           collections={collections}
+          onCreateCollection={createCollection}
+          onRenameCollection={renameCollection}
           onSelect={(nextView) => {
             setView(nextView)
             setMobileNav(false)
@@ -138,6 +221,8 @@ export default function App() {
               <Sidebar
                 active={view}
                 collections={collections}
+                onCreateCollection={createCollection}
+                onRenameCollection={renameCollection}
                 onSelect={(nextView) => {
                   setView(nextView)
                   setMobileNav(false)
@@ -158,9 +243,19 @@ export default function App() {
                 <p>{meta.subtitle || meta.description}</p>
               </div>
             </div>
-            <button className="lampButton" onClick={() => setDark((v) => !v)} aria-label="Toggle dark mode">
-              {dark ? <SunIcon /> : <MoonIcon />}
-            </button>
+            {activeCollection && (
+              <div className="topBarActions">
+                <button
+                  type="button"
+                  className="deleteCollectionButton"
+                  aria-label={`Delete ${activeCollection.name}`}
+                  title={`Delete ${activeCollection.name}`}
+                  onClick={() => deleteCollection(activeCollection)}
+                >
+                  <TrashIcon />
+                </button>
+              </div>
+            )}
           </header>
 
           <div className="mainContent">
@@ -185,7 +280,7 @@ export default function App() {
         </main>
       </div>
 
-      {selected && <BookDialog book={selected} onClose={() => setSelected(null)} />}
+      {selected && <BookDialog key={selected.id || selected.uid} book={selected} onClose={() => setSelected(null)} onOpen={setSelected} />}
     </div>
   )
 }
@@ -194,7 +289,60 @@ export default function App() {
 // Sidebar
 // ---------------------------------------------------------------------------
 
-function Sidebar({ active, collections, onSelect }) {
+function Sidebar({ active, collections, onSelect, onCreateCollection, onRenameCollection }) {
+  const [editingId, setEditingId] = useState(null)
+  const [draftName, setDraftName] = useState('')
+  const [collectionError, setCollectionError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const startRename = (collection) => {
+    setEditingId(collection.id)
+    setDraftName(collection.name)
+    setCollectionError('')
+  }
+
+  const finishRename = async (collection) => {
+    const clean = draftName.trim().replace(/\s+/g, ' ')
+    if (clean === collection.name) {
+      setEditingId(null)
+      setCollectionError('')
+      return
+    }
+    if (!clean) {
+      setCollectionError('Collection name is required.')
+      return
+    }
+    if (collections.some((item) => item.id !== collection.id && item.name.toLowerCase() === clean.toLowerCase())) {
+      setCollectionError('Collection names must be unique.')
+      return
+    }
+
+    setSaving(true)
+    try {
+      await onRenameCollection(collection, clean)
+      setEditingId(null)
+      setCollectionError('')
+    } catch (err) {
+      setCollectionError(err.message || 'Could not rename collection.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const createCollection = async () => {
+    setSaving(true)
+    setCollectionError('')
+    try {
+      const createdName = await onCreateCollection()
+      setEditingId(collectionIdFromName(createdName))
+      setDraftName(createdName)
+    } catch (err) {
+      setCollectionError(err.message || 'Could not create collection.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <aside className="sidebar paperGrain">
       <div className="brand">
@@ -221,27 +369,81 @@ function Sidebar({ active, collections, onSelect }) {
         ))}
       </section>
 
-      <section className="navSection">
+      <section className="navSection collectionsSection">
         <div className="sectionHeader">
           <p className="sectionLabel">Collections</p>
-          <button className="plusButton" aria-label="New collection">
+          <button className="plusButton" aria-label="New collection" onClick={createCollection} disabled={saving}>
             <PlusIcon />
           </button>
         </div>
-        {collections.map((collection) => {
-          const id = `collection:${collection.id}`
-          const isActive = active === id
-          return (
-            <button
-              key={collection.id}
-              className={isActive ? 'collectionButton active' : 'collectionButton'}
-              onClick={() => onSelect(id)}
-            >
-              <span className="collectionDot" />
-              <span>{collection.name}</span>
-            </button>
-          )
-        })}
+        <div className="collectionList">
+          {collections.map((collection) => {
+            const id = `collection:${collection.id}`
+            const isActive = active === id
+            const isEditing = editingId === collection.id
+            return (
+              <div
+                key={collection.id}
+                role="button"
+                tabIndex={0}
+                className={isActive ? 'collectionButton active' : 'collectionButton'}
+                onClick={() => onSelect(id)}
+                onKeyDown={(event) => {
+                  if (isEditing) return
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    onSelect(id)
+                  }
+                }}
+              >
+                <span className="collectionDot" />
+                {isEditing ? (
+                  <form
+                    className="collectionEditForm"
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      finishRename(collection)
+                    }}
+                  >
+                    <input
+                      className="collectionNameInput"
+                      value={draftName}
+                      autoFocus
+                      disabled={saving}
+                      onChange={(event) => setDraftName(event.target.value)}
+                      onBlur={(event) => {
+                        if (event.currentTarget.dataset.cancelRename === 'true') return
+                        finishRename(collection)
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape') {
+                          event.currentTarget.dataset.cancelRename = 'true'
+                          setEditingId(null)
+                          setCollectionError('')
+                        }
+                      }}
+                      aria-label={`Rename ${collection.name}`}
+                    />
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    className="collectionNameButton"
+                    onDoubleClick={(event) => {
+                      event.stopPropagation()
+                      startRename(collection)
+                    }}
+                  >
+                    {collection.name}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+        {collectionError && <p className="collectionError">{collectionError}</p>}
       </section>
     </aside>
   )
@@ -430,19 +632,25 @@ function BookCover({ book, glow = false }) {
 
 function BookDialog({ book, onClose, onOpen }) {
   const [fullBook, setFullBook] = useState(null)
+  const bookId = book.id || book.uid || ''
 
   useEffect(() => {
     let cancelled = false
-    apiFetch(`/book/${book.id}`)
+    setFullBook(null)
+    if (!bookId) return () => { cancelled = true }
+    apiFetch(`/book/${bookId}`)
       .then((data) => {
-        if (!cancelled && data) setFullBook(data)
+        if (!cancelled && data) setFullBook({ ...normaliseBook(data), similar_books: data.similar_books || [] })
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [book.id])
+  }, [bookId])
 
-  const displayBook = fullBook || book
-  const similarBooks = fullBook?.similar_books || []
+  const displayBook = fullBook ? { ...book, ...fullBook } : book
+  const similarBooks = fullBook?.similar_books || book.similar_books || []
+  const dialogGenres = (displayBook.genres && displayBook.genres.length > 0)
+    ? displayBook.genres.slice(0, 5)
+    : (displayBook.genre ? [displayBook.genre] : [])
 
   return (
     <div className="dialogScrim" onClick={onClose}>
@@ -456,13 +664,38 @@ function BookDialog({ book, onClose, onOpen }) {
           </div>
           <div className="dialogCopy">
             <h2>{displayBook.title}</h2>
-            <p className="dialogAuthor">{displayBook.author} &gt;</p>
-            
-            <div className="dialogMetaLine">
-              {displayBook.rating > 0 && <StarRating value={displayBook.rating} />}
-              {displayBook.rating > 0 && displayBook.genre && <span className="metaDot">·</span>}
-              {displayBook.genre && <span>{displayBook.genre}</span>}
+            <p className="dialogAuthor">{displayBook.author}</p>
+
+            <div className="dialogStatsRow">
+              {displayBook.rating > 0 && (
+                <span className="dialogStatItem">
+                  <StarMiniIcon />
+                  <span>{displayBook.rating.toFixed(1)}{displayBook.ratingCount > 0 ? ` (${formatCompactNumber(displayBook.ratingCount)})` : ''}</span>
+                </span>
+              )}
+              {displayBook.reviewCount > 0 && (
+                <span className="dialogStatItem">
+                  <ReviewIcon />
+                  <span>{formatCompactNumber(displayBook.reviewCount)}</span>
+                </span>
+              )}
+              {displayBook.pages > 0 && (
+                <span className="dialogStatItem">
+                  <PagesIcon />
+                  <span>{formatCompactNumber(displayBook.pages)} pages</span>
+                </span>
+              )}
             </div>
+
+            {dialogGenres.length > 0 && (
+              <div className="dialogGenrePills" aria-label="Genres">
+                {dialogGenres.map((genre) => (
+                  <span key={genre} className="dialogGenrePill">
+                    {genre}
+                  </span>
+                ))}
+              </div>
+            )}
 
             <p className="dialogBlurb">{displayBook.blurb || displayBook.description || 'A great read from your library.'}</p>
           </div>
@@ -475,7 +708,7 @@ function BookDialog({ book, onClose, onOpen }) {
               {similarBooks.map((simRaw) => {
                 const simBook = normaliseBook(simRaw)
                 return (
-                  <button key={simBook.id} className="similarCard" onClick={() => { if (onOpen) onOpen(simBook) }}>
+                  <button key={simBook.id} className="similarCard" onClick={() => { if (onOpen) onOpen(simRaw) }}>
                     <BookCover book={simBook} />
                   </button>
                 )
@@ -638,6 +871,46 @@ function CloseIcon() {
     <Icon>
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
+    </Icon>
+  )
+}
+
+function StarMiniIcon() {
+  return (
+    <Icon>
+      <path d="m12 4 1.9 4.9 5.1.3-4 3.3 1.3 5-4.3-2.8-4.3 2.8 1.3-5-4-3.3 5.1-.3z" />
+    </Icon>
+  )
+}
+
+function PagesIcon() {
+  return (
+    <Icon>
+      <path d="M7 4h8a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2V7a3 3 0 0 1 2-3z" />
+      <path d="M9 8h6" />
+      <path d="M9 11h6" />
+    </Icon>
+  )
+}
+
+function ReviewIcon() {
+  return (
+    <Icon>
+      <path d="M6.5 6h11A2.5 2.5 0 0 1 20 8.5v5A2.5 2.5 0 0 1 17.5 16H11l-4.5 3V16H6.5A2.5 2.5 0 0 1 4 13.5v-5A2.5 2.5 0 0 1 6.5 6z" />
+      <path d="M8.5 10h7" />
+      <path d="M8.5 12.5h4.5" />
+    </Icon>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <Icon>
+      <path d="M4 7h16" />
+      <path d="M9 7V5h6v2" />
+      <path d="M7 7l1 12h8l1-12" />
+      <path d="M10 11v5" />
+      <path d="M14 11v5" />
     </Icon>
   )
 }
