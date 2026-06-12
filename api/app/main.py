@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .data_repository import DataRepository
-from .reading_lists import LikedBooksStore, ReadingListStore, ReadingProgressStore
+from .reading_lists import LikedBooksStore, ReadingListStore, ReadingProgressStore, WantToReadStore
 from .obsidian_sync import (
     add_snapshot_book_to_dataset,
     apply_sync_selection,
@@ -24,6 +24,7 @@ app = FastAPI(title="Atlas API", version="0.1.0")
 store = AtlasStore()
 lists = ReadingListStore(Path(__file__).resolve().parents[2])
 liked = LikedBooksStore(Path(__file__).resolve().parents[2])
+want_to_read = WantToReadStore(Path(__file__).resolve().parents[2])
 progress = ReadingProgressStore(Path(__file__).resolve().parents[2])
 ROOT = Path(__file__).resolve().parents[2]
 repo = DataRepository(ROOT)
@@ -142,6 +143,15 @@ def _hydrate_liked(book_ids: list[str]) -> dict:
     return {"book_ids": [b.get("id") for b in books], "books": books, "count": len(books)}
 
 
+def _hydrate_want_to_read(book_ids: list[str]) -> dict:
+    books = []
+    for book_id in book_ids:
+        b = store.get_book(book_id)
+        if b:
+            books.append(b)
+    return {"book_ids": [b.get("id") for b in books], "books": books, "count": len(books)}
+
+
 def _hydrate_lists(rows: list[dict]) -> list[dict]:
     out = []
     for row in rows:
@@ -242,6 +252,28 @@ def remove_liked_book(book_id: str) -> dict:
     return _hydrate_liked(liked.list_all())
 
 
+@app.get("/want-to-read-books")
+def get_want_to_read_books() -> dict:
+    return _hydrate_want_to_read(want_to_read.list_all())
+
+
+@app.post("/want-to-read-books")
+def add_want_to_read_book(payload: AddBookIn) -> dict:
+    if not store.get_book(payload.book_id):
+        raise HTTPException(status_code=404, detail="book not found")
+    try:
+        want_to_read.add(payload.book_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return _hydrate_want_to_read(want_to_read.list_all())
+
+
+@app.delete("/want-to-read-books/{book_id}")
+def remove_want_to_read_book(book_id: str) -> dict:
+    want_to_read.remove(book_id)
+    return _hydrate_want_to_read(want_to_read.list_all())
+
+
 @app.get("/reading-progress")
 def get_reading_progress() -> dict:
     return {"entries": progress.list_all()}
@@ -255,6 +287,7 @@ def get_global_library() -> dict:
 @app.get("/my-books")
 def get_my_books() -> dict:
     progress_entries = progress.list_all()
+    saved_want_to_read = set(want_to_read.list_all())
     books: list[dict] = []
     books_map: dict = {}
 
@@ -276,6 +309,7 @@ def get_my_books() -> dict:
             "reading_total_pages": int(prog.get("total_pages") or row.get("total_pages") or 0),
             "reading_finish_date": (prog.get("finish_date") or row.get("finish_date") or ""),
             "reading_start_date": (prog.get("start_date") or row.get("start_date") or ""),
+            "saved_to_want_to_read": str(book_id) in saved_want_to_read,
             "linked_dataset_book": linked_dataset_book,
         })
 
@@ -528,6 +562,21 @@ def api_add_liked_book(payload: AddBookIn) -> dict:
 @api_router.delete("/liked-books/{book_id}")
 def api_remove_liked_book(book_id: str) -> dict:
     return remove_liked_book(book_id)
+
+
+@api_router.get("/want-to-read-books")
+def api_get_want_to_read_books() -> dict:
+    return get_want_to_read_books()
+
+
+@api_router.post("/want-to-read-books")
+def api_add_want_to_read_book(payload: AddBookIn) -> dict:
+    return add_want_to_read_book(payload)
+
+
+@api_router.delete("/want-to-read-books/{book_id}")
+def api_remove_want_to_read_book(book_id: str) -> dict:
+    return remove_want_to_read_book(book_id)
 
 
 @api_router.get("/reading-progress")

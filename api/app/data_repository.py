@@ -27,6 +27,7 @@ class DataRepository:
         return {
             "schema_version": self.USER_STATE_VERSION,
             "liked_book_ids": [],
+            "want_to_read_book_ids": [],
             "reading_lists": [],
             "reading_progress": {},
             "meta": {
@@ -59,6 +60,7 @@ class DataRepository:
         payload = self._read_json(self.user_state_path, self.default_user_state())
         payload.setdefault("schema_version", self.USER_STATE_VERSION)
         payload.setdefault("liked_book_ids", [])
+        payload.setdefault("want_to_read_book_ids", [])
         payload.setdefault("reading_lists", [])
         payload.setdefault("reading_progress", {})
         payload.setdefault("meta", {})
@@ -69,6 +71,7 @@ class DataRepository:
         payload = payload or {}
         payload["schema_version"] = self.USER_STATE_VERSION
         payload.setdefault("liked_book_ids", [])
+        payload.setdefault("want_to_read_book_ids", [])
         payload.setdefault("reading_lists", [])
         payload.setdefault("reading_progress", {})
         payload.setdefault("meta", {})
@@ -117,6 +120,7 @@ class DataRepository:
                     "schema_version": int(user_state.get("schema_version") or self.USER_STATE_VERSION),
                     "exists": self.user_state_path.exists(),
                     "liked_count": len(user_state.get("liked_book_ids", [])),
+                    "want_to_read_count": len(user_state.get("want_to_read_book_ids", [])),
                     "list_count": len(user_state.get("reading_lists", [])),
                     "progress_count": len(user_state.get("reading_progress", {})),
                 },
