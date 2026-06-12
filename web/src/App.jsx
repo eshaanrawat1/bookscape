@@ -119,6 +119,8 @@ export default function App() {
   // Live data from the API
   const [books, setBooks] = useState([])
   const [collections, setCollections] = useState([])
+  const [wantToReadBookIds, setWantToReadBookIds] = useState([])
+  const [wantToReadBooks, setWantToReadBooks] = useState([])
   const [globalLibrary, setGlobalLibrary] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -127,9 +129,10 @@ export default function App() {
     let cancelled = false
     async function load() {
       try {
-        const [myBooksRes, listsRes, globalRes] = await Promise.all([
+        const [myBooksRes, listsRes, wantToReadRes, globalRes] = await Promise.all([
           apiFetch('/my-books'),
           apiFetch('/reading-lists'),
+          apiFetch('/want-to-read-books'),
           apiFetch('/global-library'),
         ])
 
@@ -139,6 +142,8 @@ export default function App() {
         setBooks(normalisedBooks)
 
         setCollections(mapReadingLists(listsRes.lists || []))
+        setWantToReadBookIds(wantToReadRes.book_ids || [])
+        setWantToReadBooks((wantToReadRes.books || []).map(normaliseBook))
         setGlobalLibrary(globalRes.genres || [])
       } catch (err) {
         if (!cancelled) setError(err.message)
@@ -154,7 +159,10 @@ export default function App() {
   const bookById = new Map(books.map((b) => [b.id, b]))
   const booksByIds = (ids) => ids.map((id) => bookById.get(id)).filter(Boolean)
   const currentlyReading = books.filter((b) => b.status === 'reading')
-  const wantToRead = books.filter((b) => b.status === 'not_started')
+  const savedWantToReadIds = new Set(wantToReadBookIds)
+  const wantToReadFromProgress = books.filter((b) => b.status === 'not_started' || savedWantToReadIds.has(b.id))
+  const wantToReadFromSaved = wantToReadBooks.filter((b) => !bookById.has(b.id))
+  const wantToRead = [...wantToReadFromProgress, ...wantToReadFromSaved]
   const finished = books.filter((b) => b.status === 'done')
   const heroBook = currentlyReading[0] || books[0] || null
 
@@ -199,6 +207,25 @@ export default function App() {
     if (view === `collection:${collection.id}`) {
       setView('library')
     }
+  }
+
+  async function addBookToCollection(collectionName, bookId) {
+    const data = await apiFetch(`/reading-lists/${collectionIdFromName(collectionName)}/books`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ book_id: bookId }),
+    })
+    setCollections(mapReadingLists(data.lists || []))
+  }
+
+  async function saveBookToWantToRead(bookId) {
+    const data = await apiFetch('/want-to-read-books', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ book_id: bookId }),
+    })
+    setWantToReadBookIds(data.book_ids || [])
+    setWantToReadBooks((data.books || []).map(normaliseBook))
   }
 
   return (
@@ -280,7 +307,18 @@ export default function App() {
         </main>
       </div>
 
-      {selected && <BookDialog key={selected.id || selected.uid} book={selected} onClose={() => setSelected(null)} onOpen={setSelected} />}
+      {selected && (
+        <BookDialog
+          key={selected.id || selected.uid}
+          book={selected}
+          collections={collections}
+          isSavedToWantToRead={savedWantToReadIds.has(selected.id || selected.uid)}
+          onAddToCollection={addBookToCollection}
+          onClose={() => setSelected(null)}
+          onOpen={setSelected}
+          onSaveToWantToRead={saveBookToWantToRead}
+        />
+      )}
     </div>
   )
 }
@@ -630,8 +668,20 @@ function BookCover({ book, glow = false }) {
   )
 }
 
-function BookDialog({ book, onClose, onOpen }) {
+function BookDialog({
+  book,
+  collections,
+  isSavedToWantToRead,
+  onAddToCollection,
+  onClose,
+  onOpen,
+  onSaveToWantToRead,
+}) {
   const [fullBook, setFullBook] = useState(null)
+  const [collectionMenuOpen, setCollectionMenuOpen] = useState(false)
+  const [actionMessage, setActionMessage] = useState('')
+  const [savingCollection, setSavingCollection] = useState('')
+  const [savingToRead, setSavingToRead] = useState(false)
   const bookId = book.id || book.uid || ''
 
   useEffect(() => {
@@ -651,6 +701,35 @@ function BookDialog({ book, onClose, onOpen }) {
   const dialogGenres = (displayBook.genres && displayBook.genres.length > 0)
     ? displayBook.genres.slice(0, 5)
     : (displayBook.genre ? [displayBook.genre] : [])
+
+  const handleSave = async () => {
+    if (!bookId || savingToRead || isSavedToWantToRead) return
+    setSavingToRead(true)
+    setActionMessage('')
+    try {
+      await onSaveToWantToRead(bookId)
+      setActionMessage('Saved to Want to read.')
+    } catch (err) {
+      setActionMessage(err.message || 'Could not save this book.')
+    } finally {
+      setSavingToRead(false)
+    }
+  }
+
+  const handleAddToCollection = async (collectionName) => {
+    if (!bookId || !collectionName || savingCollection === collectionName) return
+    setSavingCollection(collectionName)
+    setActionMessage('')
+    try {
+      await onAddToCollection(collectionName, bookId)
+      setCollectionMenuOpen(false)
+      setActionMessage(`Added to ${collectionName}.`)
+    } catch (err) {
+      setActionMessage(err.message || 'Could not add this book.')
+    } finally {
+      setSavingCollection('')
+    }
+  }
 
   return (
     <div className="dialogScrim" onClick={onClose}>
@@ -698,6 +777,53 @@ function BookDialog({ book, onClose, onOpen }) {
             )}
 
             <p className="dialogBlurb">{displayBook.blurb || displayBook.description || 'A great read from your library.'}</p>
+
+            <div className="dialogActionPanel">
+              <div className="dialogActionRow">
+                <div className={collectionMenuOpen ? 'collectionMenuAnchor open' : 'collectionMenuAnchor'}>
+                  <button
+                    type="button"
+                    className="dialogIconButton dialogCollectionButton"
+                    onClick={() => setCollectionMenuOpen((value) => !value)}
+                    disabled={!collections.length || !bookId}
+                    aria-label="Add to collections"
+                    title="Add to collections"
+                    aria-expanded={collectionMenuOpen}
+                  >
+                    <PlusIcon />
+                  </button>
+                  {collectionMenuOpen && collections.length > 0 && (
+                    <div className="collectionPicker" role="menu" aria-label="Add to collection">
+                      {collections.map((collection) => (
+                        <button
+                          key={collection.id}
+                          type="button"
+                          className="collectionPickerItem"
+                          onClick={() => handleAddToCollection(collection.name)}
+                          disabled={savingCollection === collection.name}
+                        >
+                          <span>{collection.name}</span>
+                          {savingCollection === collection.name ? <span className="collectionPickerState">Adding…</span> : null}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  className={isSavedToWantToRead ? 'dialogIconButton dialogSaveButton saved' : 'dialogIconButton dialogSaveButton'}
+                  onClick={handleSave}
+                  disabled={!bookId || savingToRead || isSavedToWantToRead}
+                  aria-label={isSavedToWantToRead ? 'Saved to Want to read' : 'Save to Want to read'}
+                  title={isSavedToWantToRead ? 'Saved to Want to read' : 'Save to Want to read'}
+                >
+                  <HeartIcon filled={isSavedToWantToRead} />
+                </button>
+              </div>
+
+              {actionMessage && <p className="dialogActionMessage">{actionMessage}</p>}
+            </div>
           </div>
         </div>
 
@@ -871,6 +997,18 @@ function CloseIcon() {
     <Icon>
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
+    </Icon>
+  )
+}
+
+function HeartIcon({ filled = false }) {
+  return filled ? (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 21s-7.2-4.4-9.7-9.1C.4 7.6 2.5 4 6.4 4c2.1 0 3.7 1 4.8 2.4C12.3 5 13.9 4 16 4c3.9 0 6 3.6 4.1 7.9C19.2 16.6 12 21 12 21z" />
+    </svg>
+  ) : (
+    <Icon>
+      <path d="M20.4 7.6c0 4.7-8.4 9.9-8.4 9.9s-8.4-5.2-8.4-9.9C3.6 5.1 5.3 3.5 7.7 3.5c1.5 0 2.9.8 4.3 2.6 1.4-1.8 2.8-2.6 4.3-2.6 2.4 0 4.1 1.6 4.1 4.1z" />
     </Icon>
   )
 }
