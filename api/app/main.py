@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .data_repository import DataRepository
+from .finished_books import FinishedBooksStore
 from .reading_lists import LikedBooksStore, ReadingListStore, ReadingProgressStore, WantToReadStore
 from .obsidian_sync import (
     add_snapshot_book_to_dataset,
@@ -26,6 +27,7 @@ lists = ReadingListStore(Path(__file__).resolve().parents[2])
 liked = LikedBooksStore(Path(__file__).resolve().parents[2])
 want_to_read = WantToReadStore(Path(__file__).resolve().parents[2])
 progress = ReadingProgressStore(Path(__file__).resolve().parents[2])
+finished_books = FinishedBooksStore(Path(__file__).resolve().parents[2])
 ROOT = Path(__file__).resolve().parents[2]
 repo = DataRepository(ROOT)
 daily_stats = ReadingDailyStatsStore(ROOT)
@@ -132,6 +134,15 @@ class SyncIgnoreIn(BaseModel):
 
 class MergeSnapshotBookIn(BaseModel):
     dataset_book_id: str = ""
+
+
+class FinishedBookIn(BaseModel):
+    status: str = "done"
+    current_page: int = 0
+    total_pages: int = 0
+    start_date: str = ""
+    finish_date: str = ""
+    notes: str = ""
 
 
 def _hydrate_liked(book_ids: list[str]) -> dict:
@@ -282,6 +293,36 @@ def get_reading_progress() -> dict:
 @app.get("/global-library")
 def get_global_library() -> dict:
     return {"genres": store.get_global_library()}
+
+
+@app.get("/finished-books/{book_id}")
+def get_finished_book(book_id: str) -> dict:
+    entry = finished_books.get(book_id)
+    if entry:
+        return {"book_id": book_id, "entry": entry}
+
+    progress_entry = progress.list_all().get(book_id, {})
+    fallback = {
+        "book_id": book_id,
+        "entry": {
+            "book_id": book_id,
+            "status": "done",
+            "current_page": int(progress_entry.get("current_page") or 0),
+            "total_pages": int(progress_entry.get("total_pages") or 0),
+            "start_date": str(progress_entry.get("start_date") or ""),
+            "finish_date": str(progress_entry.get("finish_date") or ""),
+            "notes": str(progress_entry.get("notes") or ""),
+        },
+    }
+    return fallback
+
+
+@app.put("/finished-books/{book_id}")
+def upsert_finished_book(book_id: str, payload: FinishedBookIn) -> dict:
+    if not store.get_book(book_id):
+        raise HTTPException(status_code=404, detail="book not found")
+    row = finished_books.upsert(book_id, payload.model_dump())
+    return {"book_id": book_id, "entry": row}
 
 
 @app.get("/my-books")
@@ -587,6 +628,16 @@ def api_get_reading_progress() -> dict:
 @api_router.get("/global-library")
 def api_get_global_library() -> dict:
     return get_global_library()
+
+
+@api_router.get("/finished-books/{book_id}")
+def api_get_finished_book(book_id: str) -> dict:
+    return get_finished_book(book_id)
+
+
+@api_router.put("/finished-books/{book_id}")
+def api_upsert_finished_book(book_id: str, payload: FinishedBookIn) -> dict:
+    return upsert_finished_book(book_id, payload)
 
 
 @api_router.put("/reading-progress/{book_id}")

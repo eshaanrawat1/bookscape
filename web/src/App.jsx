@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const BASE = '/api'
 
@@ -74,6 +74,10 @@ function normaliseBook(raw) {
     genre: primaryGenre,
     genres,
     pages,
+    totalPages,
+    currentPage,
+    startDate: raw.reading_start_date || raw.start_date || '',
+    finishDate: raw.reading_finish_date || raw.finish_date || '',
     rating,
     reviewCount,
     ratingCount,
@@ -84,6 +88,47 @@ function normaliseBook(raw) {
     // keep raw fields for completeness
     _raw: raw,
   }
+}
+
+function getBookIdentityCandidates(book) {
+  const raw = book?._raw || book || {}
+  const linked = raw.linked_dataset_book || {}
+  return [
+    raw.id,
+    raw.uid,
+    book?.id,
+    book?.uid,
+    linked.id,
+    linked.uid,
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .filter((value, index, array) => array.indexOf(value) === index)
+}
+
+function normalizeIdentityText(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+}
+
+function resolveSavedWantToReadBook(book, savedBooks) {
+  const candidates = getBookIdentityCandidates(book)
+  const candidateSet = new Set(candidates)
+  const targetTitle = normalizeIdentityText(book?.title)
+  const targetAuthor = normalizeIdentityText(book?.author)
+
+  return (savedBooks || []).find((savedBook) => {
+    const savedCandidates = getBookIdentityCandidates(savedBook)
+    if (savedCandidates.some((id) => candidateSet.has(id))) return true
+    return (
+      normalizeIdentityText(savedBook?.title) === targetTitle &&
+      normalizeIdentityText(savedBook?.author) === targetAuthor &&
+      targetTitle &&
+      targetAuthor
+    )
+  }) || null
 }
 
 // ---------------------------------------------------------------------------
@@ -98,11 +143,11 @@ const viewMeta = {
 }
 
 const mainNav = [
-  { id: 'reading-now', label: 'Reading Now', icon: BookOpenIcon },
   { id: 'library', label: 'Library', icon: LibraryIcon },
 ]
 
 const shelfNav = [
+  { id: 'reading-now', label: 'Reading Now', icon: BookOpenIcon },
   { id: 'want-to-read', label: 'Want to Read', icon: BookmarkIcon },
   { id: 'finished', label: 'Finished', icon: CheckIcon },
 ]
@@ -123,6 +168,7 @@ export default function App() {
   const [wantToReadBooks, setWantToReadBooks] = useState([])
   const [globalLibrary, setGlobalLibrary] = useState([])
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -155,14 +201,28 @@ export default function App() {
     return () => { cancelled = true }
   }, [])
 
+  async function reloadAppData() {
+    const [myBooksRes, listsRes, wantToReadRes, globalRes] = await Promise.all([
+      apiFetch('/my-books'),
+      apiFetch('/reading-lists'),
+      apiFetch('/want-to-read-books'),
+      apiFetch('/global-library'),
+    ])
+
+    const normalisedBooks = (myBooksRes.books || []).map(normaliseBook)
+    setBooks(normalisedBooks)
+    setCollections(mapReadingLists(listsRes.lists || []))
+    setWantToReadBookIds(wantToReadRes.book_ids || [])
+    setWantToReadBooks((wantToReadRes.books || []).map(normaliseBook))
+    setGlobalLibrary(globalRes.genres || [])
+  }
+
   // Derived views from live books
   const bookById = new Map(books.map((b) => [b.id, b]))
   const booksByIds = (ids) => ids.map((id) => bookById.get(id)).filter(Boolean)
   const currentlyReading = books.filter((b) => b.status === 'reading')
   const savedWantToReadIds = new Set(wantToReadBookIds)
-  const wantToReadFromProgress = books.filter((b) => b.status === 'not_started' || savedWantToReadIds.has(b.id))
-  const wantToReadFromSaved = wantToReadBooks.filter((b) => !bookById.has(b.id))
-  const wantToRead = [...wantToReadFromProgress, ...wantToReadFromSaved]
+  const wantToRead = wantToReadBooks
   const finished = books.filter((b) => b.status === 'done')
   const heroBook = currentlyReading[0] || books[0] || null
 
@@ -218,14 +278,34 @@ export default function App() {
     setCollections(mapReadingLists(data.lists || []))
   }
 
-  async function saveBookToWantToRead(bookId) {
-    const data = await apiFetch('/want-to-read-books', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ book_id: bookId }),
-    })
+  async function toggleBookWantToRead(bookId, isSaved) {
+    const data = await apiFetch(
+      isSaved ? `/want-to-read-books/${bookId}` : '/want-to-read-books',
+      {
+        method: isSaved ? 'DELETE' : 'POST',
+        headers: isSaved ? undefined : { 'Content-Type': 'application/json' },
+        body: isSaved ? undefined : JSON.stringify({ book_id: bookId }),
+      }
+    )
     setWantToReadBookIds(data.book_ids || [])
     setWantToReadBooks((data.books || []).map(normaliseBook))
+    await reloadAppData()
+  }
+
+  async function syncFromObsidian() {
+    if (syncing) return
+    setSyncing(true)
+    setError(null)
+    try {
+      await apiFetch('/sync/obsidian?dry_run=false', {
+        method: 'POST',
+      })
+      await reloadAppData()
+    } catch (err) {
+      setError(err.message || 'Could not sync from Obsidian.')
+    } finally {
+      setSyncing(false)
+    }
   }
 
   return (
@@ -270,19 +350,32 @@ export default function App() {
                 <p>{meta.subtitle || meta.description}</p>
               </div>
             </div>
-            {activeCollection && (
-              <div className="topBarActions">
+            <div className="topBarActions">
+              {view === 'reading-now' && (
+                <button
+                  type="button"
+                  className="syncButton"
+                  onClick={syncFromObsidian}
+                  disabled={syncing}
+                  aria-label="Sync from Obsidian"
+                  title="Sync from Obsidian"
+                >
+                  <SyncIcon spinning={syncing} />
+                  <span>{syncing ? 'Syncing' : 'Sync'}</span>
+                </button>
+              )}
+              {activeCollection && (
                 <button
                   type="button"
                   className="deleteCollectionButton"
                   aria-label={`Delete ${activeCollection.name}`}
                   title={`Delete ${activeCollection.name}`}
                   onClick={() => deleteCollection(activeCollection)}
-                >
-                  <TrashIcon />
-                </button>
-              </div>
-            )}
+                  >
+                    <TrashIcon />
+                  </button>
+              )}
+            </div>
           </header>
 
           <div className="mainContent">
@@ -308,16 +401,16 @@ export default function App() {
       </div>
 
       {selected && (
-        <BookDialog
-          key={selected.id || selected.uid}
-          book={selected}
-          collections={collections}
-          isSavedToWantToRead={savedWantToReadIds.has(selected.id || selected.uid)}
-          onAddToCollection={addBookToCollection}
-          onClose={() => setSelected(null)}
-          onOpen={setSelected}
-          onSaveToWantToRead={saveBookToWantToRead}
-        />
+      <BookDialog
+        key={selected.id || selected.uid}
+        book={selected}
+        collections={collections}
+        savedWantToReadBook={resolveSavedWantToReadBook(selected, wantToReadBooks)}
+        onAddToCollection={addBookToCollection}
+        onClose={() => setSelected(null)}
+        onOpen={setSelected}
+        onToggleWantToRead={toggleBookWantToRead}
+      />
       )}
     </div>
   )
@@ -671,18 +764,19 @@ function BookCover({ book, glow = false }) {
 function BookDialog({
   book,
   collections,
-  isSavedToWantToRead,
+  savedWantToReadBook,
   onAddToCollection,
   onClose,
   onOpen,
-  onSaveToWantToRead,
+  onToggleWantToRead,
 }) {
   const [fullBook, setFullBook] = useState(null)
   const [collectionMenuOpen, setCollectionMenuOpen] = useState(false)
   const [actionMessage, setActionMessage] = useState('')
   const [savingCollection, setSavingCollection] = useState('')
   const [savingToRead, setSavingToRead] = useState(false)
-  const bookId = book.id || book.uid || ''
+  const identityCandidates = getBookIdentityCandidates(book)
+  const bookId = identityCandidates[0] || ''
 
   useEffect(() => {
     let cancelled = false
@@ -696,19 +790,32 @@ function BookDialog({
     return () => { cancelled = true }
   }, [bookId])
 
-  const displayBook = fullBook ? { ...book, ...fullBook } : book
-  const similarBooks = fullBook?.similar_books || book.similar_books || []
+  const displayBook = fullBook ? { ...fullBook, ...book, similar_books: fullBook.similar_books || book.similar_books || [] } : book
+  const similarBooks = displayBook.similar_books || []
   const dialogGenres = (displayBook.genres && displayBook.genres.length > 0)
     ? displayBook.genres.slice(0, 5)
     : (displayBook.genre ? [displayBook.genre] : [])
+  const isFinishedBook = book.status === 'done' || displayBook.status === 'done'
+  const savedWantToReadKey = savedWantToReadBook ? (savedWantToReadBook.id || savedWantToReadBook.uid || '') : ''
+  const isSavedToWantToRead = Boolean(savedWantToReadBook)
+
+  if (isFinishedBook) {
+    return (
+      <FinishedBookDialog
+        book={displayBook}
+        onClose={onClose}
+      />
+    )
+  }
 
   const handleSave = async () => {
-    if (!bookId || savingToRead || isSavedToWantToRead) return
+    if (!bookId || savingToRead) return
     setSavingToRead(true)
     setActionMessage('')
     try {
-      await onSaveToWantToRead(bookId)
-      setActionMessage('Saved to Want to read.')
+      const nextSaved = !isSavedToWantToRead
+      await onToggleWantToRead(isSavedToWantToRead ? savedWantToReadKey : bookId, isSavedToWantToRead)
+      setActionMessage(nextSaved ? 'Saved to Want to read.' : 'Removed from Want to read.')
     } catch (err) {
       setActionMessage(err.message || 'Could not save this book.')
     } finally {
@@ -814,9 +921,9 @@ function BookDialog({
                   type="button"
                   className={isSavedToWantToRead ? 'dialogIconButton dialogSaveButton saved' : 'dialogIconButton dialogSaveButton'}
                   onClick={handleSave}
-                  disabled={!bookId || savingToRead || isSavedToWantToRead}
-                  aria-label={isSavedToWantToRead ? 'Saved to Want to read' : 'Save to Want to read'}
-                  title={isSavedToWantToRead ? 'Saved to Want to read' : 'Save to Want to read'}
+                  disabled={!bookId || savingToRead}
+                  aria-label={isSavedToWantToRead ? 'Remove from Want to read' : 'Save to Want to read'}
+                  title={isSavedToWantToRead ? 'Remove from Want to read' : 'Save to Want to read'}
                 >
                   <HeartIcon filled={isSavedToWantToRead} />
                 </button>
@@ -842,6 +949,269 @@ function BookDialog({
             </div>
           </div>
         )}
+      </article>
+    </div>
+  )
+}
+
+function FinishedBookDialog({ book, onClose }) {
+  const [record, setRecord] = useState(null)
+  const [hydrated, setHydrated] = useState(false)
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false)
+  const saveTimerRef = useRef(null)
+  const lastSavedRef = useRef('')
+  const statusMenuRef = useRef(null)
+  const bookId = book.id || book.uid || ''
+  const baseRecord = {
+    status: 'done',
+    current_page: book.currentPage || book.pages || 0,
+    total_pages: book.totalPages || book.pages || 0,
+    start_date: book.startDate || '',
+    finish_date: book.finishDate || '',
+    notes: '',
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    setHydrated(false)
+    if (!bookId) {
+      setRecord(baseRecord)
+      lastSavedRef.current = JSON.stringify(baseRecord)
+      setHydrated(true)
+      return () => { cancelled = true }
+    }
+
+    apiFetch(`/finished-books/${bookId}`)
+      .then((data) => {
+        if (cancelled) return
+        const next = data?.entry || {}
+        const nextRecord = {
+          ...baseRecord,
+          ...next,
+        }
+        setRecord(nextRecord)
+        lastSavedRef.current = JSON.stringify(nextRecord)
+        setHydrated(true)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRecord(baseRecord)
+          lastSavedRef.current = JSON.stringify(baseRecord)
+          setHydrated(true)
+        }
+      })
+
+    return () => { cancelled = true }
+  }, [bookId, baseRecord.current_page, baseRecord.total_pages, baseRecord.start_date, baseRecord.finish_date])
+
+  const draft = record || baseRecord
+  const currentPage = Number(draft.current_page) || 0
+  const totalPages = Number(draft.total_pages) || 0
+  const progress = totalPages > 0
+    ? Math.min(100, Math.round((currentPage / totalPages) * 100))
+    : 0
+  const progressLabel = totalPages > 0 ? `${formatCompactNumber(currentPage)} / ${formatCompactNumber(totalPages)} pages` : '0 / 0 pages'
+
+  const updateField = (field, value) => {
+    setRecord((current) => ({
+      ...(current || baseRecord),
+      [field]: value,
+    }))
+  }
+
+  const persistRecord = async (nextRecord) => {
+    if (!bookId) return
+    try {
+      const payload = {
+        status: String(nextRecord.status || 'done').trim().toLowerCase() || 'done',
+        current_page: Math.max(0, parseInt(nextRecord.current_page, 10) || 0),
+        total_pages: Math.max(0, parseInt(nextRecord.total_pages, 10) || 0),
+        start_date: String(nextRecord.start_date || '').trim(),
+        finish_date: String(nextRecord.finish_date || '').trim(),
+        notes: String(nextRecord.notes || '').trim(),
+      }
+      const data = await apiFetch(`/finished-books/${bookId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const nextSaved = { ...baseRecord, ...(data.entry || payload) }
+      setRecord(nextSaved)
+      lastSavedRef.current = JSON.stringify(nextSaved)
+    } catch (err) {
+      // Keep the draft visible; autosave will retry on the next edit.
+    }
+  }
+
+  useEffect(() => {
+    if (!hydrated || !record) return undefined
+    const signature = JSON.stringify({
+      status: String(record.status || 'done').trim().toLowerCase() || 'done',
+      current_page: Number(record.current_page) || 0,
+      total_pages: Number(record.total_pages) || 0,
+      start_date: String(record.start_date || '').trim(),
+      finish_date: String(record.finish_date || '').trim(),
+      notes: String(record.notes || '').trim(),
+    })
+
+    if (signature === lastSavedRef.current) return undefined
+
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      persistRecord(record)
+    }, 650)
+
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    }
+  }, [record, hydrated])
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    function handlePointerDown(event) {
+      if (!statusMenuRef.current) return
+      if (!statusMenuRef.current.contains(event.target)) {
+        setStatusMenuOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [])
+
+  const statusLabelMap = {
+    done: 'Finished',
+    reading: 'Reading',
+    not_started: 'Want to read',
+  }
+
+  return (
+    <div className="dialogScrim finishedScrim" onClick={onClose}>
+      <article className="bookDialog finishedBookDialog paperGrain" onClick={(event) => event.stopPropagation()}>
+        <button className="dialogClose" onClick={onClose} aria-label="Close details">
+          <CloseIcon />
+        </button>
+
+        <div className="finishedDialogTop">
+          <div className="finishedCoverColumn">
+            <div className="finishedCoverWrap">
+              <BookCover book={book} glow />
+            </div>
+            <div className="finishedProgressRing" style={{ '--progress': `${progress}%` }}>
+              <span>{progress}%</span>
+            </div>
+            <div className="finishedPages">
+              <strong>{progressLabel}</strong>
+              <span>Pages read</span>
+            </div>
+          </div>
+
+          <div className="finishedCopy">
+            <div className="finishedHeader">
+              <div>
+                <h2>{book.title}</h2>
+                <p>{book.author}</p>
+              </div>
+            </div>
+
+            <div className="finishedStatusRow" ref={statusMenuRef}>
+              <div className={statusMenuOpen ? 'finishedStatusControl open' : 'finishedStatusControl'}>
+                <button
+                  type="button"
+                  className="finishedStatusButton"
+                  onClick={() => setStatusMenuOpen((value) => !value)}
+                  aria-haspopup="menu"
+                  aria-expanded={statusMenuOpen}
+                >
+                  <span>{statusLabelMap[draft.status] || 'Finished'}</span>
+                  <span className="finishedStatusDot" />
+                  <span className="finishedStatusCaret">▾</span>
+                </button>
+                {statusMenuOpen && (
+                  <div className="finishedStatusMenu" role="menu" aria-label="Reading status">
+                    {[
+                      ['done', 'Finished'],
+                      ['reading', 'Reading'],
+                      ['not_started', 'Want to read'],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={draft.status === value ? 'finishedStatusMenuItem active' : 'finishedStatusMenuItem'}
+                        role="menuitemradio"
+                        aria-checked={draft.status === value}
+                        onClick={() => {
+                          updateField('status', value)
+                          setStatusMenuOpen(false)
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="finishedPanel">
+              <div className="finishedFieldRow">
+                <label className="finishedField">
+                  <span>Progress</span>
+                  <div className="finishedFieldValue">
+                    <input
+                      type="number"
+                      min="0"
+                      value={draft.current_page}
+                      onChange={(event) => updateField('current_page', event.target.value)}
+                    />
+                    <span>/</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={draft.total_pages}
+                      onChange={(event) => updateField('total_pages', event.target.value)}
+                    />
+                    <span>pages</span>
+                  </div>
+                </label>
+              </div>
+
+              <div className="finishedFieldRow twoCol">
+                <label className="finishedField">
+                  <span>Start</span>
+                  <input
+                    type="date"
+                    value={draft.start_date}
+                    onChange={(event) => updateField('start_date', event.target.value)}
+                  />
+                </label>
+                <label className="finishedField">
+                  <span>End</span>
+                  <input
+                    type="date"
+                    value={draft.finish_date}
+                    onChange={(event) => updateField('finish_date', event.target.value)}
+                  />
+                </label>
+              </div>
+
+              <label className="finishedNotes">
+                <span>Notes</span>
+                <textarea
+                  rows="7"
+                  value={draft.notes}
+                  onChange={(event) => updateField('notes', event.target.value)}
+                  placeholder="Add a few thoughts, a memorable passage, or why this one mattered."
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+
       </article>
     </div>
   )
@@ -1001,14 +1371,28 @@ function CloseIcon() {
   )
 }
 
+function SyncIcon({ spinning = false }) {
+  return (
+    <svg className={spinning ? 'syncIcon spinning' : 'syncIcon'} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 12a9 9 0 0 0-15.2-6.4L3 8" />
+      <path d="M3 4v4h4" />
+      <path d="M3 12a9 9 0 0 0 15.2 6.4L21 16" />
+      <path d="M21 20v-4h-4" />
+    </svg>
+  )
+}
+
 function HeartIcon({ filled = false }) {
   return filled ? (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 21s-7.2-4.4-9.7-9.1C.4 7.6 2.5 4 6.4 4c2.1 0 3.7 1 4.8 2.4C12.3 5 13.9 4 16 4c3.9 0 6 3.6 4.1 7.9C19.2 16.6 12 21 12 21z" />
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 21s-7.2-4.4-9.7-9.1C.4 7.6 2.5 4 6.4 4c2.1 0 3.7 1 4.8 2.4C12.3 5 13.9 4 16 4c3.9 0 6 3.6 4.1 7.9C19.2 16.6 12 21 12 21z"
+        fill="currentColor"
+      />
     </svg>
   ) : (
     <Icon>
-      <path d="M20.4 7.6c0 4.7-8.4 9.9-8.4 9.9s-8.4-5.2-8.4-9.9C3.6 5.1 5.3 3.5 7.7 3.5c1.5 0 2.9.8 4.3 2.6 1.4-1.8 2.8-2.6 4.3-2.6 2.4 0 4.1 1.6 4.1 4.1z" />
+      <path d="M12 20.2s-7-4.1-7-8.8c0-2.4 1.6-4.1 4-4.1 1.5 0 2.7.7 3.7 2 1-1.3 2.2-2 3.7-2 2.4 0 4 1.7 4 4.1 0 4.7-7 8.8-7 8.8z" />
     </Icon>
   )
 }
