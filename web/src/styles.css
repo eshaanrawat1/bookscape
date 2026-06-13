@@ -440,6 +440,87 @@ svg {
   padding: 2.5rem 2.2rem 4.2rem;
 }
 
+.searchLanding {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.pageSearchHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin-bottom: 2rem;
+}
+
+.pageSearchLabelRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--primary);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pageSearchLabelRow svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.pageSearchField {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.6rem;
+  transition: border-color 160ms ease;
+}
+
+.pageSearchField:focus-within {
+  border-bottom-color: var(--primary);
+}
+
+.pageSearchField input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  padding: 0;
+  outline: 0;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: clamp(2.1rem, 2.8vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+}
+
+.pageSearchField input::placeholder {
+  color: color-mix(in oklch, var(--muted-foreground) 74%, transparent);
+}
+
+.searchHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.searchHeader h2 {
+  margin: 0;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 2.4rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--foreground);
+}
+
+.searchHeader p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 1.15rem;
+}
+
 .stack {
   display: flex;
   flex-direction: column;
@@ -452,7 +533,7 @@ svg {
   border: 1px solid var(--border);
   border-radius: 3.1rem;
   background-color: var(--card);
-  padding: 2.4rem;
+  padding: 2.7rem 2.4rem;
 }
 
 .heroGlow {
@@ -556,7 +637,7 @@ svg {
 
 .heroCopy h2 {
   font-size: clamp(2.6rem, 4vw, 3.7rem);
-  line-height: 1.02;
+  line-height: 1.08;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1305,6 +1386,16 @@ svg {
   border-radius: 999px;
   background: #7dbf85;
   box-shadow: 0 0 0 4px color-mix(in oklch, #7dbf85 18%, transparent);
+}
+
+.finishedStatusDot.reading {
+  background: oklch(0.72 0.16 72);
+  box-shadow: 0 0 0 4px color-mix(in oklch, oklch(0.72 0.16 72) 18%, transparent);
+}
+
+.finishedStatusDot.notStarted {
+  background: oklch(0.69 0.05 85);
+  box-shadow: 0 0 0 4px color-mix(in oklch, oklch(0.69 0.05 85) 18%, transparent);
 }
 
 .finishedPanel {

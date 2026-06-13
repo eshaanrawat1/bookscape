@@ -77,6 +77,7 @@ class AtlasStore:
 
         self.catalog = list(self.books_by_id.values())
         self._build_point_indexes()
+        self._build_fallback_search_indexes()
 
         ids_path = RUNTIME_VECTOR / "book_ids.npy"
         emb_path = RUNTIME_VECTOR / "embeddings.npy"
@@ -105,10 +106,43 @@ class AtlasStore:
         self.points_cache = {}
         for p in self.points:
             self.clusters.setdefault(int(p["cluster"]), []).append(p)
+
+    def _add_search_doc(self, point: dict, seen: set[str]) -> None:
+        title = str(point.get("title", "")).lower().strip()
+        if not title:
+            return
+        genres = point.get("genres", [])
+        genres_text = " ".join(str(g) for g in genres) if isinstance(genres, list) else str(genres or "")
+        text = f"{title} {point.get('author', '')} {point.get('genre', '')} {genres_text} {point.get('description', '')}".lower()
+        key = str(point.get("id") or point.get("uid") or f"{title}::{point.get('author', '')}").strip()
+        if key in seen:
+            return
+        seen.add(key)
+        self.search_docs.append((title, text, point))
+
+    def _build_fallback_search_indexes(self) -> None:
+        seen: set[str] = set()
         for p in self.catalog:
-            title = p.get("title", "").lower()
-            text = f"{title} {p.get('author', '')} {p.get('genre', '')} {p.get('description', '')}".lower()
-            self.search_docs.append((title, text, p))
+            self._add_search_doc(p, seen)
+
+        books_file = ROOT / "data" / "books.json"
+        if not books_file.exists():
+            return
+
+        try:
+            with books_file.open("r", encoding="utf-8") as f:
+                all_books = json.load(f)
+            if isinstance(all_books, dict):
+                all_books = list(all_books.values())
+        except Exception:
+            return
+
+        if not isinstance(all_books, list):
+            return
+
+        for book in all_books:
+            if isinstance(book, dict):
+                self._add_search_doc(book, seen)
 
     @staticmethod
     def _sample_evenly(items: list[dict], target: int) -> list[dict]:

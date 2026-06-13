@@ -138,12 +138,14 @@ function resolveSavedWantToReadBook(book, savedBooks) {
 const viewMeta = {
   'reading-now': { title: 'Reading Now', subtitle: 'Pick up where you left off.' },
   library: { title: 'Library', subtitle: 'Everything on your shelves.' },
+  search: { title: 'Search', subtitle: 'Find a book by title or author.' },
   'want-to-read': { title: 'Want to Read', subtitle: 'Saved for a rainy day.' },
   finished: { title: 'Finished', subtitle: "Books you've loved and closed." },
 }
 
 const mainNav = [
   { id: 'library', label: 'Library', icon: LibraryIcon },
+  { id: 'search', label: 'Search', icon: SearchIcon },
 ]
 
 const shelfNav = [
@@ -160,6 +162,11 @@ export default function App() {
   const [view, setView] = useState('reading-now')
   const [mobileNav, setMobileNav] = useState(false)
   const [selected, setSelected] = useState(null)
+  const [searchDraft, setSearchDraft] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchError, setSearchError] = useState(null)
 
   // Live data from the API
   const [books, setBooks] = useState([])
@@ -230,6 +237,33 @@ export default function App() {
     ? collections.find((c) => `collection:${c.id}` === view)
     : null
   const meta = activeCollection ? activeCollection : viewMeta[view]
+  const openBookDialog = (book) => setSelected({ book, variant: 'standard' })
+  const openFinishedBookDialog = (book) => setSelected({ book, variant: 'finished', preferLiveStatus: true })
+
+  async function runSearch(rawQuery = searchDraft) {
+    const nextQuery = String(rawQuery || '').trim()
+    setSearchDraft(nextQuery)
+    setSearchQuery(nextQuery)
+    setView('search')
+
+    if (!nextQuery) {
+      setSearchResults([])
+      setSearchError(null)
+      return
+    }
+
+    setSearchLoading(true)
+    setSearchError(null)
+    try {
+      const data = await apiFetch(`/search?q=${encodeURIComponent(nextQuery)}&limit=24`)
+      setSearchResults((data.results || []).map(normaliseBook))
+    } catch (err) {
+      setSearchError(err.message || 'Could not search books.')
+      setSearchResults([])
+    } finally {
+      setSearchLoading(false)
+    }
+  }
 
   async function createCollection() {
     const name = nextCollectionName(collections)
@@ -387,12 +421,22 @@ export default function App() {
               <ViewContent
                 view={view}
                 activeCollection={activeCollection}
-                onOpen={setSelected}
+                onOpen={openBookDialog}
+                onOpenReadingNow={openFinishedBookDialog}
+                onOpenSidebar={() => setMobileNav(true)}
+                onSelectView={setView}
+                onSearch={runSearch}
                 books={books}
                 booksByIds={booksByIds}
                 currentlyReading={currentlyReading}
                 wantToRead={wantToRead}
                 finished={finished}
+                searchDraft={searchDraft}
+                searchQuery={searchQuery}
+                searchResults={searchResults}
+                searchLoading={searchLoading}
+                searchError={searchError}
+                setSearchDraft={setSearchDraft}
                 globalLibrary={globalLibrary}
               />
             )}
@@ -401,16 +445,25 @@ export default function App() {
       </div>
 
       {selected && (
-      <BookDialog
-        key={selected.id || selected.uid}
-        book={selected}
-        collections={collections}
-        savedWantToReadBook={resolveSavedWantToReadBook(selected, wantToReadBooks)}
-        onAddToCollection={addBookToCollection}
-        onClose={() => setSelected(null)}
-        onOpen={setSelected}
-        onToggleWantToRead={toggleBookWantToRead}
-      />
+        selected.variant === 'finished' ? (
+          <FinishedBookDialog
+            key={selected.book.id || selected.book.uid}
+            book={selected.book}
+            preferLiveStatus={selected.preferLiveStatus}
+            onClose={() => setSelected(null)}
+          />
+        ) : (
+          <BookDialog
+            key={selected.book.id || selected.book.uid}
+            book={selected.book}
+            collections={collections}
+            savedWantToReadBook={resolveSavedWantToReadBook(selected.book, wantToReadBooks)}
+            onAddToCollection={addBookToCollection}
+            onClose={() => setSelected(null)}
+            onOpen={openBookDialog}
+            onToggleWantToRead={toggleBookWantToRead}
+          />
+        )
       )}
     </div>
   )
@@ -594,7 +647,27 @@ function NavButton({ item, active, onSelect }) {
 // View routing
 // ---------------------------------------------------------------------------
 
-function ViewContent({ view, activeCollection, onOpen, books, booksByIds, currentlyReading, wantToRead, finished, globalLibrary }) {
+function ViewContent({
+  view,
+  activeCollection,
+  onOpen,
+  onOpenReadingNow,
+  onOpenSidebar,
+  onSelectView,
+  onSearch,
+  books,
+  booksByIds,
+  currentlyReading,
+  wantToRead,
+  finished,
+  searchDraft,
+  searchQuery,
+  searchResults,
+  searchLoading,
+  searchError,
+  setSearchDraft,
+  globalLibrary,
+}) {
   if (activeCollection) {
     return <BookGrid books={booksByIds(activeCollection.bookIds)} onOpen={onOpen} />
   }
@@ -602,7 +675,7 @@ function ViewContent({ view, activeCollection, onOpen, books, booksByIds, curren
   if (view === 'reading-now') {
     return (
       <div className="stack">
-        {currentlyReading.length > 0 && <ReadingNowHero books={currentlyReading} onOpen={onOpen} />}
+        {currentlyReading.length > 0 && <ReadingNowHero books={currentlyReading} onOpen={onOpenReadingNow} />}
         <Shelf title="Up next" subtitle="Saved for the right moment." books={wantToRead.slice(0, 6)} onOpen={onOpen} />
       </div>
     )
@@ -623,6 +696,23 @@ function ViewContent({ view, activeCollection, onOpen, books, booksByIds, curren
           />
         ))}
       </div>
+    )
+  }
+
+  if (view === 'search') {
+    return (
+      <SearchView
+        draft={searchDraft}
+        query={searchQuery}
+        results={searchResults}
+        loading={searchLoading}
+        error={searchError}
+        onDraftChange={setSearchDraft}
+        onSearch={onSearch}
+        onOpen={onOpen}
+        onOpenSidebar={onOpenSidebar}
+        onGoLibrary={() => onSelectView('library')}
+      />
     )
   }
 
@@ -727,6 +817,103 @@ function BookGrid({ books, onOpen }) {
       {books.map((book) => (
         <BookCard key={book.id} book={book} onOpen={onOpen} />
       ))}
+    </div>
+  )
+}
+
+function SearchView({ draft, query, results, loading, error, onDraftChange, onSearch, onOpen }) {
+  const inputRef = useRef(null)
+
+  const submitSearch = async (event) => {
+    event.preventDefault()
+    await onSearch(draft)
+  }
+
+  if (loading) {
+    return (
+      <div className="stack">
+        <SearchHeader draft={draft} onDraftChange={onDraftChange} onSubmit={submitSearch} inputRef={inputRef} />
+        <SearchLanding title={`Searching for “${query}”`} body="Finding matches across the catalog." />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="stack">
+        <SearchHeader draft={draft} onDraftChange={onDraftChange} onSubmit={submitSearch} inputRef={inputRef} />
+        <SearchLanding title="Could not search books" body={error} />
+      </div>
+    )
+  }
+
+  if (!query) {
+    return (
+      <div className="stack">
+        <SearchHeader draft={draft} onDraftChange={onDraftChange} onSubmit={submitSearch} inputRef={inputRef} />
+        <SearchLanding
+          title="Search the catalog"
+          body="Type a title or author, then press Enter."
+          emptyText="Search for a book to see results here."
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="stack">
+      <SearchHeader draft={draft} onDraftChange={onDraftChange} onSubmit={submitSearch} inputRef={inputRef} />
+      <SearchLanding
+        title={`Results for “${query}”`}
+        body={`${results.length} matching ${results.length === 1 ? 'book' : 'books'}`}
+      />
+      {results.length > 0 ? (
+        <BookGrid books={results} onOpen={onOpen} />
+      ) : (
+        <SearchLanding title="No results found" body="Try a different title, author, or a broader term." />
+      )}
+    </div>
+  )
+}
+
+function SearchHeader({ draft, onDraftChange, onSubmit, inputRef }) {
+  useEffect(() => {
+    inputRef?.current?.focus()
+    inputRef?.current?.select?.()
+  }, [])
+
+  return (
+    <form className="pageSearchHeader" onSubmit={onSubmit}>
+      <div className="pageSearchLabelRow">
+        <SearchIcon />
+        <span>Search</span>
+      </div>
+      <div className="pageSearchField">
+        <input
+          ref={inputRef}
+          type="search"
+          value={draft}
+          onChange={(event) => onDraftChange(event.target.value)}
+          placeholder="Search books"
+          aria-label="Search books"
+        />
+      </div>
+    </form>
+  )
+}
+
+function SearchLanding({ title, body, emptyText }) {
+  return (
+    <div className="searchLanding">
+      <div className="searchHeader">
+        <h2>{title}</h2>
+        <p>{body}</p>
+      </div>
+      {emptyText ? (
+        <div className="emptyState">
+          <p>{emptyText}</p>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -954,7 +1141,7 @@ function BookDialog({
   )
 }
 
-function FinishedBookDialog({ book, onClose }) {
+function FinishedBookDialog({ book, preferLiveStatus = false, onClose }) {
   const [record, setRecord] = useState(null)
   const [hydrated, setHydrated] = useState(false)
   const [statusMenuOpen, setStatusMenuOpen] = useState(false)
@@ -963,7 +1150,7 @@ function FinishedBookDialog({ book, onClose }) {
   const statusMenuRef = useRef(null)
   const bookId = book.id || book.uid || ''
   const baseRecord = {
-    status: 'done',
+    status: book.status || 'not_started',
     current_page: book.currentPage || book.pages || 0,
     total_pages: book.totalPages || book.pages || 0,
     start_date: book.startDate || '',
@@ -989,14 +1176,21 @@ function FinishedBookDialog({ book, onClose }) {
           ...baseRecord,
           ...next,
         }
+        if (preferLiveStatus) {
+          nextRecord.status = baseRecord.status
+        }
         setRecord(nextRecord)
         lastSavedRef.current = JSON.stringify(nextRecord)
         setHydrated(true)
       })
       .catch(() => {
         if (!cancelled) {
-          setRecord(baseRecord)
-          lastSavedRef.current = JSON.stringify(baseRecord)
+          const nextRecord = { ...baseRecord }
+          if (preferLiveStatus) {
+            nextRecord.status = baseRecord.status
+          }
+          setRecord(nextRecord)
+          lastSavedRef.current = JSON.stringify(nextRecord)
           setHydrated(true)
         }
       })
@@ -1088,6 +1282,11 @@ function FinishedBookDialog({ book, onClose }) {
     reading: 'Reading',
     not_started: 'Want to read',
   }
+  const statusDotClass = {
+    done: 'finishedStatusDot done',
+    reading: 'finishedStatusDot reading',
+    not_started: 'finishedStatusDot notStarted',
+  }[draft.status] || 'finishedStatusDot'
 
   return (
     <div className="dialogScrim finishedScrim" onClick={onClose}>
@@ -1128,7 +1327,7 @@ function FinishedBookDialog({ book, onClose }) {
                   aria-expanded={statusMenuOpen}
                 >
                   <span>{statusLabelMap[draft.status] || 'Finished'}</span>
-                  <span className="finishedStatusDot" />
+                  <span className={statusDotClass} />
                   <span className="finishedStatusCaret">▾</span>
                 </button>
                 {statusMenuOpen && (
@@ -1307,6 +1506,15 @@ function PlusIcon() {
     <Icon>
       <path d="M12 5v14" />
       <path d="M5 12h14" />
+    </Icon>
+  )
+}
+
+function SearchIcon() {
+  return (
+    <Icon>
+      <circle cx="11" cy="11" r="6" />
+      <path d="m20 20-3.5-3.5" />
     </Icon>
   )
 }
