@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
+BOOKS_PATH = ROOT / "data" / "books.json"
 RUNTIME_CATALOG = ROOT / "data" / "runtime" / "catalog"
 RUNTIME_VECTOR = ROOT / "data" / "runtime" / "vector"
 
@@ -39,8 +40,9 @@ class AtlasStore:
         except Exception:
             return 0.0
 
-    def _current_artifact_stamp(self) -> tuple[float, float, float]:
+    def _current_artifact_stamp(self) -> tuple[float, float, float, float]:
         return (
+            self._mtime_or_zero(BOOKS_PATH),
             self._mtime_or_zero(RUNTIME_CATALOG / "books_globe.json"),
             self._mtime_or_zero(RUNTIME_VECTOR / "book_ids.npy"),
             self._mtime_or_zero(RUNTIME_VECTOR / "embeddings.npy"),
@@ -66,6 +68,10 @@ class AtlasStore:
         self._global_library_cache = None
         self._all_books_cache = None
 
+        books_catalog = self._load_books_catalog()
+        self.catalog = list(books_catalog)
+        self._build_search_indexes()
+
         points_path = RUNTIME_CATALOG / "books_globe.json"
         if points_path.exists():
             with points_path.open("r", encoding="utf-8") as f:
@@ -74,10 +80,7 @@ class AtlasStore:
             self.point_by_id = {p["id"]: p for p in self.points}
 
         self.books_by_id = dict(self.point_by_id)
-
-        self.catalog = list(self.books_by_id.values())
         self._build_point_indexes()
-        self._build_fallback_search_indexes()
 
         ids_path = RUNTIME_VECTOR / "book_ids.npy"
         emb_path = RUNTIME_VECTOR / "embeddings.npy"
@@ -98,14 +101,28 @@ class AtlasStore:
 
     def has_data(self) -> bool:
         self._maybe_reload()
-        return bool(self.points)
+        return bool(self.catalog)
 
     def _build_point_indexes(self) -> None:
         self.clusters = {}
-        self.search_docs = []
         self.points_cache = {}
         for p in self.points:
             self.clusters.setdefault(int(p["cluster"]), []).append(p)
+
+    def _load_books_catalog(self) -> list[dict]:
+        if not BOOKS_PATH.exists():
+            return []
+        try:
+            with BOOKS_PATH.open("r", encoding="utf-8") as f:
+                payload = json.load(f)
+        except Exception:
+            return []
+
+        if isinstance(payload, dict):
+            payload = list(payload.values())
+        if not isinstance(payload, list):
+            return []
+        return [row for row in payload if isinstance(row, dict)]
 
     def _add_search_doc(self, point: dict, seen: set[str]) -> None:
         title = str(point.get("title", "")).lower().strip()
@@ -120,29 +137,11 @@ class AtlasStore:
         seen.add(key)
         self.search_docs.append((title, text, point))
 
-    def _build_fallback_search_indexes(self) -> None:
+    def _build_search_indexes(self) -> None:
+        self.search_docs = []
         seen: set[str] = set()
         for p in self.catalog:
             self._add_search_doc(p, seen)
-
-        books_file = ROOT / "data" / "books.json"
-        if not books_file.exists():
-            return
-
-        try:
-            with books_file.open("r", encoding="utf-8") as f:
-                all_books = json.load(f)
-            if isinstance(all_books, dict):
-                all_books = list(all_books.values())
-        except Exception:
-            return
-
-        if not isinstance(all_books, list):
-            return
-
-        for book in all_books:
-            if isinstance(book, dict):
-                self._add_search_doc(book, seen)
 
     @staticmethod
     def _sample_evenly(items: list[dict], target: int) -> list[dict]:

@@ -21,7 +21,7 @@ class DataRepository:
         self.user_state_path = self.user_dir / "user_state.json"
         # Canonical source for "my obsidian data" is the full sync snapshot.
         self.obsidian_data_path = self.user_dir / "all_books.json"
-        self.books_catalog_path = root / "data" / "runtime" / "catalog" / "books_globe.json"
+        self.books_catalog_path = root / "data" / "books.json"
 
     def default_user_state(self) -> dict:
         return {

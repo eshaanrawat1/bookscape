@@ -1,4 +1,24 @@
 import { useState, useEffect, useRef } from 'react'
+import {
+  BookOpen,
+  Library,
+  Bookmark,
+  CheckCircle2,
+  Flame,
+  Plus,
+  Search,
+  Menu,
+  Clock3,
+  Star,
+  X,
+  RefreshCcw,
+  Heart,
+  FileText,
+  MessageSquareText,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react'
 
 const BASE = '/api'
 
@@ -27,6 +47,7 @@ function mapReadingLists(rawLists) {
     name: list.name,
     description: '',
     bookIds: (list.book_ids || []),
+    books: (list.books || []).map(normaliseBook),
   }))
 }
 
@@ -312,6 +333,16 @@ export default function App() {
     setCollections(mapReadingLists(data.lists || []))
   }
 
+  async function removeBookFromCollection(collectionName, bookId) {
+    const data = await apiFetch(
+      `/reading-lists/${collectionIdFromName(collectionName)}/books/${bookId}`,
+      {
+        method: 'DELETE',
+      }
+    )
+    setCollections(mapReadingLists(data.lists || []))
+  }
+
   async function toggleBookWantToRead(bookId, isSaved) {
     const data = await apiFetch(
       isSaved ? `/want-to-read-books/${bookId}` : '/want-to-read-books',
@@ -426,6 +457,8 @@ export default function App() {
                 onOpenSidebar={() => setMobileNav(true)}
                 onSelectView={setView}
                 onSearch={runSearch}
+                onRemoveFromCollection={removeBookFromCollection}
+                collections={collections}
                 books={books}
                 booksByIds={booksByIds}
                 currentlyReading={currentlyReading}
@@ -655,6 +688,8 @@ function ViewContent({
   onOpenSidebar,
   onSelectView,
   onSearch,
+  onRemoveFromCollection,
+  collections,
   books,
   booksByIds,
   currentlyReading,
@@ -669,7 +704,15 @@ function ViewContent({
   globalLibrary,
 }) {
   if (activeCollection) {
-    return <BookGrid books={booksByIds(activeCollection.bookIds)} onOpen={onOpen} />
+    return (
+      <BookGrid
+        books={activeCollection.books?.length ? activeCollection.books : booksByIds(activeCollection.bookIds)}
+        onOpen={onOpen}
+        showRemoveButton
+        removeLabel={activeCollection.name}
+        onRemove={(bookId) => onRemoveFromCollection(activeCollection.name, bookId)}
+      />
+    )
   }
 
   if (view === 'reading-now') {
@@ -677,6 +720,17 @@ function ViewContent({
       <div className="stack">
         {currentlyReading.length > 0 && <ReadingNowHero books={currentlyReading} onOpen={onOpenReadingNow} />}
         <Shelf title="Up next" subtitle="Saved for the right moment." books={wantToRead.slice(0, 6)} onOpen={onOpen} />
+        {collections
+          .filter((collection) => (collection.books?.length || collection.bookIds?.length || 0) > 0)
+          .map((collection) => (
+            <Shelf
+              key={collection.id}
+              title={collection.name}
+              subtitle="Collection"
+              books={collection.books?.length ? collection.books : booksByIds(collection.bookIds)}
+              onOpen={onOpen}
+            />
+          ))}
       </div>
     )
   }
@@ -802,7 +856,7 @@ function Shelf({ title, subtitle, books, onOpen }) {
   )
 }
 
-function BookGrid({ books, onOpen }) {
+function BookGrid({ books, onOpen, showRemoveButton = false, removeLabel = '', onRemove }) {
   if (!books.length) {
     return (
       <div className="emptyState">
@@ -815,7 +869,14 @@ function BookGrid({ books, onOpen }) {
   return (
     <div className="bookGrid">
       {books.map((book) => (
-        <BookCard key={book.id} book={book} onOpen={onOpen} />
+        <BookCard
+          key={book.id}
+          book={book}
+          onOpen={onOpen}
+          showRemoveButton={showRemoveButton}
+          removeLabel={removeLabel}
+          onRemove={onRemove}
+        />
       ))}
     </div>
   )
@@ -852,7 +913,7 @@ function SearchView({ draft, query, results, loading, error, onDraftChange, onSe
       <div className="stack">
         <SearchHeader draft={draft} onDraftChange={onDraftChange} onSubmit={submitSearch} inputRef={inputRef} />
         <SearchLanding
-          title="Search the catalog"
+          title=""
           body="Type a title or author, then press Enter."
           emptyText="Search for a book to see results here."
         />
@@ -884,17 +945,14 @@ function SearchHeader({ draft, onDraftChange, onSubmit, inputRef }) {
 
   return (
     <form className="pageSearchHeader" onSubmit={onSubmit}>
-      <div className="pageSearchLabelRow">
-        <SearchIcon />
-        <span>Search</span>
-      </div>
       <div className="pageSearchField">
+        <SearchIcon />
         <input
           ref={inputRef}
           type="search"
           value={draft}
           onChange={(event) => onDraftChange(event.target.value)}
-          placeholder="Search books"
+          placeholder=""
           aria-label="Search books"
         />
       </div>
@@ -918,8 +976,8 @@ function SearchLanding({ title, body, emptyText }) {
   )
 }
 
-function BookCard({ book, onOpen }) {
-  return (
+function BookCard({ book, onOpen, showRemoveButton = false, removeLabel = '', onRemove }) {
+  const card = (
     <button className="bookCard" onClick={() => onOpen(book)}>
       <div className="coverWrap">
         <BookCover book={book} />
@@ -932,6 +990,29 @@ function BookCard({ book, onOpen }) {
       <strong>{book.title}</strong>
       <span>{book.author}</span>
     </button>
+  )
+
+  if (!showRemoveButton || !onRemove) return card
+
+  return (
+    <div className="bookCardWrap">
+      {showRemoveButton && onRemove && (
+        <button
+          type="button"
+          className="collectionRemoveButton"
+          aria-label={`Remove ${book.title} from ${removeLabel || 'this collection'}`}
+          title={`Remove from ${removeLabel || 'collection'}`}
+          onClick={(event) => {
+            event.stopPropagation()
+            onRemove(book.id)
+          }}
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <X />
+        </button>
+      )}
+      {card}
+    </div>
   )
 }
 
@@ -1433,230 +1514,78 @@ function StarRating({ value }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Icons (unchanged from original)
-// ---------------------------------------------------------------------------
-
-function Icon({ children }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {children}
-    </svg>
-  )
-}
-
 function BookOpenIcon() {
-  return (
-    <Icon>
-      <path d="M12 7v14" />
-      <path d="M3 5.5A3.5 3.5 0 0 1 6.5 2H12v19H6.5A3.5 3.5 0 0 0 3 17.5z" />
-      <path d="M21 5.5A3.5 3.5 0 0 0 17.5 2H12v19h5.5a3.5 3.5 0 0 1 3.5-3.5z" />
-    </Icon>
-  )
+  return <BookOpen />
 }
 
 function LibraryIcon() {
-  return (
-    <Icon>
-      <path d="M4 19V5" />
-      <path d="M8 19V5" />
-      <path d="M12 19V5" />
-      <path d="m17 5 3 14" />
-    </Icon>
-  )
-}
-
-function HeadphonesIcon() {
-  return (
-    <Icon>
-      <path d="M3 14a9 9 0 0 1 18 0" />
-      <path d="M5 14v4a2 2 0 0 0 2 2h1v-8H7a2 2 0 0 0-2 2z" />
-      <path d="M19 14v4a2 2 0 0 1-2 2h-1v-8h1a2 2 0 0 1 2 2z" />
-    </Icon>
-  )
+  return <Library />
 }
 
 function BookmarkIcon() {
-  return (
-    <Icon>
-      <path d="M6 3h12v18l-6-4-6 4z" />
-    </Icon>
-  )
+  return <Bookmark />
 }
 
 function CheckIcon() {
-  return (
-    <Icon>
-      <circle cx="12" cy="12" r="9" />
-      <path d="m8 12 2.5 2.5L16 9" />
-    </Icon>
-  )
+  return <CheckCircle2 />
 }
 
 function FlameIcon() {
-  return (
-    <Icon>
-      <path d="M8.5 14.5A3.5 3.5 0 0 0 12 18a3.5 3.5 0 0 0 3.5-3.5c0-1.7-.9-2.7-2.2-4.1C12 9 11.4 7.7 12.2 5c-3 1.7-5.2 4.5-5.2 7.5a5 5 0 0 0 10 0" />
-    </Icon>
-  )
+  return <Flame />
 }
 
 function PlusIcon() {
-  return (
-    <Icon>
-      <path d="M12 5v14" />
-      <path d="M5 12h14" />
-    </Icon>
-  )
+  return <Plus />
 }
 
 function SearchIcon() {
-  return (
-    <Icon>
-      <circle cx="11" cy="11" r="6" />
-      <path d="m20 20-3.5-3.5" />
-    </Icon>
-  )
-}
-
-function MoonIcon() {
-  return (
-    <Icon>
-      <path d="M20 14.2A7 7 0 0 1 9.8 4a8 8 0 1 0 10.2 10.2z" />
-    </Icon>
-  )
-}
-
-function SunIcon() {
-  return (
-    <Icon>
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2" />
-      <path d="M12 20v2" />
-      <path d="m4.9 4.9 1.4 1.4" />
-      <path d="m17.7 17.7 1.4 1.4" />
-      <path d="M2 12h2" />
-      <path d="M20 12h2" />
-      <path d="m6.3 17.7-1.4 1.4" />
-      <path d="m19.1 4.9-1.4 1.4" />
-    </Icon>
-  )
+  return <Search />
 }
 
 function MenuIcon() {
-  return (
-    <Icon>
-      <path d="M4 6h16" />
-      <path d="M4 12h16" />
-      <path d="M4 18h16" />
-    </Icon>
-  )
+  return <Menu />
 }
 
 function ClockIcon() {
-  return (
-    <Icon>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
-    </Icon>
-  )
+  return <Clock3 />
 }
 
 function StarIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-      <path d="m12 3 2.75 5.58 6.16.9-4.45 4.34 1.05 6.13L12 17.05l-5.51 2.9 1.05-6.13-4.45-4.34 6.16-.9z" />
-    </svg>
-  )
+  return <Star />
 }
 
 function CloseIcon() {
-  return (
-    <Icon>
-      <path d="M18 6 6 18" />
-      <path d="m6 6 12 12" />
-    </Icon>
-  )
+  return <X />
 }
 
 function SyncIcon({ spinning = false }) {
-  return (
-    <svg className={spinning ? 'syncIcon spinning' : 'syncIcon'} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 12a9 9 0 0 0-15.2-6.4L3 8" />
-      <path d="M3 4v4h4" />
-      <path d="M3 12a9 9 0 0 0 15.2 6.4L21 16" />
-      <path d="M21 20v-4h-4" />
-    </svg>
-  )
+  return <RefreshCcw className={spinning ? 'syncIcon spinning' : 'syncIcon'} />
 }
 
 function HeartIcon({ filled = false }) {
-  return filled ? (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M12 21s-7.2-4.4-9.7-9.1C.4 7.6 2.5 4 6.4 4c2.1 0 3.7 1 4.8 2.4C12.3 5 13.9 4 16 4c3.9 0 6 3.6 4.1 7.9C19.2 16.6 12 21 12 21z"
-        fill="currentColor"
-      />
-    </svg>
-  ) : (
-    <Icon>
-      <path d="M12 20.2s-7-4.1-7-8.8c0-2.4 1.6-4.1 4-4.1 1.5 0 2.7.7 3.7 2 1-1.3 2.2-2 3.7-2 2.4 0 4 1.7 4 4.1 0 4.7-7 8.8-7 8.8z" />
-    </Icon>
-  )
+  return filled ? <Heart fill="currentColor" /> : <Heart />
 }
 
 function StarMiniIcon() {
-  return (
-    <Icon>
-      <path d="m12 4 1.9 4.9 5.1.3-4 3.3 1.3 5-4.3-2.8-4.3 2.8 1.3-5-4-3.3 5.1-.3z" />
-    </Icon>
-  )
+  return <Star />
 }
 
 function PagesIcon() {
-  return (
-    <Icon>
-      <path d="M7 4h8a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2V7a3 3 0 0 1 2-3z" />
-      <path d="M9 8h6" />
-      <path d="M9 11h6" />
-    </Icon>
-  )
+  return <FileText />
 }
 
 function ReviewIcon() {
-  return (
-    <Icon>
-      <path d="M6.5 6h11A2.5 2.5 0 0 1 20 8.5v5A2.5 2.5 0 0 1 17.5 16H11l-4.5 3V16H6.5A2.5 2.5 0 0 1 4 13.5v-5A2.5 2.5 0 0 1 6.5 6z" />
-      <path d="M8.5 10h7" />
-      <path d="M8.5 12.5h4.5" />
-    </Icon>
-  )
+  return <MessageSquareText />
 }
 
 function TrashIcon() {
-  return (
-    <Icon>
-      <path d="M4 7h16" />
-      <path d="M9 7V5h6v2" />
-      <path d="M7 7l1 12h8l1-12" />
-      <path d="M10 11v5" />
-      <path d="M14 11v5" />
-    </Icon>
-  )
+  return <Trash2 />
 }
 
 function ChevronLeftIcon() {
-  return (
-    <Icon>
-      <path d="m15 18-6-6 6-6" />
-    </Icon>
-  )
+  return <ChevronLeft />
 }
 
 function ChevronRightIcon() {
-  return (
-    <Icon>
-      <path d="m9 18 6-6-6-6" />
-    </Icon>
-  )
+  return <ChevronRight />
 }
