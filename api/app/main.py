@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
+import subprocess
+import sys
 
 from fastapi import APIRouter, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -340,18 +343,13 @@ def get_my_books() -> dict:
     for book_id, row in books_map.items():
         if not isinstance(row, dict):
             continue
-        linked_dataset_book_id = str(row.get("dataset_book_id") or "")
-        linked_dataset_book = store.get_book(linked_dataset_book_id) if linked_dataset_book_id else None
-        matched_catalog_book = store.find_book_by_title_author(row.get("title"), row.get("author"))
-        effective_color = str(
-            row.get("color")
-            or (linked_dataset_book or {}).get("color")
-            or (matched_catalog_book or {}).get("color")
-            or ""
-        )
+        catalog_uid = str(row.get("catalog_uid") or "").strip()
+        linked_catalog_book = store.get_book(catalog_uid) if catalog_uid else None
+        effective_color = str(row.get("color") or (linked_catalog_book or {}).get("color") or "")
         prog = progress_entries.get(str(book_id), {}) or {}
         books.append({
             **row,
+            "catalog_uid": catalog_uid,
             "color": effective_color,
             "reading_status": str(prog.get("status") or row.get("status") or "not_started"),
             "reading_current_page": int(prog.get("current_page") or row.get("current_page") or row.get("total_pages") or 0),
@@ -359,7 +357,7 @@ def get_my_books() -> dict:
             "reading_finish_date": (prog.get("finish_date") or row.get("finish_date") or ""),
             "reading_start_date": (prog.get("start_date") or row.get("start_date") or ""),
             "saved_to_want_to_read": str(book_id) in saved_want_to_read,
-            "linked_dataset_book": linked_dataset_book,
+            "linked_catalog_book": linked_catalog_book,
         })
 
     books.sort(
@@ -676,6 +674,56 @@ def api_get_book(book_id: str) -> dict:
 @api_router.get("/recommendations")
 def api_recommendations(book_id: str = Query(...), limit: int = Query(default=5, ge=1, le=20)) -> dict:
     return recommendations(book_id=book_id, limit=limit)
+
+
+class ScrapeBookIn(BaseModel):
+    url: str
+
+
+@app.post("/scrape-book")
+def scrape_book(payload: ScrapeBookIn) -> dict:
+    url = payload.url.strip()
+    uid_match = re.search(r"/book/show/(\d+)", url)
+    if not uid_match:
+        raise HTTPException(status_code=400, detail="Invalid Goodreads URL format")
+    
+    book_id = uid_match.group(1)
+    
+    scraper_path = ROOT / "data" / "scraper.py"
+    cmd = [
+        sys.executable,
+        str(scraper_path),
+        "--single",
+        url
+    ]
+    
+    try:
+        res = subprocess.run(cmd, cwd=ROOT / "data", capture_output=True, text=True, timeout=60)
+        if res.returncode != 0:
+            err_msg = res.stderr or res.stdout or "Scraper execution failed"
+            raise HTTPException(status_code=500, detail=f"Scraper error: {err_msg}")
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Scraper timed out")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to run scraper: {str(e)}")
+        
+    store.reload()
+    
+    book = store.get_book(book_id)
+    if not book:
+        log_details = ""
+        if res.stdout:
+            warnings = [line.strip() for line in res.stdout.split("\n") if "⚠️" in line or "🚨" in line or "error" in line.lower()]
+            if warnings:
+                log_details = f" Details: {' | '.join(warnings)}"
+        raise HTTPException(status_code=404, detail=f"Scraper completed but book not found in dataset.{log_details}")
+        
+    return {"ok": True, "book": book}
+
+
+@api_router.post("/scrape-book")
+def api_scrape_book(payload: ScrapeBookIn) -> dict:
+    return scrape_book(payload)
 
 
 app.include_router(api_router)

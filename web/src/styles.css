@@ -369,8 +369,13 @@ svg {
 }
 
 @keyframes syncSpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .titleGroup h1 {
@@ -484,8 +489,8 @@ svg {
   padding: 0;
   outline: 0;
   font-family: 'Playfair Display', Georgia, serif;
-  font-size: clamp(2rem, 2.6vw, 2.8rem);
-  font-weight: 700;
+  font-size: clamp(2rem, 2.3vw, 2.6rem);
+  font-weight: 400;
   letter-spacing: -0.02em;
   line-height: 1.08;
 }
@@ -538,14 +543,8 @@ svg {
   width: 22rem;
   height: 22rem;
   border-radius: 999px;
-  background:
-    radial-gradient(
-      circle at 32% 32%,
-      color-mix(in srgb, var(--hero-glow, oklch(0.62 0.14 250)) 78%, white) 0%,
-      color-mix(in srgb, var(--hero-glow, oklch(0.62 0.14 250)) 58%, transparent) 44%,
-      transparent 74%
-    );
-  opacity: 0.88;
+  background: var(--hero-glow, oklch(0.62 0.14 250));
+  opacity: 0.5;
   filter: blur(48px);
   pointer-events: none;
 }
@@ -669,7 +668,7 @@ svg {
   margin-top: 0.25rem;
 }
 
-.progressBlock > div:first-child {
+.progressBlock>div:first-child {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
@@ -877,7 +876,7 @@ svg {
   white-space: nowrap;
 }
 
-.bookCard > span {
+.bookCard>span {
   overflow: hidden;
   margin-top: 0.16rem;
   color: var(--muted-foreground);
@@ -1010,6 +1009,80 @@ svg {
   padding: 1.5rem;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
   overflow: auto;
+}
+
+/* Scraper Dialog */
+.scraperDialog {
+  width: min(44rem, calc(100vw - 2rem)) !important;
+  min-height: auto !important;
+}
+
+.scraperForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.scraperField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.scraperLabel {
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--foreground);
+}
+
+.scraperInput {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 1.05rem;
+  outline: 0;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.scraperInput:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 16%, transparent);
+}
+
+.scraperStatus {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.scraperStatusText {
+  color: var(--muted-foreground);
+  font-size: 1.02rem;
+  font-weight: 500;
+}
+
+.scraperError {
+  color: oklch(0.58 0.22 25);
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 500;
+}
+
+.scraperButtons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 0.55rem;
+}
+
+.scraperButtons .primaryButton,
+.scraperButtons .secondaryButton {
+  min-height: 3rem;
+  padding: 0 1.5rem;
 }
 
 .dialogTop {
@@ -1466,8 +1539,8 @@ svg {
   max-width: 38rem;
 }
 
-.finishedField > span,
-.finishedNotes > span {
+.finishedField>span,
+.finishedNotes>span {
   color: var(--muted-foreground);
   font-size: 1.08rem;
   font-weight: 600;
@@ -1555,6 +1628,7 @@ svg {
     opacity: 0;
     transform: translateY(-0.35rem) scale(0.985);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -1597,6 +1671,7 @@ svg {
   /* hide scrollbar */
   scrollbar-width: none;
 }
+
 .dialogSimilarScroll::-webkit-scrollbar {
   display: none;
 }
@@ -1613,6 +1688,7 @@ svg {
   transform: translateZ(0);
   transition: transform 120ms ease;
 }
+
 .similarCard:hover {
   transform: translateY(-0.2rem) translateZ(0);
 }
@@ -1675,7 +1751,7 @@ svg {
     min-height: 100vh;
   }
 
-  .hearthShell > .sidebar {
+  .hearthShell>.sidebar {
     display: none;
   }
 
@@ -1763,6 +1839,7 @@ svg {
   .shelfScroll .bookCard {
     flex: 0 0 11rem;
   }
+
   .bookDialog {
     padding: 1rem;
   }

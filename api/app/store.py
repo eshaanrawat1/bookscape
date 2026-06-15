@@ -255,20 +255,23 @@ class AtlasStore:
     def get_book(self, book_id: str) -> dict | None:
         self._maybe_reload()
         self._ensure_all_books()
-        
+
         book = self._all_books_cache.get(book_id)
         if not book:
             return self.books_by_id.get(book_id)
-            
-        # Resolve similar books instantly
+
+        # Resolve similar books instantly.
         similar_ids = book.get("similar_book_ids", [])
         similar_books = []
         for sid in similar_ids:
-            if sid in self._all_books_cache:
-                similar_books.append(self._all_books_cache[sid])
-                
-        # Return a copy with similar_books populated
+            similar = self._all_books_cache.get(sid)
+            if not similar:
+                continue
+            similar_books.append({**similar, "catalog_uid": str(similar.get("catalog_uid") or similar.get("uid") or "")})
+
+        # Return a copy with similar_books populated.
         result = dict(book)
+        result["catalog_uid"] = str(book.get("catalog_uid") or book.get("uid") or "")
         result["similar_books"] = similar_books
         return result
 
@@ -391,12 +394,17 @@ class AtlasStore:
             for b in top_30:
                 mapped.append({
                     "id": b.get("uid", ""),
+                    "catalog_uid": b.get("uid", ""),
                     "title": b.get("title", "Untitled"),
                     "author": b.get("author", ""),
                     "cover": b.get("image_url", ""),
                     "color": b.get("color", ""),
                     "tint": "220 30% 45%",
                     "genre": genre,
+                    "genres": b.get("genres", []),
+                    "avg_rating": b.get("avg_rating", 0),
+                    "rating_count": b.get("rating_count", 0),
+                    "review_count": b.get("review_count", 0),
                     "book_rating": b.get("avg_rating", 0),
                     "description": b.get("description", ""),
                     "total_pages": b.get("page_count", 0),

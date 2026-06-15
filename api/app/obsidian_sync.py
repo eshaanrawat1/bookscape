@@ -102,6 +102,38 @@ def _norm_key(title: object, author: object) -> str:
     return f"{t}::{a}"
 
 
+def _link_fields_from_row(row: dict | None) -> dict[str, str]:
+    row = row or {}
+    catalog_uid = str(row.get("catalog_uid") or row.get("dataset_book_id") or "").strip()
+    dataset_book_id = str(row.get("dataset_book_id") or catalog_uid).strip()
+    dataset_link_type = str(row.get("dataset_link_type") or "").strip()
+    dataset_linked_at = str(row.get("dataset_linked_at") or "").strip()
+    return {
+        "catalog_uid": catalog_uid,
+        "dataset_book_id": dataset_book_id,
+        "dataset_link_type": dataset_link_type,
+        "dataset_linked_at": dataset_linked_at,
+    }
+
+
+def _preserve_link_fields(row: dict, prior_row: dict | None = None, *, clear: bool = False) -> dict:
+    prior = prior_row or {}
+    current = _link_fields_from_row(row)
+    prior_links = _link_fields_from_row(prior)
+    if clear:
+        row["catalog_uid"] = ""
+        row["dataset_book_id"] = ""
+        row["dataset_link_type"] = ""
+        row["dataset_linked_at"] = ""
+        return row
+
+    row["catalog_uid"] = current["catalog_uid"] or prior_links["catalog_uid"]
+    row["dataset_book_id"] = current["dataset_book_id"] or prior_links["dataset_book_id"] or row["catalog_uid"]
+    row["dataset_link_type"] = current["dataset_link_type"] or prior_links["dataset_link_type"]
+    row["dataset_linked_at"] = current["dataset_linked_at"] or prior_links["dataset_linked_at"]
+    return row
+
+
 def _hamming_similarity(a: str, b: str) -> float:
     """
     Normalized Hamming similarity over padded strings.
@@ -441,18 +473,15 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
         prior_snapshot_row = existing_snapshot_books.get(book["id"], {})
         if not isinstance(prior_snapshot_row, dict):
             prior_snapshot_row = {}
-        all_synced_books_map[book["id"]] = {
+        synced_row = {
             **book,
             "reading_status": progress_row["status"],
             "reading_total_pages": progress_row["total_pages"],
             "reading_current_page": progress_row["current_page"],
             "reading_start_date": progress_row["start_date"],
             "reading_finish_date": progress_row["finish_date"],
-            # Preserve lightweight linkage metadata across sync refreshes.
-            "dataset_book_id": str(prior_snapshot_row.get("dataset_book_id") or ""),
-            "dataset_link_type": str(prior_snapshot_row.get("dataset_link_type") or ""),
-            "dataset_linked_at": str(prior_snapshot_row.get("dataset_linked_at") or ""),
         }
+        all_synced_books_map[book["id"]] = _preserve_link_fields(synced_row, prior_snapshot_row)
         updated_progress_entries += 1
 
         key = _norm_key(book["title"], book["author"])
@@ -641,13 +670,14 @@ def add_snapshot_book_to_dataset(root: Path, book_id: str) -> dict:
     rebuild = _run_full_rebuild_async(root, requested_by_book_id=book_id)
 
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    book["catalog_uid"] = book_id
     book["dataset_book_id"] = book_id
     book["dataset_link_type"] = "added_pending_rebuild"
     book["dataset_linked_at"] = now
     books[book_id] = book
     payload["books"] = books
     repo.write_obsidian_books_snapshot(payload)
-    return {"book_id": book_id, "dataset_book_id": book_id, "link_type": "added_pending_rebuild", "rebuild": rebuild}
+    return {"book_id": book_id, "catalog_uid": book_id, "dataset_book_id": book_id, "link_type": "added_pending_rebuild", "rebuild": rebuild}
 
 
 def merge_snapshot_book_with_dataset(root: Path, snapshot_book_id: str, dataset_book_id: str) -> dict:
@@ -658,13 +688,14 @@ def merge_snapshot_book_with_dataset(root: Path, snapshot_book_id: str, dataset_
         raise FileNotFoundError(f"Snapshot book not found: {snapshot_book_id}")
     row = books[snapshot_book_id]
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    row["catalog_uid"] = str(dataset_book_id or "")
     row["dataset_book_id"] = str(dataset_book_id or "")
     row["dataset_link_type"] = "merged"
     row["dataset_linked_at"] = now
     books[snapshot_book_id] = row
     payload["books"] = books
     repo.write_obsidian_books_snapshot(payload)
-    return {"book_id": snapshot_book_id, "dataset_book_id": row["dataset_book_id"], "link_type": "merged"}
+    return {"book_id": snapshot_book_id, "catalog_uid": row["catalog_uid"], "dataset_book_id": row["dataset_book_id"], "link_type": "merged"}
 
 
 def unlink_snapshot_book_from_dataset(root: Path, snapshot_book_id: str) -> dict:
@@ -674,13 +705,11 @@ def unlink_snapshot_book_from_dataset(root: Path, snapshot_book_id: str) -> dict
     if not isinstance(books, dict) or snapshot_book_id not in books or not isinstance(books.get(snapshot_book_id), dict):
         raise FileNotFoundError(f"Snapshot book not found: {snapshot_book_id}")
     row = books[snapshot_book_id]
-    row["dataset_book_id"] = ""
-    row["dataset_link_type"] = ""
-    row["dataset_linked_at"] = ""
+    _preserve_link_fields(row, clear=True)
     books[snapshot_book_id] = row
     payload["books"] = books
     repo.write_obsidian_books_snapshot(payload)
-    return {"book_id": snapshot_book_id, "dataset_book_id": "", "link_type": "unlinked"}
+    return {"book_id": snapshot_book_id, "catalog_uid": "", "dataset_book_id": "", "link_type": "unlinked"}
 
 
 def apply_sync_selection(root: Path, selected_book_ids: list[str]) -> dict:
@@ -713,7 +742,9 @@ def apply_sync_selection(root: Path, selected_book_ids: list[str]) -> dict:
 
     selected_books = [proposed_by_id[book_id] for book_id in selected_ids]
     for book in selected_books:
-        books_map[str(book["id"])] = book
+        existing_row = books_map.get(str(book["id"])) if isinstance(books_map, dict) else {}
+        merged_book = _preserve_link_fields(dict(book), existing_row if isinstance(existing_row, dict) else None)
+        books_map[str(book["id"])] = merged_book
         if str(book["id"]) in proposed_progress:
             progress_entries[str(book["id"])] = proposed_progress[str(book["id"])]
 

@@ -88,10 +88,11 @@ function normaliseBook(raw) {
 
   return {
     id: raw.id || raw.uid || '',
+    catalogUid: raw.catalog_uid || raw.uid || '',
     title: raw.title || 'Untitled',
     author: raw.author || '',
     cover: raw.cover || raw.image_url || '',
-    color: raw.color || raw.linked_dataset_book?.color || '',
+    color: raw.color || raw.linked_catalog_book?.color || '',
     tint: '220 30% 45%', // neutral fallback tint — image_url is used for actual cover art
     genre: primaryGenre,
     genres,
@@ -112,20 +113,19 @@ function normaliseBook(raw) {
   }
 }
 
-function getBookIdentityCandidates(book) {
+function getCatalogBookId(book) {
   const raw = book?._raw || book || {}
-  const linked = raw.linked_dataset_book || {}
+  const linked = raw.linked_catalog_book || {}
   return [
-    raw.id,
-    raw.uid,
-    book?.id,
-    book?.uid,
-    linked.id,
+    raw.catalog_uid,
+    book?.catalogUid,
     linked.uid,
+    linked.id,
+    raw.id,
   ]
     .map((value) => String(value || '').trim())
     .filter(Boolean)
-    .filter((value, index, array) => array.indexOf(value) === index)
+    .filter((value, index, array) => array.indexOf(value) === index)[0] || ''
 }
 
 function normalizeIdentityText(value) {
@@ -136,21 +136,9 @@ function normalizeIdentityText(value) {
 }
 
 function resolveSavedWantToReadBook(book, savedBooks) {
-  const candidates = getBookIdentityCandidates(book)
-  const candidateSet = new Set(candidates)
-  const targetTitle = normalizeIdentityText(book?.title)
-  const targetAuthor = normalizeIdentityText(book?.author)
-
-  return (savedBooks || []).find((savedBook) => {
-    const savedCandidates = getBookIdentityCandidates(savedBook)
-    if (savedCandidates.some((id) => candidateSet.has(id))) return true
-    return (
-      normalizeIdentityText(savedBook?.title) === targetTitle &&
-      normalizeIdentityText(savedBook?.author) === targetAuthor &&
-      targetTitle &&
-      targetAuthor
-    )
-  }) || null
+  const targetId = getCatalogBookId(book)
+  if (!targetId) return null
+  return (savedBooks || []).find((savedBook) => getCatalogBookId(savedBook) === targetId) || null
 }
 
 // ---------------------------------------------------------------------------
@@ -198,6 +186,7 @@ export default function App() {
   const [globalLibrary, setGlobalLibrary] = useState([])
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
+  const [showScraperDialog, setShowScraperDialog] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -430,6 +419,18 @@ export default function App() {
                   <span>{syncing ? 'Syncing' : 'Sync'}</span>
                 </button>
               )}
+              {view === 'library' && (
+                <button
+                  type="button"
+                  className="syncButton"
+                  onClick={() => setShowScraperDialog(true)}
+                  aria-label="Add Book by URL"
+                  title="Add Book by URL"
+                >
+                  <PlusIcon />
+                  <span>Add Book</span>
+                </button>
+              )}
               {activeCollection && (
                 <button
                   type="button"
@@ -498,6 +499,16 @@ export default function App() {
             onToggleWantToRead={toggleBookWantToRead}
           />
         )
+      )}
+      {showScraperDialog && (
+        <ScraperDialog
+          onClose={() => setShowScraperDialog(false)}
+          onSuccess={async (newBook) => {
+            setShowScraperDialog(false)
+            await reloadAppData()
+            setSelected({ book: normaliseBook(newBook), variant: 'standard' })
+          }}
+        />
       )}
     </div>
   )
@@ -1046,8 +1057,7 @@ function BookDialog({
   const [actionMessage, setActionMessage] = useState('')
   const [savingCollection, setSavingCollection] = useState('')
   const [savingToRead, setSavingToRead] = useState(false)
-  const identityCandidates = getBookIdentityCandidates(book)
-  const bookId = identityCandidates[0] || ''
+  const bookId = getCatalogBookId(book)
 
   useEffect(() => {
     let cancelled = false
@@ -1067,7 +1077,7 @@ function BookDialog({
     ? displayBook.genres.slice(0, 5)
     : (displayBook.genre ? [displayBook.genre] : [])
   const isFinishedBook = book.status === 'done' || displayBook.status === 'done'
-  const savedWantToReadKey = savedWantToReadBook ? (savedWantToReadBook.id || savedWantToReadBook.uid || '') : ''
+  const savedWantToReadKey = getCatalogBookId(savedWantToReadBook)
   const isSavedToWantToRead = Boolean(savedWantToReadBook)
 
   if (isFinishedBook) {
@@ -1212,7 +1222,7 @@ function BookDialog({
               {similarBooks.map((simRaw) => {
                 const simBook = normaliseBook(simRaw)
                 return (
-                  <button key={simBook.id} className="similarCard" onClick={() => { if (onOpen) onOpen(simRaw) }}>
+                  <button key={simBook.id} className="similarCard" onClick={() => { if (onOpen) onOpen(simBook) }}>
                     <BookCover book={simBook} />
                   </button>
                 )
@@ -1495,6 +1505,130 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose }) {
           </div>
         </div>
 
+      </article>
+    </div>
+  )
+}
+
+function ScraperDialog({ onClose, onSuccess }) {
+  const [url, setUrl] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [statusMessage, setStatusMessage] = useState('')
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    const trimmedUrl = url.trim()
+    if (!trimmedUrl) {
+      setError('Please enter a URL.')
+      return
+    }
+    if (!trimmedUrl.includes('/book/show/')) {
+      setError('Please enter a valid Goodreads book URL (e.g., containing /book/show/).')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    setStatusMessage('Connecting to Goodreads...')
+
+    // Set up status intervals to give the user a sense of progress during the wait
+    const progressSteps = [
+      { delay: 3000, message: 'Downloading book page...' },
+      { delay: 8000, message: 'Extracting book metadata...' },
+      { delay: 13000, message: 'Fetching similar books...' },
+      { delay: 18000, message: 'Downloading cover image...' },
+      { delay: 23000, message: 'Analyzing cover colors and gradients...' },
+      { delay: 28000, message: 'Saving book to dataset...' }
+    ]
+
+    const timers = progressSteps.map(step => 
+      setTimeout(() => setStatusMessage(step.message), step.delay)
+    )
+
+    try {
+      const res = await apiFetch('/scrape-book', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: trimmedUrl }),
+      })
+      timers.forEach(clearTimeout)
+      if (res.ok && res.book) {
+        onSuccess(res.book)
+      } else {
+        setError('Failed to import book details.')
+      }
+    } catch (err) {
+      timers.forEach(clearTimeout)
+      setError(err.message || 'An error occurred while importing the book.')
+    } finally {
+      setLoading(false)
+      setStatusMessage('')
+    }
+  }
+
+  return (
+    <div className="dialogScrim" onClick={onClose}>
+      <article className="bookDialog paperGrain scraperDialog" onClick={(e) => e.stopPropagation()}>
+        <button className="dialogIconButton dialogClose" onClick={onClose} aria-label="Close dialog">
+          <CloseIcon />
+        </button>
+        
+        <h2>Add Book to Library</h2>
+        <p className="dialogAuthor" style={{ marginBottom: '1.5rem' }}>
+          Enter a Goodreads URL to crawl and import it into your Bookscape library.
+        </p>
+
+        <form onSubmit={handleSubmit} className="scraperForm">
+          <div className="scraperField">
+            <label htmlFor="goodreads-url" className="scraperLabel">
+              Goodreads Book URL
+            </label>
+            <input
+              id="goodreads-url"
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              disabled={loading}
+              placeholder="https://www.goodreads.com/book/show/..."
+              className="scraperInput"
+              required
+            />
+          </div>
+
+          {error && (
+            <p className="scraperError">
+              {error}
+            </p>
+          )}
+
+          {loading && (
+            <div className="scraperStatus">
+              <SyncIcon spinning={true} />
+              <span className="scraperStatusText">
+                {statusMessage}
+              </span>
+            </div>
+          )}
+
+          <div className="scraperButtons">
+            <button
+              type="button"
+              className="secondaryButton"
+              onClick={onClose}
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="primaryButton"
+              disabled={loading}
+            >
+              {loading ? 'Importing...' : 'Import'}
+            </button>
+          </div>
+        </form>
       </article>
     </div>
   )

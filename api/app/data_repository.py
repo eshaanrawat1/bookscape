@@ -11,7 +11,7 @@ def _utc_now() -> str:
 
 class DataRepository:
     USER_STATE_VERSION = 1
-    OBSIDIAN_DATA_VERSION = 1
+    OBSIDIAN_DATA_VERSION = 2
     BOOKS_CATALOG_VERSION = 1
 
     def __init__(self, root: Path) -> None:
