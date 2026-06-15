@@ -538,7 +538,14 @@ svg {
   width: 22rem;
   height: 22rem;
   border-radius: 999px;
-  opacity: 0.42;
+  background:
+    radial-gradient(
+      circle at 32% 32%,
+      color-mix(in srgb, var(--hero-glow, oklch(0.62 0.14 250)) 78%, white) 0%,
+      color-mix(in srgb, var(--hero-glow, oklch(0.62 0.14 250)) 58%, transparent) 44%,
+      transparent 74%
+    );
+  opacity: 0.88;
   filter: blur(48px);
   pointer-events: none;
 }
@@ -1585,6 +1592,8 @@ svg {
   gap: 1.2rem;
   overflow-x: auto;
   padding-bottom: 0.5rem;
+  overscroll-behavior-x: contain;
+  contain: paint;
   /* hide scrollbar */
   scrollbar-width: none;
 }
@@ -1600,10 +1609,12 @@ svg {
   cursor: pointer;
   border-radius: 0.4rem;
   overflow: hidden;
+  will-change: transform;
+  transform: translateZ(0);
   transition: transform 120ms ease;
 }
 .similarCard:hover {
-  transform: scale(1.04);
+  transform: translateY(-0.2rem) translateZ(0);
 }
 
 .dialogCopy h2 {

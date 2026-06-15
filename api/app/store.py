@@ -28,6 +28,7 @@ class AtlasStore:
         self.faiss_index = None
         self._global_library_cache: list[dict] | None = None
         self._all_books_cache: dict[str, dict] | None = None
+        self._catalog_title_author_index: dict[tuple[str, str], dict] = {}
         self._load()
 
     def reload(self) -> None:
@@ -39,6 +40,10 @@ class AtlasStore:
             return float(path.stat().st_mtime)
         except Exception:
             return 0.0
+
+    @staticmethod
+    def _normalize_text(value: object) -> str:
+        return " ".join(str(value or "").strip().lower().split())
 
     def _current_artifact_stamp(self) -> tuple[float, float, float, float]:
         return (
@@ -67,9 +72,20 @@ class AtlasStore:
         self.faiss_index = None
         self._global_library_cache = None
         self._all_books_cache = None
+        self._catalog_title_author_index = {}
 
         books_catalog = self._load_books_catalog()
         self.catalog = list(books_catalog)
+        self._all_books_cache = {
+            str(book.get("uid")): book
+            for book in self.catalog
+            if isinstance(book, dict) and book.get("uid")
+        }
+        self._catalog_title_author_index = {
+            (self._normalize_text(book.get("title")), self._normalize_text(book.get("author"))): book
+            for book in self.catalog
+            if isinstance(book, dict) and book.get("title") and book.get("author")
+        }
         self._build_search_indexes()
 
         points_path = RUNTIME_CATALOG / "books_globe.json"
@@ -197,18 +213,44 @@ class AtlasStore:
     def _ensure_all_books(self) -> None:
         if self._all_books_cache is not None:
             return
-            
+
+        if self.catalog:
+            self._all_books_cache = {
+                str(book.get("uid")): book
+                for book in self.catalog
+                if isinstance(book, dict) and book.get("uid")
+            }
+            if not self._catalog_title_author_index:
+                self._catalog_title_author_index = {
+                    (self._normalize_text(book.get("title")), self._normalize_text(book.get("author"))): book
+                    for book in self.catalog
+                    if isinstance(book, dict) and book.get("title") and book.get("author")
+                }
+            return
+
         books_file = ROOT / "data" / "books.json"
         if not books_file.exists():
             self._all_books_cache = {}
             return
-            
+
         with books_file.open("r", encoding="utf-8") as f:
             all_books = json.load(f)
             if isinstance(all_books, dict):
                 all_books = list(all_books.values())
-        
-        self._all_books_cache = {str(b.get("uid")): b for b in all_books}
+
+        self._all_books_cache = {str(b.get("uid")): b for b in all_books if isinstance(b, dict)}
+        self._catalog_title_author_index = {
+            (self._normalize_text(book.get("title")), self._normalize_text(book.get("author"))): book
+            for book in all_books
+            if isinstance(book, dict) and book.get("title") and book.get("author")
+        }
+
+    def find_book_by_title_author(self, title: object, author: object) -> dict | None:
+        self._maybe_reload()
+        key = (self._normalize_text(title), self._normalize_text(author))
+        if not key[0] or not key[1]:
+            return None
+        return self._catalog_title_author_index.get(key)
 
     def get_book(self, book_id: str) -> dict | None:
         self._maybe_reload()
@@ -317,15 +359,12 @@ class AtlasStore:
         if self._global_library_cache is not None:
             return self._global_library_cache
 
-        books_file = ROOT / "data" / "books.json"
-        if not books_file.exists():
+        self._ensure_all_books()
+        if not self._all_books_cache:
             return []
-            
-        with books_file.open("r", encoding="utf-8") as f:
-            all_books = json.load(f)
-            if isinstance(all_books, dict):
-                all_books = list(all_books.values())
-                
+
+        all_books = list(self._all_books_cache.values())
+
         # Exclude unhelpful/broad genres
         exclude = {"...more", "audiobook", "book club", "adult", "fiction", "nonfiction", "novels", "literature"}
         
@@ -355,6 +394,7 @@ class AtlasStore:
                     "title": b.get("title", "Untitled"),
                     "author": b.get("author", ""),
                     "cover": b.get("image_url", ""),
+                    "color": b.get("color", ""),
                     "tint": "220 30% 45%",
                     "genre": genre,
                     "book_rating": b.get("avg_rating", 0),

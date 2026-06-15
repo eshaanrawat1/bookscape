@@ -342,9 +342,17 @@ def get_my_books() -> dict:
             continue
         linked_dataset_book_id = str(row.get("dataset_book_id") or "")
         linked_dataset_book = store.get_book(linked_dataset_book_id) if linked_dataset_book_id else None
+        matched_catalog_book = store.find_book_by_title_author(row.get("title"), row.get("author"))
+        effective_color = str(
+            row.get("color")
+            or (linked_dataset_book or {}).get("color")
+            or (matched_catalog_book or {}).get("color")
+            or ""
+        )
         prog = progress_entries.get(str(book_id), {}) or {}
         books.append({
             **row,
+            "color": effective_color,
             "reading_status": str(prog.get("status") or row.get("status") or "not_started"),
             "reading_current_page": int(prog.get("current_page") or row.get("current_page") or row.get("total_pages") or 0),
             "reading_total_pages": int(prog.get("total_pages") or row.get("total_pages") or 0),

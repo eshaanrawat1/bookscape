@@ -91,6 +91,7 @@ function normaliseBook(raw) {
     title: raw.title || 'Untitled',
     author: raw.author || '',
     cover: raw.cover || raw.image_url || '',
+    color: raw.color || raw.linked_dataset_book?.color || '',
     tint: '220 30% 45%', // neutral fallback tint — image_url is used for actual cover art
     genre: primaryGenre,
     genres,
@@ -792,10 +793,11 @@ function ReadingNowHero({ books, onOpen }) {
   const prevBook = () => setCurrentIndex((i) => (i - 1 + books.length) % books.length)
 
   const pagesLeft = Math.round((book.pages * (100 - book.progress)) / 100)
+  const heroGlowColor = book.color || `hsl(${book.tint})`
 
   return (
     <section className="heroCard paperGrain">
-      <div className="heroGlow" style={{ background: `hsl(${book.tint} / 0.6)` }} />
+      <div className="heroGlow" style={{ '--hero-glow': heroGlowColor }} />
       <div className="heroInner">
         <button className="heroCover" onClick={() => onOpen(book)}>
           <BookCover book={book} glow />
@@ -1017,8 +1019,9 @@ function BookCard({ book, onOpen, showRemoveButton = false, removeLabel = '', on
 }
 
 function BookCover({ book, glow = false }) {
+  const coverGlowColor = book.color || `hsl(${book.tint})`
   return (
-    <div className={glow ? 'bookCover hasGlow' : 'bookCover'} style={{ '--cover-glow': `hsl(${book.tint} / 0.55)` }}>
+    <div className={glow ? 'bookCover hasGlow' : 'bookCover'} style={{ '--cover-glow': coverGlowColor }}>
       {glow && <div className="coverGlow" />}
       <div className="coverImage">
         <div className="spineShadow" />
