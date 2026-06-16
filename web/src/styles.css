@@ -255,6 +255,16 @@ svg {
   cursor: pointer;
 }
 
+.collectionCount {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--muted-foreground);
+  font-size: inherit;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .collectionEditForm {
   min-width: 0;
   flex: 1;
@@ -900,6 +910,13 @@ svg {
   background: var(--cover-glow);
   opacity: 0.5;
   filter: blur(26px);
+}
+
+.bookDialog .coverGlow,
+.finishedBookDialog .coverGlow {
+  inset: -1.15rem;
+  opacity: 0.74;
+  filter: blur(18px);
 }
 
 .coverImage {
@@ -1640,10 +1657,11 @@ svg {
   font-size: 1.3rem;
   line-height: 1.55;
   color: var(--foreground);
-  display: -webkit-box;
-  -webkit-line-clamp: 6;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  max-height: calc(6 * 1.55em);
+  overflow-y: auto;
+  padding-right: 0.35rem;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
 }
 
 .dialogSimilar {
