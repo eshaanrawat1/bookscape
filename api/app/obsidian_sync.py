@@ -7,18 +7,17 @@ import subprocess
 import sys
 import unicodedata
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 
 import numpy as np
 import yaml
 
 from .data_repository import DataRepository
+from .reading_stats import compute_reading_stats
 try:
     from pipeline.embed_books import generate_embeddings  # type: ignore[import]
 except ModuleNotFoundError:
-    # pipeline/ was removed; provide a lightweight deterministic fallback so the
-    # API can start and serve all routes that don't require ML embeddings.
     def generate_embeddings(books: list[dict], dim: int = 64) -> tuple:  # type: ignore[misc]
         import hashlib
 
@@ -323,46 +322,6 @@ def _load_existing_embeddings(root: Path) -> tuple[np.ndarray | None, list[str]]
         return None, []
 
 
-def _load_book_by_id(root: Path) -> dict[str, dict]:
-    out: dict[str, dict] = {}
-    points_path = root / "data" / "runtime" / "catalog" / "books_globe.json"
-    if points_path.exists():
-        try:
-            with points_path.open("r", encoding="utf-8") as f:
-                payload = json.load(f)
-            for row in payload.get("points", []):
-                book_id = row.get("id")
-                if book_id:
-                    out[str(book_id)] = row
-        except Exception:
-            pass
-    obsidian_books_path = root / "user_data" / "obsidian_books.json"
-    if obsidian_books_path.exists():
-        try:
-            with obsidian_books_path.open("r", encoding="utf-8") as f:
-                payload = json.load(f) or {}
-            books = payload.get("books", {})
-            if isinstance(books, dict):
-                for book_id, row in books.items():
-                    if book_id and isinstance(row, dict):
-                        out[str(book_id)] = row
-        except Exception:
-            pass
-    all_books_path = root / "user_data" / "all_books.json"
-    if all_books_path.exists():
-        try:
-            with all_books_path.open("r", encoding="utf-8") as f:
-                payload = json.load(f) or {}
-            books = payload.get("books", {})
-            if isinstance(books, dict):
-                for book_id, row in books.items():
-                    if book_id and isinstance(row, dict):
-                        out[str(book_id)] = row
-        except Exception:
-            pass
-    return out
-
-
 def _clean_bracket_author_entries(books_map: dict) -> tuple[dict, int]:
     cleaned = {}
     removed = 0
@@ -436,8 +395,6 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
 
     existing_keys = _load_existing_norm_keys(root)
     ignored_keys = _load_ignored_keys(root)
-    book_by_id = _load_book_by_id(root)
-    base_embs, base_ids = _load_existing_embeddings(root)
 
     scanned_files = 0
     parsed_books = 0
@@ -498,34 +455,6 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
         books_map[book["id"]] = book
         proposed_books.append(book)
 
-    embedding_preview = []
-    if proposed_books:
-        new_embs, new_ids, method = generate_embeddings(proposed_books)
-        for i, b in enumerate(proposed_books):
-            emb = new_embs[i]
-            similar = []
-            if base_embs is not None and base_ids:
-                sims = base_embs @ emb.reshape(-1, 1)
-                order = np.argsort(-sims.squeeze())[:10]
-                for idx in order.tolist():
-                    base_id = base_ids[idx]
-                    meta = book_by_id.get(base_id, {})
-                    similar.append({
-                        "id": base_id,
-                        "title": meta.get("title", ""),
-                        "author": meta.get("author", ""),
-                        "score": float(sims.squeeze()[idx]),
-                    })
-            embedding_preview.append({
-                "id": b["id"],
-                "title": b["title"],
-                "author": b["author"],
-                "embedding_method": method,
-                "embedding_dim": int(len(emb)),
-                "embedding": emb.tolist(),
-                "similar_books": similar,
-            })
-
     preview_payload = {
         "dry_run": dry_run,
         "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
@@ -542,7 +471,6 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
         "proposed_books": proposed_books,
         "proposed_progress_entries": {k: progress_entries[k] for k in [b["id"] for b in proposed_books]},
         "all_synced_progress_entries": all_synced_progress_entries,
-        "embedding_preview": embedding_preview,
     }
     with preview_path.open("w", encoding="utf-8") as f:
         json.dump(preview_payload, f, indent=2)
@@ -811,55 +739,3 @@ def ignore_future_suggestion(root: Path, title: str, author: str) -> dict:
     ignored.add(key)
     _save_ignored_keys(root, ignored)
     return {"ignored_key": key, "already_ignored": already, "ignored_count": len(ignored)}
-
-
-def compute_reading_stats(entries: dict[str, dict], today: date | None = None) -> dict:
-    now = today or date.today()
-    rows = []
-    for row in entries.values():
-        finish = _parse_date_str((row or {}).get("finish_date"))
-        status = str((row or {}).get("status") or "").strip().lower()
-        if status != "done" or not finish:
-            continue
-        finish_d = date.fromisoformat(finish)
-        pages = _to_int((row or {}).get("total_pages"), default=_to_int((row or {}).get("current_page"), default=0))
-        rows.append({"finish_date": finish_d, "pages": pages})
-
-    def for_period(period: str) -> tuple[list[dict], int]:
-        if period == "daily":
-            picked = [r for r in rows if r["finish_date"] == now]
-            return picked, 1
-        if period == "monthly":
-            picked = [r for r in rows if r["finish_date"].year == now.year and r["finish_date"].month == now.month]
-            return picked, now.day
-        if period == "yearly":
-            picked = [r for r in rows if r["finish_date"].year == now.year]
-            return picked, now.timetuple().tm_yday
-        picked = list(rows)
-        if not picked:
-            return picked, 1
-        earliest = min(r["finish_date"] for r in picked)
-        return picked, max(1, (now - earliest).days + 1)
-
-    completion_days = sorted({r["finish_date"] for r in rows})
-    streak = 0
-    if completion_days:
-        day = completion_days[-1]
-        day_set = set(completion_days)
-        streak = 1
-        while (day - timedelta(days=1)) in day_set:
-            day = day - timedelta(days=1)
-            streak += 1
-
-    out = {}
-    for period in ("daily", "monthly", "yearly", "all"):
-        picked, days_passed = for_period(period)
-        unique_days = len({r["finish_date"] for r in picked})
-        out[period] = {
-            "totalBooksRead": len(picked),
-            "totalPagesRead": sum(r["pages"] for r in picked),
-            "daysReadStreak": streak,
-            "daysRead": unique_days,
-            "daysPassed": days_passed,
-        }
-    return out

@@ -9,6 +9,15 @@ from fastapi import APIRouter, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from .catalog import (
+    get_book as load_book,
+    get_book_payload as load_book_payload,
+    get_global_library as load_global_library,
+    has_data,
+    recommend_books,
+    search_books,
+    suggest_titles,
+)
 from .data_repository import DataRepository
 from .finished_books import FinishedBooksStore
 from .reading_lists import LikedBooksStore, ReadingListStore, ReadingProgressStore, WantToReadStore
@@ -22,10 +31,8 @@ from .obsidian_sync import (
     unlink_snapshot_book_from_dataset,
 )
 from .reading_stats import ReadingDailyStatsStore, build_activity_payload, compute_reading_stats
-from .store import AtlasStore
 
 app = FastAPI(title="Atlas API", version="0.1.0")
-store = AtlasStore()
 lists = ReadingListStore(Path(__file__).resolve().parents[2])
 liked = LikedBooksStore(Path(__file__).resolve().parents[2])
 want_to_read = WantToReadStore(Path(__file__).resolve().parents[2])
@@ -47,7 +54,7 @@ app.add_middleware(
 @app.get("/health")
 @app.get("/api/health")
 def health() -> dict:
-    return {"ok": True, "has_data": store.has_data()}
+    return {"ok": True, "has_data": has_data(ROOT)}
 
 
 @app.get("/data-health")
@@ -69,16 +76,9 @@ def _load_vault_entries_or_skip(mode: str) -> tuple[dict[str, dict], dict] | tup
     return entries, meta
 
 
-@app.get("/points")
-def points(zoom: str = Query(default="near"), max_points: int = Query(default=12000, ge=500, le=100000)) -> dict:
-    level = zoom if zoom in {"far", "mid", "near"} else "near"
-    points_out = store.points_for_zoom(level, max_points=max_points)
-    return {"zoom": level, "points": points_out, "count": len(points_out), "total_count": len(store.points)}
-
-
 @app.get("/book/{book_id}")
 def get_book(book_id: str) -> dict:
-    book = store.get_book(book_id)
+    book = load_book_payload(ROOT, book_id)
     if not book:
         raise HTTPException(status_code=404, detail="book not found")
     return book
@@ -86,24 +86,16 @@ def get_book(book_id: str) -> dict:
 
 @app.get("/search")
 def search(q: str = Query(..., min_length=1), limit: int = Query(default=10, ge=1, le=50)) -> dict:
-    return {"query": q, "results": store.search(q, limit=limit)}
+    return {"query": q, "results": search_books(ROOT, q, limit=limit)}
 
 @app.get("/search/suggest")
 def search_suggest(q: str = Query(..., min_length=1), limit: int = Query(default=8, ge=1, le=20)) -> dict:
-    return {"query": q, "suggestions": store.suggest_titles(q, limit=limit)}
+    return {"query": q, "suggestions": suggest_titles(ROOT, q, limit=limit)}
 
 
 @app.get("/recommendations")
 def recommendations(book_id: str = Query(...), limit: int = Query(default=5, ge=1, le=20)) -> dict:
-    return {"book_id": book_id, "results": store.recommend(book_id, limit=limit)}
-
-
-@app.get("/cluster/random")
-def random_cluster() -> dict:
-    point = store.random_cluster_point()
-    if not point:
-        raise HTTPException(status_code=404, detail="no points")
-    return {"point": point}
+    return {"book_id": book_id, "results": recommend_books(ROOT, book_id, limit=limit)}
 
 
 class CreateListIn(BaseModel):
@@ -151,7 +143,7 @@ class FinishedBookIn(BaseModel):
 def _hydrate_liked(book_ids: list[str]) -> dict:
     books = []
     for book_id in book_ids:
-        b = store.get_book(book_id)
+        b = load_book(ROOT, book_id)
         if b:
             books.append(b)
     return {"book_ids": [b.get("id") for b in books], "books": books, "count": len(books)}
@@ -160,7 +152,7 @@ def _hydrate_liked(book_ids: list[str]) -> dict:
 def _hydrate_want_to_read(book_ids: list[str]) -> dict:
     books = []
     for book_id in book_ids:
-        b = store.get_book(book_id)
+        b = load_book(ROOT, book_id)
         if b:
             books.append(b)
     return {"book_ids": [b.get("id") for b in books], "books": books, "count": len(books)}
@@ -171,7 +163,7 @@ def _hydrate_lists(rows: list[dict]) -> list[dict]:
     for row in rows:
         books = []
         for book_id in row.get("books", []):
-            b = store.get_book(book_id)
+            b = load_book(ROOT, book_id)
             if b:
                 books.append(b)
         out.append({"name": row.get("name", ""), "book_ids": row.get("books", []), "books": books, "count": len(books)})
@@ -179,7 +171,7 @@ def _hydrate_lists(rows: list[dict]) -> list[dict]:
 
 
 def _book_exists_for_progress(book_id: str) -> bool:
-    if store.get_book(book_id):
+    if load_book(ROOT, book_id):
         return True
     obsidian = repo.read_obsidian_books_snapshot()
     books_map = obsidian.get("books", {})
@@ -224,7 +216,7 @@ def rename_reading_list(name: str, payload: RenameListIn) -> dict:
 
 @app.post("/reading-lists/{name}/books")
 def add_book_to_list(name: str, payload: AddBookIn) -> dict:
-    if not store.get_book(payload.book_id):
+    if not load_book(ROOT, payload.book_id):
         raise HTTPException(status_code=404, detail="book not found")
     try:
         lists.add_book(name, payload.book_id)
@@ -251,7 +243,7 @@ def get_liked_books() -> dict:
 
 @app.post("/liked-books")
 def add_liked_book(payload: AddBookIn) -> dict:
-    if not store.get_book(payload.book_id):
+    if not load_book(ROOT, payload.book_id):
         raise HTTPException(status_code=404, detail="book not found")
     try:
         liked.add(payload.book_id)
@@ -273,7 +265,7 @@ def get_want_to_read_books() -> dict:
 
 @app.post("/want-to-read-books")
 def add_want_to_read_book(payload: AddBookIn) -> dict:
-    if not store.get_book(payload.book_id):
+    if not load_book(ROOT, payload.book_id):
         raise HTTPException(status_code=404, detail="book not found")
     try:
         want_to_read.add(payload.book_id)
@@ -295,7 +287,7 @@ def get_reading_progress() -> dict:
 
 @app.get("/global-library")
 def get_global_library() -> dict:
-    return {"genres": store.get_global_library()}
+    return {"genres": load_global_library(ROOT)}
 
 
 @app.get("/finished-books/{book_id}")
@@ -322,7 +314,7 @@ def get_finished_book(book_id: str) -> dict:
 
 @app.put("/finished-books/{book_id}")
 def upsert_finished_book(book_id: str, payload: FinishedBookIn) -> dict:
-    if not store.get_book(book_id):
+    if not load_book(ROOT, book_id):
         raise HTTPException(status_code=404, detail="book not found")
     row = finished_books.upsert(book_id, payload.model_dump())
     return {"book_id": book_id, "entry": row}
@@ -344,7 +336,7 @@ def get_my_books() -> dict:
         if not isinstance(row, dict):
             continue
         catalog_uid = str(row.get("catalog_uid") or "").strip()
-        linked_catalog_book = store.get_book(catalog_uid) if catalog_uid else None
+        linked_catalog_book = load_book(ROOT, catalog_uid) if catalog_uid else None
         effective_color = str(row.get("color") or (linked_catalog_book or {}).get("color") or "")
         prog = progress_entries.get(str(book_id), {}) or {}
         books.append({
@@ -454,8 +446,6 @@ def sync_obsidian(dry_run: bool = Query(default=True)) -> dict:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"sync failed: {e}") from e
 
-    if not dry_run:
-        store.reload()
     return {
         "ok": True,
         "dry_run": res.dry_run,
@@ -482,7 +472,6 @@ def apply_obsidian_sync_selection(payload: SyncSelectionIn) -> dict:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"apply failed: {e}") from e
 
-    store.reload()
     return {
         "ok": True,
         "applied_count": out.get("applied_count", 0),
@@ -530,7 +519,7 @@ def merge_my_book(book_id: str, payload: MergeSnapshotBookIn) -> dict:
     dataset_book_id = (payload.dataset_book_id or "").strip()
     if not dataset_book_id:
         raise HTTPException(status_code=400, detail="dataset_book_id is required")
-    if not store.get_book(dataset_book_id):
+    if not load_book(ROOT, dataset_book_id):
         raise HTTPException(status_code=404, detail="dataset book not found")
     try:
         out = merge_snapshot_book_with_dataset(Path(__file__).resolve().parents[2], book_id, dataset_book_id)
@@ -707,9 +696,7 @@ def scrape_book(payload: ScrapeBookIn) -> dict:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to run scraper: {str(e)}")
         
-    store.reload()
-    
-    book = store.get_book(book_id)
+    book = load_book_payload(ROOT, book_id)
     if not book:
         log_details = ""
         if res.stdout:

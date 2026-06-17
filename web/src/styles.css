@@ -1020,12 +1020,22 @@ svg {
   max-height: calc(100vh - 2rem);
   gap: 1.5rem;
   transform: translate(-50%, -50%);
+  isolation: isolate;
   border: 1px solid var(--border);
   border-radius: 2rem;
   background-color: var(--card);
   padding: 1.5rem;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
   overflow: auto;
+}
+
+.bookDialog:not(.finishedBookDialog) {
+  background-image:
+    var(--dialog-glow, linear-gradient(180deg, transparent, transparent)),
+    linear-gradient(180deg, color-mix(in oklch, var(--card) 94%, white) 0%, color-mix(in oklch, var(--card) 86%, var(--background)) 100%);
+  background-size: auto, cover;
+  background-position: center;
+  background-blend-mode: soft-light, normal;
 }
 
 /* Scraper Dialog */
