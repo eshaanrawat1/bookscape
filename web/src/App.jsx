@@ -1005,7 +1005,6 @@ function SearchView({ draft, query, results, loading, error, onDraftChange, onSe
     return (
       <div className="stack">
         <SearchHeader draft={draft} onDraftChange={onDraftChange} onSubmit={submitSearch} inputRef={inputRef} />
-        <SearchLanding title={`Searching for “${query}”`} body="Finding matches across the catalog." />
       </div>
     )
   }
@@ -1035,10 +1034,6 @@ function SearchView({ draft, query, results, loading, error, onDraftChange, onSe
   return (
     <div className="stack">
       <SearchHeader draft={draft} onDraftChange={onDraftChange} onSubmit={submitSearch} inputRef={inputRef} />
-      <SearchLanding
-        title={`Results for “${query}”`}
-        body={`${results.length} matching ${results.length === 1 ? 'book' : 'books'}`}
-      />
       {results.length > 0 ? (
         <BookGrid books={results} onOpen={onOpen} />
       ) : (
