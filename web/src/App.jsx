@@ -18,6 +18,7 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
+  BarChart3,
 } from 'lucide-react'
 
 const BASE = '/api'
@@ -245,6 +246,7 @@ const viewMeta = {
   'reading-now': { title: 'Reading Now', subtitle: 'Pick up where you left off.' },
   library: { title: 'Library', subtitle: 'Everything on your shelves.' },
   search: { title: 'Search', subtitle: 'Find a book by title or author.' },
+  stats: { title: 'Statistics', subtitle: 'A quick read on your finished books.' },
   'want-to-read': { title: 'Want to Read', subtitle: 'Saved for a rainy day.' },
   finished: { title: 'Finished', subtitle: "Books you've loved and closed." },
 }
@@ -252,12 +254,28 @@ const viewMeta = {
 const mainNav = [
   { id: 'library', label: 'Library', icon: LibraryIcon },
   { id: 'search', label: 'Search', icon: SearchIcon },
+  { id: 'stats', label: 'Statistics', icon: BarChartIcon },
 ]
 
 const shelfNav = [
   { id: 'reading-now', label: 'Reading Now', icon: BookOpenIcon },
   { id: 'want-to-read', label: 'Want to Read', icon: BookmarkIcon },
   { id: 'finished', label: 'Finished', icon: CheckIcon },
+]
+
+const monthOptions = [
+  { value: '1', label: 'January' },
+  { value: '2', label: 'February' },
+  { value: '3', label: 'March' },
+  { value: '4', label: 'April' },
+  { value: '5', label: 'May' },
+  { value: '6', label: 'June' },
+  { value: '7', label: 'July' },
+  { value: '8', label: 'August' },
+  { value: '9', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' },
 ]
 
 // ---------------------------------------------------------------------------
@@ -273,6 +291,11 @@ export default function App() {
   const [searchResults, setSearchResults] = useState([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchError, setSearchError] = useState(null)
+  const [statsSummary, setStatsSummary] = useState(null)
+  const [statsLoading, setStatsLoading] = useState(false)
+  const [statsError, setStatsError] = useState(null)
+  const [statsYear, setStatsYear] = useState('')
+  const [statsMonth, setStatsMonth] = useState('')
 
   // Live data from the API
   const [books, setBooks] = useState([])
@@ -314,6 +337,32 @@ export default function App() {
     load()
     return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    if (view !== 'stats') return
+    let cancelled = false
+
+    async function loadStats() {
+      setStatsLoading(true)
+      try {
+        const params = new URLSearchParams()
+        if (statsYear) params.set('year', statsYear)
+        if (statsMonth) params.set('month', statsMonth)
+        const suffix = params.toString() ? `?${params.toString()}` : ''
+        const data = await apiFetch(`/stats${suffix}`)
+        if (cancelled) return
+        setStatsSummary(data)
+        setStatsError(null)
+      } catch (err) {
+        if (!cancelled) setStatsError(err.message || 'Could not load stats.')
+      } finally {
+        if (!cancelled) setStatsLoading(false)
+      }
+    }
+
+    loadStats()
+    return () => { cancelled = true }
+  }, [view, statsYear, statsMonth])
 
   async function reloadAppData() {
     const [myBooksRes, listsRes, wantToReadRes, globalRes] = await Promise.all([
@@ -569,6 +618,14 @@ export default function App() {
                 searchError={searchError}
                 setSearchDraft={setSearchDraft}
                 globalLibrary={globalLibrary}
+                statsSummary={statsSummary}
+                statsLoading={statsLoading}
+                statsError={statsError}
+                statsYear={statsYear}
+                statsMonth={statsMonth}
+                setStatsYear={setStatsYear}
+                setStatsMonth={setStatsMonth}
+                onOpenStatsBook={openBookDialog}
               />
             )}
           </div>
@@ -812,6 +869,14 @@ function ViewContent({
   searchError,
   setSearchDraft,
   globalLibrary,
+  statsSummary,
+  statsLoading,
+  statsError,
+  statsYear,
+  statsMonth,
+  setStatsYear,
+  setStatsMonth,
+  onOpenStatsBook,
 }) {
   if (activeCollection) {
     return (
@@ -876,6 +941,21 @@ function ViewContent({
         onOpen={onOpen}
         onOpenSidebar={onOpenSidebar}
         onGoLibrary={() => onSelectView('library')}
+      />
+    )
+  }
+
+  if (view === 'stats') {
+    return (
+      <StatsView
+        summary={statsSummary}
+        loading={statsLoading}
+        error={statsError}
+        year={statsYear}
+        month={statsMonth}
+        onYearChange={setStatsYear}
+        onMonthChange={setStatsMonth}
+        onOpen={onOpenStatsBook}
       />
     )
   }
@@ -1078,6 +1158,169 @@ function SearchLanding({ title, body, emptyText }) {
           <p>{emptyText}</p>
         </div>
       ) : null}
+    </div>
+  )
+}
+
+function StatsView({ summary, loading, error, year, month, onYearChange, onMonthChange, onOpen }) {
+  const years = summary?.available_years || []
+  const hasBooks = (summary?.books_read || 0) > 0
+  const heroColor = summary?.most_time_spent?.color || summary?.densest_book?.color || 'oklch(0.62 0.14 55)'
+
+  return (
+    <div className="stack statsPage">
+      <div className="statsFilters">
+        <AccordionFilter
+          label="Year"
+          value={year}
+          emptyLabel="All years"
+          options={years.map((value) => ({ value: String(value), label: String(value) }))}
+          onChange={onYearChange}
+        />
+        <AccordionFilter
+          label="Month"
+          value={month}
+          emptyLabel="All months"
+          options={monthOptions}
+          onChange={onMonthChange}
+        />
+      </div>
+
+      {loading ? (
+        <div className="emptyState">
+          <p>Loading stats...</p>
+        </div>
+      ) : error ? (
+        <div className="emptyState">
+          <h2>Could not load stats</h2>
+          <p>{error}</p>
+        </div>
+      ) : hasBooks ? (
+        <>
+          <section className="heroCard paperGrain statsHeroCard">
+            <div className="heroGlow statsHeroGlow" style={{ '--hero-glow': buildHeroGlow(heroColor) }} />
+            <div className="statsHeroCopy">
+              <span className="pill">
+                <BarChart3 />
+                {summary.period_label || 'All time'}
+              </span>
+              <h2>Reading at a glance</h2>
+              <p>Minimal stats pulled from your finished books and Obsidian snapshot.</p>
+            </div>
+            <div className="statsSummary">
+              <div className="statsMetric">
+                <strong>{summary.books_read}</strong>
+                <span>Books read</span>
+              </div>
+              <div className="statsMetric">
+                <strong>{formatCompactNumber(summary.pages_read)}</strong>
+                <span>Pages read</span>
+              </div>
+              <div className="statsMetric">
+                <strong>{summary.genres_covered}</strong>
+                <span>Genres covered</span>
+              </div>
+            </div>
+            <div className="statsMetaRow">
+              <span>{summary.most_time_spent_days ? `${summary.most_time_spent_days} days longest read` : 'No long reads tracked yet'}</span>
+              {summary.genre_list?.length > 0 ? <span>{summary.genre_list.slice(0, 4).join(' · ')}</span> : null}
+            </div>
+          </section>
+
+          <section className="statsFeatured">
+            {summary.densest_book && (
+              <div className="statsFeature">
+                <div className="statsFeatureHeader">
+                  <h2>Densest book</h2>
+                  <p>{formatCompactNumber(summary.densest_book.pages)} pages</p>
+                </div>
+                <BookCard book={summary.densest_book} onOpen={onOpen} />
+              </div>
+            )}
+            {summary.most_time_spent && (
+              <div className="statsFeature">
+                <div className="statsFeatureHeader">
+                  <h2>Most time spent</h2>
+                  <p>{summary.most_time_spent_days ? `${summary.most_time_spent_days} days` : 'No date range'}</p>
+                </div>
+                <BookCard book={summary.most_time_spent} onOpen={onOpen} />
+              </div>
+            )}
+          </section>
+        </>
+      ) : (
+        <div className="emptyState statsEmptyState">
+          <h2>No finished books yet</h2>
+          <p>Finish a book in Obsidian or in the finished books store to see stats here.</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AccordionFilter({ label, value, emptyLabel, options, onChange }) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef(null)
+  const selected = options.find((option) => String(option.value) === String(value)) || null
+  const displayLabel = selected?.label || emptyLabel
+
+  useEffect(() => {
+    if (!open) return undefined
+    const handlePointerDown = (event) => {
+      if (rootRef.current && !rootRef.current.contains(event.target)) {
+        setOpen(false)
+      }
+    }
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [open])
+
+  return (
+    <div ref={rootRef} className={`statsFilter statsFilterAccordion${open ? ' isOpen' : ''}`}>
+      <span>{label}</span>
+      <button
+        type="button"
+        className="statsFilterTrigger"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <strong>{displayLabel}</strong>
+        <ChevronRight className="statsFilterChevron" />
+      </button>
+      <div className="statsFilterPanel" aria-hidden={!open}>
+        <button
+          type="button"
+          className={`statsFilterOption${value === '' ? ' active' : ''}`}
+          onClick={() => {
+            onChange('')
+            setOpen(false)
+          }}
+        >
+          {emptyLabel}
+        </button>
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={`statsFilterOption${String(option.value) === String(value) ? ' active' : ''}`}
+            onClick={() => {
+              onChange(String(option.value))
+              setOpen(false)
+            }}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -1636,7 +1879,7 @@ function ScraperDialog({ onClose, onSuccess }) {
       { delay: 13000, message: 'Fetching similar books...' },
       { delay: 18000, message: 'Downloading cover image...' },
       { delay: 23000, message: 'Analyzing cover colors and gradients...' },
-      { delay: 28000, message: 'Saving book to dataset...' }
+      { delay: 28000, message: 'Saving book to library...' }
     ]
 
     const timers = progressSteps.map(step => 
@@ -1822,4 +2065,8 @@ function ChevronLeftIcon() {
 
 function ChevronRightIcon() {
   return <ChevronRight />
+}
+
+function BarChartIcon() {
+  return <BarChart3 />
 }

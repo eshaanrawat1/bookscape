@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 import re
 import subprocess
@@ -396,6 +397,162 @@ def get_reading_stats() -> dict:
     }
 
 
+def _parse_iso_date(value: object) -> date | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(raw[:10])
+    except Exception:
+        return None
+
+
+def _stats_book_payload(book_id: str, row: dict) -> dict:
+    obsidian_row = row if isinstance(row, dict) else {}
+    catalog_uid = str(
+        obsidian_row.get("catalog_uid")
+        or obsidian_row.get("dataset_book_id")
+        or ""
+    ).strip()
+    catalog = load_book(ROOT, catalog_uid) if catalog_uid else None
+    if not isinstance(catalog, dict):
+        catalog = {}
+
+    genres = obsidian_row.get("genres") or catalog.get("genres", [])
+    if not isinstance(genres, list):
+        genres = [genres]
+    clean_genres = [str(genre).strip() for genre in genres if str(genre).strip()]
+
+    total_pages = int(
+        obsidian_row.get("reading_total_pages")
+        or obsidian_row.get("total_pages")
+        or catalog.get("page_count")
+        or 0
+    )
+    start_date = str(obsidian_row.get("start_date") or obsidian_row.get("reading_start_date") or "").strip()
+    finish_date = str(obsidian_row.get("finish_date") or obsidian_row.get("reading_finish_date") or "").strip()
+    title = str(obsidian_row.get("title") or catalog.get("title") or "Untitled")
+    author = str(obsidian_row.get("author") or catalog.get("author") or "")
+    cover = str(obsidian_row.get("image_url") or obsidian_row.get("cover") or catalog.get("image_url") or "")
+    rating = obsidian_row.get("book_rating") or catalog.get("avg_rating") or 0
+    rating_count = obsidian_row.get("book_rating_count") or catalog.get("rating_count") or 0
+    review_count = obsidian_row.get("book_review_count") or catalog.get("review_count") or 0
+    return {
+        "id": book_id,
+        "catalog_uid": catalog_uid,
+        "catalogUid": catalog_uid,
+        "title": title,
+        "author": author,
+        "cover": cover,
+        "color": str(obsidian_row.get("color") or catalog.get("color") or ""),
+        "tint": "220 30% 45%",
+        "genre": clean_genres[0] if clean_genres else str(obsidian_row.get("genre") or catalog.get("genre") or ""),
+        "genres": clean_genres,
+        "pages": total_pages,
+        "totalPages": total_pages,
+        "currentPage": total_pages,
+        "startDate": start_date,
+        "finishDate": finish_date,
+        "rating": float(rating or 0),
+        "reviewCount": int(review_count or 0),
+        "ratingCount": int(rating_count or 0),
+        "progress": 100,
+        "status": "done",
+        "format": [],
+        "blurb": str(obsidian_row.get("description") or catalog.get("description") or ""),
+        "_raw": {**obsidian_row, **({"linked_catalog_book": catalog} if catalog else {})},
+    }
+
+
+def _build_stats_summary(year: int | None = None, month: int | None = None) -> dict:
+    finished_rows = finished_books.list_all()
+    progress_rows = progress.list_all()
+    obsidian_payload = repo.read_obsidian_books_snapshot()
+    obsidian_rows = obsidian_payload.get("books", {})
+    if not isinstance(obsidian_rows, dict):
+        obsidian_rows = {}
+
+    available_years: set[int] = set()
+    for row in obsidian_rows.values():
+        if not isinstance(row, dict):
+            continue
+        finish_date = _parse_iso_date(row.get("finish_date") or row.get("reading_finish_date"))
+        if finish_date:
+            available_years.add(finish_date.year)
+    for row in progress_rows.values():
+        if not isinstance(row, dict):
+            continue
+        finish_date = _parse_iso_date(row.get("finish_date"))
+        if finish_date:
+            available_years.add(finish_date.year)
+
+    selected: dict[str, dict] = {}
+    all_book_ids = set(obsidian_rows.keys()) | set(finished_rows.keys()) | set(progress_rows.keys())
+    for book_id in all_book_ids:
+        obsidian_row = obsidian_rows.get(book_id, {}) if isinstance(obsidian_rows.get(book_id), dict) else {}
+        finished_row = finished_rows.get(book_id, {}) if isinstance(finished_rows.get(book_id), dict) else {}
+        progress_row = progress_rows.get(book_id, {}) if isinstance(progress_rows.get(book_id), dict) else {}
+        row = {**obsidian_row, **finished_row, **progress_row}
+        if str(row.get("status") or "done").strip().lower() != "done":
+            continue
+        finish_date = _parse_iso_date(row.get("finish_date") or row.get("reading_finish_date"))
+        if not finish_date:
+            continue
+        if year is not None and finish_date.year != year:
+            continue
+        if month is not None and finish_date.month != month:
+            continue
+        selected[str(book_id)] = row
+
+    books: list[dict] = []
+    genres: set[str] = set()
+    for book_id, row in selected.items():
+        finish_date = _parse_iso_date(row.get("finish_date") or row.get("reading_finish_date"))
+        book = _stats_book_payload(book_id, row)
+        books.append({
+            **book,
+            "finishDateObj": finish_date.isoformat() if finish_date else "",
+        })
+        for genre in book.get("genres", []):
+            genres.add(genre)
+
+    books.sort(key=lambda item: (str(item.get("finishDate") or ""), str(item.get("title") or "")), reverse=True)
+    densest_book = max(books, key=lambda item: int(item.get("pages") or 0), default=None)
+
+    def _time_spent_days(item: dict) -> int:
+        start = _parse_iso_date(item.get("startDate"))
+        finish = _parse_iso_date(item.get("finishDate"))
+        if not start or not finish or finish < start:
+            return 0
+        return max(1, (finish - start).days + 1)
+
+    most_time_spent = max(books, key=_time_spent_days, default=None)
+    most_time_spent_days = _time_spent_days(most_time_spent) if most_time_spent else 0
+    year_label = str(year) if year is not None else "All time"
+    if year is not None and month is not None:
+        period_label = f"{date(year, month, 1).strftime('%B %Y')}"
+    elif year is not None:
+        period_label = year_label
+    elif month is not None:
+        period_label = date(2000, month, 1).strftime('%B')
+    else:
+        period_label = "All time"
+
+    return {
+        "year": year,
+        "month": month,
+        "period_label": period_label,
+        "available_years": sorted(available_years, reverse=True),
+        "books_read": len(books),
+        "pages_read": sum(int(book.get("pages") or 0) for book in books),
+        "genres_covered": len(genres),
+        "genre_list": sorted(genres),
+        "densest_book": densest_book,
+        "most_time_spent": most_time_spent,
+        "most_time_spent_days": most_time_spent_days,
+    }
+
+
 @app.post("/reading-stats/snapshot/run")
 def run_reading_snapshot(force: bool = Query(default=False)) -> dict:
     loaded = _load_vault_entries_or_skip("manual_snapshot")
@@ -665,11 +822,20 @@ def api_recommendations(book_id: str = Query(...), limit: int = Query(default=5,
     return recommendations(book_id=book_id, limit=limit)
 
 
+@api_router.get("/stats")
+def api_get_stats(year: int | None = Query(default=None, ge=1900, le=3000), month: int | None = Query(default=None, ge=1, le=12)) -> dict:
+    return _build_stats_summary(year=year, month=month)
+
+
+@app.get("/stats")
+def get_stats(year: int | None = Query(default=None, ge=1900, le=3000), month: int | None = Query(default=None, ge=1, le=12)) -> dict:
+    return _build_stats_summary(year=year, month=month)
+
+
 class ScrapeBookIn(BaseModel):
     url: str
 
 
-@app.post("/scrape-book")
 def scrape_book(payload: ScrapeBookIn) -> dict:
     url = payload.url.strip()
     uid_match = re.search(r"/book/show/(\d+)", url)
@@ -679,20 +845,21 @@ def scrape_book(payload: ScrapeBookIn) -> dict:
     book_id = uid_match.group(1)
     
     scraper_path = ROOT / "data" / "scraper.py"
+    scraper_timeout = int(os.getenv("SCRAPER_TIMEOUT_SECONDS", "180"))
     cmd = [
         sys.executable,
         str(scraper_path),
-        "--single",
+        "--import-one",
         url
     ]
     
     try:
-        res = subprocess.run(cmd, cwd=ROOT / "data", capture_output=True, text=True, timeout=60)
+        res = subprocess.run(cmd, cwd=ROOT / "data", capture_output=True, text=True, timeout=scraper_timeout)
         if res.returncode != 0:
             err_msg = res.stderr or res.stdout or "Scraper execution failed"
             raise HTTPException(status_code=500, detail=f"Scraper error: {err_msg}")
     except subprocess.TimeoutExpired:
-        raise HTTPException(status_code=504, detail="Scraper timed out")
+        raise HTTPException(status_code=504, detail=f"Scraper timed out after {scraper_timeout}s")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to run scraper: {str(e)}")
         
@@ -706,6 +873,11 @@ def scrape_book(payload: ScrapeBookIn) -> dict:
         raise HTTPException(status_code=404, detail=f"Scraper completed but book not found in dataset.{log_details}")
         
     return {"ok": True, "book": book}
+
+
+@app.post("/scrape-book")
+def root_scrape_book(payload: ScrapeBookIn) -> dict:
+    return scrape_book(payload)
 
 
 @api_router.post("/scrape-book")
