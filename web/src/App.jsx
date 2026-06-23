@@ -251,6 +251,20 @@ const viewMeta = {
   finished: { title: 'Finished', subtitle: "Books you've loved and closed." },
 }
 
+function authorViewId(author) {
+  return `author:${encodeURIComponent(String(author || '').trim())}`
+}
+
+function authorNameFromView(view) {
+  if (!String(view || '').startsWith('author:')) return ''
+  const raw = String(view).slice('author:'.length)
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return raw
+  }
+}
+
 const mainNav = [
   { id: 'library', label: 'Library', icon: LibraryIcon },
   { id: 'search', label: 'Search', icon: SearchIcon },
@@ -284,6 +298,7 @@ const monthOptions = [
 
 export default function App() {
   const [view, setView] = useState('reading-now')
+  const [previousView, setPreviousView] = useState('reading-now')
   const [mobileNav, setMobileNav] = useState(false)
   const [selected, setSelected] = useState(null)
   const [searchDraft, setSearchDraft] = useState('')
@@ -296,6 +311,9 @@ export default function App() {
   const [statsError, setStatsError] = useState(null)
   const [statsYear, setStatsYear] = useState('')
   const [statsMonth, setStatsMonth] = useState('')
+  const [authorBooks, setAuthorBooks] = useState([])
+  const [authorLoading, setAuthorLoading] = useState(false)
+  const [authorError, setAuthorError] = useState(null)
 
   // Live data from the API
   const [books, setBooks] = useState([])
@@ -364,6 +382,47 @@ export default function App() {
     return () => { cancelled = true }
   }, [view, statsYear, statsMonth])
 
+  useEffect(() => {
+    if (!view.startsWith('author:')) {
+      setAuthorBooks([])
+      setAuthorError(null)
+      setAuthorLoading(false)
+      return undefined
+    }
+
+    const authorName = authorNameFromView(view)
+    if (!authorName) {
+      setAuthorBooks([])
+      setAuthorError('Could not load author books.')
+      setAuthorLoading(false)
+      return undefined
+    }
+
+    let cancelled = false
+    setAuthorLoading(true)
+    setAuthorError(null)
+
+    async function loadAuthorBooks() {
+      try {
+        const data = await apiFetch(`/author-books?author=${encodeURIComponent(authorName)}`)
+        if (cancelled) return
+        setAuthorBooks((data.books || []).map(normaliseBook))
+      } catch (err) {
+        if (!cancelled) {
+          setAuthorBooks([])
+          setAuthorError(err.message || 'Could not load author books.')
+        }
+      } finally {
+        if (!cancelled) setAuthorLoading(false)
+      }
+    }
+
+    loadAuthorBooks()
+    return () => {
+      cancelled = true
+    }
+  }, [view])
+
   async function reloadAppData() {
     const [myBooksRes, listsRes, wantToReadRes, globalRes] = await Promise.all([
       apiFetch('/my-books'),
@@ -392,9 +451,26 @@ export default function App() {
   const activeCollection = view.startsWith('collection:')
     ? collections.find((c) => `collection:${c.id}` === view)
     : null
-  const meta = activeCollection ? activeCollection : viewMeta[view]
+  const activeAuthorName = authorNameFromView(view)
+  const meta = activeCollection
+    ? activeCollection
+    : view.startsWith('author:')
+      ? { title: activeAuthorName || 'Author', subtitle: 'Every book we have by this author.' }
+      : viewMeta[view]
   const openBookDialog = (book) => setSelected({ book, variant: 'standard' })
   const openFinishedBookDialog = (book) => setSelected({ book, variant: 'finished', preferLiveStatus: true })
+  const openAuthorPage = (author) => {
+    const cleanAuthor = String(author || '').trim()
+    if (!cleanAuthor) return
+    setPreviousView((current) => (view.startsWith('author:') ? current : view))
+    setSelected(null)
+    setMobileNav(false)
+    setView(authorViewId(cleanAuthor))
+  }
+  const goBackFromAuthor = () => {
+    setView(previousView && !previousView.startsWith('author:') ? previousView : 'library')
+    setMobileNav(false)
+  }
 
   async function runSearch(rawQuery = searchDraft) {
     const nextQuery = String(rawQuery || '').trim()
@@ -600,9 +676,11 @@ export default function App() {
                 view={view}
                 activeCollection={activeCollection}
                 onOpen={openBookDialog}
+                onOpenAuthor={openAuthorPage}
                 onOpenReadingNow={openFinishedBookDialog}
                 onOpenSidebar={() => setMobileNav(true)}
                 onSelectView={setView}
+                onGoBackFromAuthor={goBackFromAuthor}
                 onSearch={runSearch}
                 onRemoveFromCollection={removeBookFromCollection}
                 collections={collections}
@@ -618,6 +696,9 @@ export default function App() {
                 searchError={searchError}
                 setSearchDraft={setSearchDraft}
                 globalLibrary={globalLibrary}
+                authorBooks={authorBooks}
+                authorLoading={authorLoading}
+                authorError={authorError}
                 statsSummary={statsSummary}
                 statsLoading={statsLoading}
                 statsError={statsError}
@@ -639,6 +720,7 @@ export default function App() {
             book={selected.book}
             preferLiveStatus={selected.preferLiveStatus}
             onClose={() => setSelected(null)}
+            onOpenAuthor={openAuthorPage}
           />
         ) : (
           <BookDialog
@@ -649,6 +731,7 @@ export default function App() {
             onAddToCollection={addBookToCollection}
             onClose={() => setSelected(null)}
             onOpen={openBookDialog}
+            onOpenAuthor={openAuthorPage}
             onToggleWantToRead={toggleBookWantToRead}
           />
         )
@@ -851,9 +934,11 @@ function ViewContent({
   view,
   activeCollection,
   onOpen,
+  onOpenAuthor,
   onOpenReadingNow,
   onOpenSidebar,
   onSelectView,
+  onGoBackFromAuthor,
   onSearch,
   onRemoveFromCollection,
   collections,
@@ -869,6 +954,9 @@ function ViewContent({
   searchError,
   setSearchDraft,
   globalLibrary,
+  authorBooks,
+  authorLoading,
+  authorError,
   statsSummary,
   statsLoading,
   statsError,
@@ -883,6 +971,7 @@ function ViewContent({
       <BookGrid
         books={activeCollection.books?.length ? activeCollection.books : booksByIds(activeCollection.bookIds)}
         onOpen={onOpen}
+        onOpenAuthor={onOpenAuthor}
         showRemoveButton
         removeLabel={activeCollection.name}
         onRemove={(bookId) => onRemoveFromCollection(activeCollection.name, bookId)}
@@ -894,7 +983,7 @@ function ViewContent({
     return (
       <div className="stack">
         {currentlyReading.length > 0 && <ReadingNowHero books={currentlyReading} onOpen={onOpenReadingNow} />}
-        <Shelf title="Up next" subtitle="Saved for the right moment." books={wantToRead.slice(0, 6)} onOpen={onOpen} />
+        <Shelf title="Up next" subtitle="Saved for the right moment." books={wantToRead.slice(0, 6)} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
         {collections
           .filter((collection) => (collection.books?.length || collection.bookIds?.length || 0) > 0)
           .map((collection) => (
@@ -904,6 +993,7 @@ function ViewContent({
               subtitle="Collection"
               books={collection.books?.length ? collection.books : booksByIds(collection.bookIds)}
               onOpen={onOpen}
+              onOpenAuthor={onOpenAuthor}
             />
           ))}
       </div>
@@ -922,9 +1012,24 @@ function ViewContent({
             title={genreSection.genre}
             books={genreSection.books}
             onOpen={onOpen}
+            onOpenAuthor={onOpenAuthor}
           />
         ))}
       </div>
+    )
+  }
+
+  if (view.startsWith('author:')) {
+    return (
+      <AuthorView
+        author={authorNameFromView(view)}
+        books={authorBooks}
+        loading={authorLoading}
+        error={authorError}
+        onOpen={onOpen}
+        onOpenAuthor={onOpenAuthor}
+        onBack={onGoBackFromAuthor}
+      />
     )
   }
 
@@ -939,6 +1044,7 @@ function ViewContent({
         onDraftChange={setSearchDraft}
         onSearch={onSearch}
         onOpen={onOpen}
+        onOpenAuthor={onOpenAuthor}
         onOpenSidebar={onOpenSidebar}
         onGoLibrary={() => onSelectView('library')}
       />
@@ -956,12 +1062,13 @@ function ViewContent({
         onYearChange={setStatsYear}
         onMonthChange={setStatsMonth}
         onOpen={onOpenStatsBook}
+        onOpenAuthor={onOpenAuthor}
       />
     )
   }
 
-  if (view === 'want-to-read') return <BookGrid books={wantToRead} onOpen={onOpen} />
-  if (view === 'finished') return <BookGrid books={finished} onOpen={onOpen} />
+  if (view === 'want-to-read') return <BookGrid books={wantToRead} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
+  if (view === 'finished') return <BookGrid books={finished} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
   return null
 }
 
@@ -1026,7 +1133,7 @@ function ReadingNowHero({ books, onOpen }) {
   )
 }
 
-function Shelf({ title, subtitle, books, onOpen }) {
+function Shelf({ title, subtitle, books, onOpen, onOpenAuthor }) {
   if (!books.length) return null
 
   return (
@@ -1040,14 +1147,14 @@ function Shelf({ title, subtitle, books, onOpen }) {
       </div>
       <div className="shelfScroll">
         {books.map((book) => (
-          <BookCard key={book.id} book={book} onOpen={onOpen} />
+          <BookCard key={book.id} book={book} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
         ))}
       </div>
     </section>
   )
 }
 
-function BookGrid({ books, onOpen, showRemoveButton = false, removeLabel = '', onRemove }) {
+function BookGrid({ books, onOpen, onOpenAuthor, showRemoveButton = false, removeLabel = '', onRemove }) {
   if (!books.length) {
     return (
       <div className="emptyState">
@@ -1064,6 +1171,7 @@ function BookGrid({ books, onOpen, showRemoveButton = false, removeLabel = '', o
           key={book.id}
           book={book}
           onOpen={onOpen}
+          onOpenAuthor={onOpenAuthor}
           showRemoveButton={showRemoveButton}
           removeLabel={removeLabel}
           onRemove={onRemove}
@@ -1073,7 +1181,7 @@ function BookGrid({ books, onOpen, showRemoveButton = false, removeLabel = '', o
   )
 }
 
-function SearchView({ draft, query, results, loading, error, onDraftChange, onSearch, onOpen }) {
+function SearchView({ draft, query, results, loading, error, onDraftChange, onSearch, onOpen, onOpenAuthor }) {
   const inputRef = useRef(null)
 
   const submitSearch = async (event) => {
@@ -1115,7 +1223,7 @@ function SearchView({ draft, query, results, loading, error, onDraftChange, onSe
     <div className="stack">
       <SearchHeader draft={draft} onDraftChange={onDraftChange} onSubmit={submitSearch} inputRef={inputRef} />
       {results.length > 0 ? (
-        <BookGrid books={results} onOpen={onOpen} />
+        <BookGrid books={results} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
       ) : (
         <SearchLanding title="No results found" body="Try a different title, author, or a broader term." />
       )}
@@ -1162,7 +1270,7 @@ function SearchLanding({ title, body, emptyText }) {
   )
 }
 
-function StatsView({ summary, loading, error, year, month, onYearChange, onMonthChange, onOpen }) {
+function StatsView({ summary, loading, error, year, month, onYearChange, onMonthChange, onOpen, onOpenAuthor }) {
   const years = summary?.available_years || []
   const hasBooks = (summary?.books_read || 0) > 0
   const heroColor = summary?.most_time_spent?.color || summary?.densest_book?.color || 'oklch(0.62 0.14 55)'
@@ -1234,7 +1342,7 @@ function StatsView({ summary, loading, error, year, month, onYearChange, onMonth
                   <h2>Densest book</h2>
                   <p>{formatCompactNumber(summary.densest_book.pages)} pages</p>
                 </div>
-                <BookCard book={summary.densest_book} onOpen={onOpen} />
+                <BookCard book={summary.densest_book} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
               </div>
             )}
             {summary.most_time_spent && (
@@ -1243,7 +1351,7 @@ function StatsView({ summary, loading, error, year, month, onYearChange, onMonth
                   <h2>Most time spent</h2>
                   <p>{summary.most_time_spent_days ? `${summary.most_time_spent_days} days` : 'No date range'}</p>
                 </div>
-                <BookCard book={summary.most_time_spent} onOpen={onOpen} />
+                <BookCard book={summary.most_time_spent} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
               </div>
             )}
           </section>
@@ -1325,20 +1433,36 @@ function AccordionFilter({ label, value, emptyLabel, options, onChange }) {
   )
 }
 
-function BookCard({ book, onOpen, showRemoveButton = false, removeLabel = '', onRemove }) {
+function BookCard({ book, onOpen, onOpenAuthor, showRemoveButton = false, removeLabel = '', onRemove }) {
   const card = (
-    <button className="bookCard" onClick={() => onOpen(book)}>
-      <div className="coverWrap">
-        <BookCover book={book} />
-        {book.progress > 0 && book.progress < 100 && (
-          <div className="coverProgress">
-            <Progress value={book.progress} />
-          </div>
-        )}
-      </div>
-      <strong>{book.title}</strong>
-      <span>{book.author}</span>
-    </button>
+    <div className="bookCard">
+      <button type="button" className="bookCardButton" onClick={() => onOpen(book)}>
+        <div className="coverWrap">
+          <BookCover book={book} />
+          {book.progress > 0 && book.progress < 100 && (
+            <div className="coverProgress">
+              <Progress value={book.progress} />
+            </div>
+          )}
+        </div>
+        <strong>{book.title}</strong>
+      </button>
+      {book.author ? (
+        <button
+          type="button"
+          className="bookAuthorButton"
+          onClick={(event) => {
+            event.stopPropagation()
+            onOpenAuthor?.(book.author)
+          }}
+          disabled={!onOpenAuthor}
+        >
+          {book.author}
+        </button>
+      ) : (
+        <span className="bookAuthorButton isEmpty" aria-hidden="true" />
+      )}
+    </div>
   )
 
   if (!showRemoveButton || !onRemove) return card
@@ -1365,6 +1489,79 @@ function BookCard({ book, onOpen, showRemoveButton = false, removeLabel = '', on
   )
 }
 
+function AuthorView({ author, books, loading, error, onOpen, onOpenAuthor, onBack }) {
+  const heroBook = books[0] || null
+
+  return (
+    <div className="stack authorPage">
+      <section className="authorHeroPanel paperGrain">
+        <div className="finishedDialogTop authorDialogTop">
+          <div className="finishedCoverColumn">
+            <div className="finishedCoverWrap">
+              {heroBook ? (
+                <BookCover book={heroBook} glow />
+              ) : (
+                <div className="authorCoverFallback">
+                  <span>{author ? author.charAt(0).toUpperCase() : '?'}</span>
+                </div>
+              )}
+            </div>
+            <div className="finishedPages">
+              <strong>{books.length}</strong>
+              <span>Books found</span>
+            </div>
+          </div>
+
+          <div className="finishedCopy">
+            <div className="finishedHeader">
+              <div>
+                <h2>{author || 'Author'}</h2>
+                <p>Books we have by this author, including co-written titles.</p>
+              </div>
+            </div>
+
+            <p className="authorSummary">
+              This page gathers every matching title from the catalog and gives you a clean shelf just like the finished-books view.
+            </p>
+
+            <div className="authorActions">
+              <button type="button" className="secondaryButton" onClick={onBack}>
+                Back to Library
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {loading ? (
+        <div className="emptyState">
+          <p>Loading author books…</p>
+        </div>
+      ) : error ? (
+        <div className="emptyState">
+          <h2>Could not load author</h2>
+          <p>{error}</p>
+        </div>
+      ) : books.length > 0 ? (
+        <section className="authorBooksSection">
+          <div className="shelfHeader">
+            <div>
+              <h2>All books</h2>
+              <p>Every title in the catalog matched to this author.</p>
+            </div>
+          </div>
+          <BookGrid books={books} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
+        </section>
+      ) : (
+        <div className="emptyState">
+          <h2>No books found</h2>
+          <p>We couldn't find any titles in the catalog for this author.</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function BookCover({ book, glow = false }) {
   const coverGlowColor = buildHeroGlow(book.color || `hsl(${book.tint})`)
   return (
@@ -1386,6 +1583,7 @@ function BookDialog({
   onAddToCollection,
   onClose,
   onOpen,
+  onOpenAuthor,
   onToggleWantToRead,
 }) {
   const [fullBook, setFullBook] = useState(null)
@@ -1421,6 +1619,7 @@ function BookDialog({
       <FinishedBookDialog
         book={displayBook}
         onClose={onClose}
+        onOpenAuthor={onOpenAuthor}
       />
     )
   }
@@ -1471,7 +1670,16 @@ function BookDialog({
           </div>
           <div className="dialogCopy">
             <h2>{displayBook.title}</h2>
-            <p className="dialogAuthor">{displayBook.author}</p>
+            {displayBook.author ? (
+              <button
+                type="button"
+                className="dialogAuthor dialogAuthorButton"
+                onClick={() => onOpenAuthor?.(displayBook.author)}
+                disabled={!onOpenAuthor}
+              >
+                {displayBook.author}
+              </button>
+            ) : null}
 
             <div className="dialogStatsRow">
               {displayBook.rating > 0 && (
@@ -1555,27 +1763,30 @@ function BookDialog({
           </div>
         </div>
 
-        {similarBooks.length > 0 && (
-          <div className="dialogSimilar">
-            <h3>Similar Books</h3>
-            <div className="dialogSimilarScroll">
-              {similarBooks.map((simRaw) => {
+        <div className="dialogSimilar">
+          <h3>Similar Books</h3>
+          <div className="dialogSimilarScroll">
+            {similarBooks.length > 0 ? (
+              similarBooks.map((simRaw) => {
                 const simBook = normaliseBook(simRaw)
                 return (
                   <button key={simBook.id} className="similarCard" onClick={() => { if (onOpen) onOpen(simBook) }}>
                     <BookCover book={simBook} />
                   </button>
                 )
-              })}
-            </div>
+              })
+            ) : (
+              <div className="similarCard similarCardEmpty" aria-hidden="true">
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </article>
     </div>
   )
 }
 
-function FinishedBookDialog({ book, preferLiveStatus = false, onClose }) {
+function FinishedBookDialog({ book, preferLiveStatus = false, onClose, onOpenAuthor }) {
   const [record, setRecord] = useState(null)
   const [hydrated, setHydrated] = useState(false)
   const [statusMenuOpen, setStatusMenuOpen] = useState(false)
@@ -1747,7 +1958,16 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose }) {
             <div className="finishedHeader">
               <div>
                 <h2>{book.title}</h2>
-                <p>{book.author}</p>
+                {book.author ? (
+                  <button
+                    type="button"
+                    className="finishedAuthorButton"
+                    onClick={() => onOpenAuthor?.(book.author)}
+                    disabled={!onOpenAuthor}
+                  >
+                    {book.author}
+                  </button>
+                ) : null}
               </div>
             </div>
 

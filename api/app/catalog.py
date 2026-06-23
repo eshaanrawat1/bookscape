@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import difflib
 import json
+import re
+import unicodedata
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -17,6 +19,26 @@ class CatalogIndex:
 
 def _normalize_text(value: object) -> str:
     return " ".join(str(value or "").strip().lower().split())
+
+
+def _normalize_author_text(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = re.sub(r"[\[\]\(\)]", " ", text)
+    text = re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
+    return " ".join(text.lower().split())
+
+
+def _split_author_field(value: object) -> list[str]:
+    raw = str(value or "").strip()
+    if not raw:
+        return []
+    parts = re.split(r"\s+(?:&|and|with|x)\s+|[;/]", raw, flags=re.IGNORECASE)
+    cleaned = [part.strip() for part in parts if str(part or "").strip()]
+    return cleaned or [raw]
 
 
 def _catalog_path(root: Path) -> Path:
@@ -171,21 +193,11 @@ def get_global_library(root: Path) -> list[dict]:
     all_books = index.books
     if not all_books:
         return []
+        
+    top_genres = ["Romantasy", "Romance", "Fantasy", "Dark Academia", "Contemporary", "Fiction", "High Fantasy", "Mystery"]
 
-    exclude = {"...more", "audiobook", "book club", "adult", "fiction", "nonfiction", "novels", "literature"}
-    genre_counts: dict[str, int] = {}
-    for book in all_books:
-        for genre in book.get("genres", []):
-            genre_name = str(genre or "").strip()
-            if not genre_name:
-                continue
-            if genre_name.lower() in exclude:
-                continue
-            genre_counts[genre_name] = genre_counts.get(genre_name, 0) + 1
-
-    top_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[:5]
     library = []
-    for genre, _count in top_genres:
+    for genre in top_genres:
         genre_books = [book for book in all_books if genre in (book.get("genres", []) or [])]
         genre_books.sort(key=lambda x: int(x.get("rating_count", 0) or 0), reverse=True)
         mapped = []
@@ -227,3 +239,33 @@ def recommend_books(root: Path, book_id: str, limit: int = 5) -> list[dict]:
         if len(out) >= limit:
             break
     return out
+
+
+def get_books_by_author(root: Path, author: str) -> list[dict]:
+    index = load_catalog_index(root)
+    query = _normalize_author_text(author)
+    if not query:
+        return []
+
+    matched = []
+    seen: set[str] = set()
+    for book in index.books:
+        author_field = book.get("author", "")
+        author_candidates = [_normalize_author_text(author_field)]
+        author_candidates.extend(_normalize_author_text(part) for part in _split_author_field(author_field))
+        if any(
+            candidate and (
+                candidate == query
+                or candidate in query
+                or query in candidate
+            )
+            for candidate in author_candidates
+        ):
+            book_uid = str(book.get("uid") or "").strip()
+            if not book_uid or book_uid in seen:
+                continue
+            seen.add(book_uid)
+            matched.append(book)
+
+    matched.sort(key=lambda item: (str(item.get("title") or "").lower(), str(item.get("uid") or "")))
+    return matched

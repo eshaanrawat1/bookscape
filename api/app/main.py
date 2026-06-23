@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from .catalog import (
     get_book as load_book,
+    get_books_by_author,
     get_book_payload as load_book_payload,
     get_global_library as load_global_library,
     has_data,
@@ -289,6 +290,12 @@ def get_reading_progress() -> dict:
 @app.get("/global-library")
 def get_global_library() -> dict:
     return {"genres": load_global_library(ROOT)}
+
+
+@app.get("/author-books")
+def get_author_books(author: str = Query(..., min_length=1)) -> dict:
+    books = get_books_by_author(ROOT, author)
+    return {"author": author, "books": books, "count": len(books)}
 
 
 @app.get("/finished-books/{book_id}")
@@ -780,6 +787,11 @@ def api_get_reading_progress() -> dict:
 @api_router.get("/global-library")
 def api_get_global_library() -> dict:
     return get_global_library()
+
+
+@api_router.get("/author-books")
+def api_get_author_books(author: str = Query(..., min_length=1)) -> dict:
+    return get_author_books(author=author)
 
 
 @api_router.get("/finished-books/{book_id}")
