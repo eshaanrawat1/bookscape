@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
+import os
 import re
 import subprocess
 import sys
@@ -17,6 +18,7 @@ from .catalog import (
     get_global_library as load_global_library,
     has_data,
     recommend_books,
+    resolve_book_record,
     search_books,
     suggest_titles,
 )
@@ -35,6 +37,7 @@ from .obsidian_sync import (
 from .reading_stats import ReadingDailyStatsStore, build_activity_payload, compute_reading_stats
 
 app = FastAPI(title="Atlas API", version="0.1.0")
+BACKEND_API_VERSION = 2
 lists = ReadingListStore(Path(__file__).resolve().parents[2])
 liked = LikedBooksStore(Path(__file__).resolve().parents[2])
 want_to_read = WantToReadStore(Path(__file__).resolve().parents[2])
@@ -56,7 +59,7 @@ app.add_middleware(
 @app.get("/health")
 @app.get("/api/health")
 def health() -> dict:
-    return {"ok": True, "has_data": has_data(ROOT)}
+    return {"ok": True, "has_data": has_data(ROOT), "backend_api_version": BACKEND_API_VERSION}
 
 
 @app.get("/data-health")
@@ -66,7 +69,7 @@ def data_health() -> dict:
 
 def _load_vault_entries_or_skip(mode: str) -> tuple[dict[str, dict], dict] | tuple[None, dict]:
     try:
-        entries, meta = load_obsidian_progress_entries()
+        entries, meta = load_obsidian_progress_entries(ROOT)
     except Exception as e:
         return None, {
             "date": "",
@@ -172,12 +175,40 @@ def _hydrate_lists(rows: list[dict]) -> list[dict]:
     return out
 
 
+def _resolve_progress_book_id(book_id: str) -> str:
+    clean = (book_id or "").strip()
+    if not clean:
+        return ""
+
+    progress_entries = progress.list_all()
+    if clean in progress_entries:
+        return clean
+
+    obsidian = repo.read_obsidian_books_snapshot()
+    books_map = obsidian.get("books", {})
+    if not isinstance(books_map, dict):
+        return clean
+
+    for snapshot_id, row in books_map.items():
+        if not isinstance(row, dict):
+            continue
+        if clean and clean in {
+            str(snapshot_id).strip(),
+            str(row.get("catalog_uid") or "").strip(),
+            str(row.get("dataset_book_id") or "").strip(),
+        }:
+            return str(snapshot_id).strip() or clean
+
+    return clean
+
+
 def _book_exists_for_progress(book_id: str) -> bool:
-    if load_book(ROOT, book_id):
+    resolved_id = _resolve_progress_book_id(book_id)
+    if load_book(ROOT, resolved_id):
         return True
     obsidian = repo.read_obsidian_books_snapshot()
     books_map = obsidian.get("books", {})
-    if isinstance(books_map, dict) and book_id in books_map:
+    if isinstance(books_map, dict) and resolved_id in books_map:
         return True
     return False
 
@@ -304,6 +335,9 @@ def get_finished_book(book_id: str) -> dict:
     if entry:
         return {"book_id": book_id, "entry": entry}
 
+    if not resolve_book_record(ROOT, book_id):
+        raise HTTPException(status_code=404, detail="book not found")
+
     progress_entry = progress.list_all().get(book_id, {})
     fallback = {
         "book_id": book_id,
@@ -322,7 +356,7 @@ def get_finished_book(book_id: str) -> dict:
 
 @app.put("/finished-books/{book_id}")
 def upsert_finished_book(book_id: str, payload: FinishedBookIn) -> dict:
-    if not load_book(ROOT, book_id):
+    if not resolve_book_record(ROOT, book_id):
         raise HTTPException(status_code=404, detail="book not found")
     row = finished_books.upsert(book_id, payload.model_dump())
     return {"book_id": book_id, "entry": row}
@@ -343,17 +377,37 @@ def get_my_books() -> dict:
     for book_id, row in books_map.items():
         if not isinstance(row, dict):
             continue
-        catalog_uid = str(row.get("catalog_uid") or "").strip()
-        linked_catalog_book = load_book(ROOT, catalog_uid) if catalog_uid else None
+        resolved_book = resolve_book_record(ROOT, book_id) or {}
+        catalog_uid = str(
+            row.get("catalog_uid")
+            or row.get("dataset_book_id")
+            or resolved_book.get("catalog_uid")
+            or resolved_book.get("uid")
+            or ""
+        ).strip()
+        linked_catalog_book = resolved_book if isinstance(resolved_book, dict) and resolved_book else None
         effective_color = str(row.get("color") or (linked_catalog_book or {}).get("color") or "")
         prog = progress_entries.get(str(book_id), {}) or {}
+        current_page = int(
+            row.get("reading_current_page")
+            or row.get("current_page")
+            or prog.get("current_page")
+            or row.get("total_pages")
+            or 0
+        )
+        total_pages = int(
+            row.get("reading_total_pages")
+            or row.get("total_pages")
+            or prog.get("total_pages")
+            or 0
+        )
         books.append({
             **row,
             "catalog_uid": catalog_uid,
             "color": effective_color,
             "reading_status": str(prog.get("status") or row.get("status") or "not_started"),
-            "reading_current_page": int(prog.get("current_page") or row.get("current_page") or row.get("total_pages") or 0),
-            "reading_total_pages": int(prog.get("total_pages") or row.get("total_pages") or 0),
+            "reading_current_page": current_page,
+            "reading_total_pages": total_pages,
             "reading_finish_date": (prog.get("finish_date") or row.get("finish_date") or ""),
             "reading_start_date": (prog.get("start_date") or row.get("start_date") or ""),
             "saved_to_want_to_read": str(book_id) in saved_want_to_read,
@@ -373,7 +427,8 @@ def get_my_books() -> dict:
 
 @app.put("/reading-progress/{book_id}")
 def upsert_reading_progress(book_id: str, payload: ReadingProgressIn) -> dict:
-    if not _book_exists_for_progress(book_id):
+    resolved_book_id = _resolve_progress_book_id(book_id)
+    if not _book_exists_for_progress(resolved_book_id):
         raise HTTPException(status_code=404, detail="book not found")
     status = (payload.status or "").strip().lower()
     if status not in {"not_started", "reading", "done"}:
@@ -391,8 +446,31 @@ def upsert_reading_progress(book_id: str, payload: ReadingProgressIn) -> dict:
         "finish_date": (payload.finish_date or "").strip(),
         "notes": payload.notes or "",
     }
-    progress.upsert(book_id, row)
-    return {"book_id": book_id, "entry": row, "entries": progress.list_all()}
+    progress.upsert(resolved_book_id, row)
+    return {"book_id": resolved_book_id, "entry": row, "entries": progress.list_all()}
+
+
+@app.get("/reading-progress/{book_id}")
+def get_reading_progress_entry(book_id: str) -> dict:
+    resolved_book_id = _resolve_progress_book_id(book_id)
+    resolved = resolve_book_record(ROOT, resolved_book_id) or resolve_book_record(ROOT, book_id)
+    if not resolved:
+        raise HTTPException(status_code=404, detail="book not found")
+
+    progress_entry = progress.list_all().get(resolved_book_id, {}) or progress.list_all().get(book_id, {})
+    fallback = {
+        "book_id": resolved_book_id,
+        "entry": {
+            "book_id": resolved_book_id,
+            "status": str(progress_entry.get("status") or resolved.get("reading_status") or resolved.get("status") or "not_started"),
+            "current_page": int(progress_entry.get("current_page") or resolved.get("reading_current_page") or resolved.get("current_page") or resolved.get("total_pages") or 0),
+            "total_pages": int(progress_entry.get("total_pages") or resolved.get("reading_total_pages") or resolved.get("total_pages") or 0),
+            "start_date": str(progress_entry.get("start_date") or resolved.get("reading_start_date") or resolved.get("start_date") or ""),
+            "finish_date": str(progress_entry.get("finish_date") or resolved.get("reading_finish_date") or resolved.get("finish_date") or ""),
+            "notes": str(progress_entry.get("notes") or ""),
+        },
+    }
+    return fallback
 
 
 @app.get("/reading-stats")
@@ -421,9 +499,11 @@ def _stats_book_payload(book_id: str, row: dict) -> dict:
         or obsidian_row.get("dataset_book_id")
         or ""
     ).strip()
-    catalog = load_book(ROOT, catalog_uid) if catalog_uid else None
+    catalog = load_book(ROOT, catalog_uid) if catalog_uid else load_book(ROOT, book_id)
     if not isinstance(catalog, dict):
         catalog = {}
+    if not catalog_uid:
+        catalog_uid = str(catalog.get("catalog_uid") or catalog.get("uid") or book_id).strip()
 
     genres = obsidian_row.get("genres") or catalog.get("genres", [])
     if not isinstance(genres, list):
@@ -601,8 +681,7 @@ def run_nightly_finalize_snapshot(force: bool = Query(default=False)) -> dict:
     return {"ok": True, "snapshot": {**daily_stats.run_nightly_finalize(entries, force=force), "source": source}}
 
 
-@app.post("/sync/obsidian")
-def sync_obsidian(dry_run: bool = Query(default=True)) -> dict:
+def _run_sync_obsidian(*, dry_run: bool = False) -> dict:
     try:
         res = run_obsidian_sync(Path(__file__).resolve().parents[2], dry_run=dry_run)
     except FileNotFoundError as e:
@@ -625,6 +704,11 @@ def sync_obsidian(dry_run: bool = Query(default=True)) -> dict:
         "periods": res.periods,
         "activity": build_activity_payload(daily_stats.list_daily()),
     }
+
+
+@app.post("/sync/obsidian")
+def sync_obsidian(dry_run: bool = Query(default=False)) -> dict:
+    return _run_sync_obsidian(dry_run=dry_run)
 
 
 @app.post("/sync/obsidian/apply")
@@ -714,6 +798,11 @@ def unlink_my_book(book_id: str) -> dict:
 api_router = APIRouter(prefix="/api")
 
 
+@api_router.post("/sync/obsidian")
+def api_sync_obsidian(dry_run: bool = Query(default=False)) -> dict:
+    return _run_sync_obsidian(dry_run=dry_run)
+
+
 @api_router.get("/my-books")
 def api_get_my_books() -> dict:
     return get_my_books()
@@ -782,6 +871,11 @@ def api_remove_want_to_read_book(book_id: str) -> dict:
 @api_router.get("/reading-progress")
 def api_get_reading_progress() -> dict:
     return get_reading_progress()
+
+
+@api_router.get("/reading-progress/{book_id}")
+def api_get_reading_progress_entry(book_id: str) -> dict:
+    return get_reading_progress_entry(book_id)
 
 
 @api_router.get("/global-library")

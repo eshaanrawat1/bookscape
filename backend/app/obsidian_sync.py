@@ -53,6 +53,20 @@ def _ignored_path(root: Path) -> Path:
     return root / "user_data" / "obsidian_sync_ignored.json"
 
 
+def _resolve_vault_path(root: Path | None = None) -> Path:
+    env_value = os.getenv("OBSIDIAN_VAULT_PATH", "").strip()
+    if env_value:
+        return Path(env_value).expanduser()
+
+    if root is not None:
+        repo = DataRepository(root)
+        snapshot_path = str(repo.read_obsidian_books_snapshot().get("vault_path") or "").strip()
+        if snapshot_path:
+            return Path(snapshot_path).expanduser()
+
+    return DEFAULT_OBSIDIAN_VAULT.expanduser()
+
+
 def _load_ignored_keys(root: Path) -> set[str]:
     path = _ignored_path(root)
     if not path.exists():
@@ -182,6 +196,38 @@ def _parse_date_str(value: object) -> str:
         return ""
 
 
+def _normalize_status(value: object) -> str:
+    raw = re.sub(r"[\s_-]+", " ", str(value or "").strip().lower())
+    raw = raw.replace("to read", "want to read")
+    if raw in {"done", "finished", "finish", "completed", "complete", "read", "finished reading"}:
+        return "done"
+    if raw in {"reading", "continue reading", "in progress", "in progress reading", "currently reading", "continue", "ongoing", "progress"}:
+        return "reading"
+    if raw in {"want to read", "to read", "tbr", "not started", "notstarted", "not_started"}:
+        return "not_started"
+    return "not_started"
+
+
+def _has_progress_metadata(fm: dict) -> bool:
+    keys = (
+        "author",
+        "total_pages",
+        "page_count",
+        "pages",
+        "status",
+        "reading_status",
+        "current_page",
+        "currentPage",
+        "start_date",
+        "startDate",
+        "finish_date",
+        "finishDate",
+        "completed_date",
+        "completedDate",
+    )
+    return any(str(fm.get(key) or "").strip() for key in keys)
+
+
 def _parse_frontmatter(md_text: str) -> dict:
     if not md_text.startswith("---"):
         return {}
@@ -215,23 +261,40 @@ def _extract_book(path: Path, fm: dict) -> dict:
     title = _normalize_name(fm.get("title") or path.stem)
     author = _normalize_name(fm.get("author"))
     book_id = _slugify(fm.get("id") or f"{title}-{author}")
-    status_raw = str(fm.get("status") or "").strip().lower()
-    if status_raw == "done":
-        status = "done"
-    elif status_raw == "reading":
-        status = "reading"
-    else:
-        status = "not_started"
+    start_date = _parse_date_str(fm.get("start_date") or fm.get("startDate"))
+    finish_date = _parse_date_str(
+        fm.get("completed_date")
+        or fm.get("completedDate")
+        or fm.get("finish_date")
+        or fm.get("finishDate")
+    )
 
-    total_pages = _to_int(fm.get("total_pages"), default=0)
-    current_page = _to_int(fm.get("current_page"), default=0)
+    total_pages = _to_int(
+        fm.get("total_pages")
+        or fm.get("page_count")
+        or fm.get("pages")
+        or fm.get("totalPages"),
+        default=0,
+    )
+    current_page = _to_int(
+        fm.get("current_page")
+        or fm.get("currentPage")
+        or fm.get("page")
+        or fm.get("progress"),
+        default=0,
+    )
+
+    status = _normalize_status(fm.get("status") or fm.get("reading_status"))
+    if status == "not_started":
+        if finish_date:
+            status = "done"
+        elif current_page > 0 or start_date:
+            status = "reading"
+
     if status == "done" and total_pages > 0:
         current_page = total_pages
     elif total_pages > 0:
         current_page = min(current_page, total_pages)
-
-    start_date = _parse_date_str(fm.get("start_date"))
-    finish_date = _parse_date_str(fm.get("completed_date") or fm.get("finish_date"))
 
     genres_raw = fm.get("genres") or ""
     if isinstance(genres_raw, list):
@@ -334,12 +397,12 @@ def _clean_bracket_author_entries(books_map: dict) -> tuple[dict, int]:
     return cleaned, removed
 
 
-def load_obsidian_progress_entries() -> tuple[dict[str, dict], dict]:
+def load_obsidian_progress_entries(root: Path | None = None) -> tuple[dict[str, dict], dict]:
     """
     Lightweight vault scan for scheduler snapshots.
     Reads markdown files, extracts progress fields, and returns by-book progress rows.
     """
-    vault_path = Path(os.getenv("OBSIDIAN_VAULT_PATH", str(DEFAULT_OBSIDIAN_VAULT))).expanduser()
+    vault_path = _resolve_vault_path(root)
     if not vault_path.exists():
         raise FileNotFoundError(f"Obsidian vault not found at: {vault_path}")
 
@@ -352,7 +415,7 @@ def load_obsidian_progress_entries() -> tuple[dict[str, dict], dict]:
         fm = _parse_frontmatter(text)
         if not fm:
             continue
-        if not (fm.get("author") or fm.get("total_pages") or fm.get("status")):
+        if not _has_progress_metadata(fm):
             continue
         book = _extract_book(md, fm)
         parsed_books += 1
@@ -368,7 +431,7 @@ def load_obsidian_progress_entries() -> tuple[dict[str, dict], dict]:
 
 
 def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
-    vault_path = Path(os.getenv("OBSIDIAN_VAULT_PATH", str(DEFAULT_OBSIDIAN_VAULT))).expanduser()
+    vault_path = _resolve_vault_path(root)
     if not vault_path.exists():
         raise FileNotFoundError(f"Obsidian vault not found at: {vault_path}")
 
@@ -411,7 +474,7 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
         fm = _parse_frontmatter(text)
         if not fm:
             continue
-        if not (fm.get("author") or fm.get("total_pages") or fm.get("status")):
+        if not _has_progress_metadata(fm):
             continue
 
         book = _extract_book(md, fm)

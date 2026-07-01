@@ -1,0 +1,83 @@
+Axiom Tauri Migration - Learnings
+
+Quickstart for a new dev
+1. Clone the repo and treat `frontend/`, `backend/`, `data/`, and `src-tauri/` as the four main roots.
+2. Install frontend dependencies in `frontend/` and Python dependencies in the backend virtualenv.
+3. Run `npm run dev` from the repo root. That should start the Vite frontend and let Tauri launch the Python backend automatically.
+4. Open the app window and confirm the backend health endpoint responds.
+5. Verify the main list view loads problem data, then check one create/update/delete flow.
+6. If you need a packaged macOS app, run the Tauri bundle build and copy the generated `.app` into `/Applications`.
+
+1. What worked best
+- Keep the Python FastAPI backend as the source of truth.
+- Wrap the app in a thin Tauri shell instead of rewriting backend logic in Rust.
+- Run the React UI in `frontend/`, the backend in `backend/`, and shared repo data in `data/`.
+- Let Rust start Python automatically so `npm run dev` can launch the whole desktop app.
+- Keep hash-based routing so the app works the same when loaded from a desktop bundle.
+
+2. Recommended project structure
+- `frontend/` should own the Vite app, frontend dependencies, and frontend build tooling.
+- `backend/` should own FastAPI, Python scripts, and backend-only code.
+- `data/` should stay at the repo root as the canonical shared data folder.
+- `src-tauri/` should own only the desktop shell, window lifecycle, and backend process startup.
+- Avoid mixing packaged app assets, backend scripts, and frontend source in one top-level folder if you can separate them cleanly.
+
+3. Tauri version and config gotchas
+- Tauri CLI version matters a lot. v1 and v2 use different config shapes.
+- If `cargo tauri` says the command does not exist, install and use the npm CLI instead.
+- If the CLI rejects `tauri.conf.json`, check whether the file matches the installed major version.
+- For this project, the easiest path was a v1-style Tauri setup.
+- Use `npm exec tauri ...` when the CLI is installed through `devDependencies`.
+
+4. Frontend path and routing rules
+- Set Vite `base` to `./` so bundled assets resolve correctly inside the app.
+- Bind the dev server to `127.0.0.1` on a fixed port so Tauri can reach it reliably.
+- Use hash routes instead of history routing so local file-based loading does not break deep links.
+- Point the frontend at a stable backend URL instead of relying on proxy paths like `/api`.
+- Add CORS on the backend for both the Tauri origin and the Vite dev-server origin.
+
+5. Startup flow that avoids manual backend steps
+- The Rust shell should start the Python backend automatically.
+- The backend launcher should prefer the project virtualenv first, then fall back to a system Python.
+- The shell should wait for a `/healthz` check before showing the main window.
+- If the backend port is already open, reuse it instead of starting a second copy.
+- Keep the backend on a fixed local port so the frontend and Tauri launcher agree.
+
+6. Concrete bugs we hit
+- The frontend initially failed to load problem data because it still assumed the old proxy/path setup.
+- That was fixed by switching the frontend to a direct backend base URL and keeping the backend health check stable.
+- Some pill and select controls looked compressed after the move.
+- That was fixed by cleaning up the shared input/select classes in the sidebar styles.
+- The Tauri bundle initially failed when the config used the wrong major-version schema.
+- That was fixed by aligning the config and Cargo metadata to the installed Tauri major version.
+- The bundle also failed when `beforeBuildCommand` and `beforeDevCommand` used the wrong relative prefix.
+- That was fixed by running `npm --prefix frontend run build` and `npm --prefix frontend run dev`.
+- The macOS bundle step failed on the DMG packaging path even though the `.app` build succeeded.
+- That was fixed by changing bundle targets to `app` when the goal was only to produce a runnable app bundle.
+
+7. Build and packaging advice
+- For day-to-day development, run the root dev command and let it launch both the Vite frontend and the Rust shell.
+- For bundle verification, use a quick Tauri build and check the `.app` output first.
+- Do not spend time on full installer polish unless you actually need a DMG.
+- On macOS, the useful artifact is the `.app` bundle in `src-tauri/target/release/bundle/macos/`.
+- If you want an actual Applications install, copy the `.app` into `/Applications`.
+
+8. Practical checklist for a similar migration
+- Move frontend code into `frontend/` first.
+- Keep backend code in `backend/` and preserve existing data paths as long as possible.
+- Add Tauri as a thin shell in `src-tauri/`.
+- Make the Rust side launch Python automatically.
+- Switch the frontend to a stable local backend base URL and add CORS.
+- Preserve hash routing.
+- Fix asset base paths for bundled builds.
+- Verify dev launch, backend health, and one representative CRUD flow before worrying about installers.
+- Only then tune icons, bundle metadata, and installer targets.
+
+Final outcome
+- The app runs as a desktop Tauri shell.
+- The Rust layer starts the Python backend automatically.
+- The frontend no longer depends on Caddy or a reverse proxy.
+- The packaged macOS `.app` builds cleanly.
+- The quickest install path is copying the `.app` into `/Applications`.
+
+cp -R src-tauri/target/release/bundle/macos/Bookscape.app /Applications/

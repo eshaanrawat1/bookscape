@@ -18,24 +18,90 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   BarChart3,
 } from 'lucide-react'
 
-const BASE = '/api'
+const BASE = 'http://127.0.0.1:9876/api'
+const ROOT_BASE = BASE.replace(/\/api$/, '')
+const BOOTSTRAP_RETRIES = 2
+const BOOTSTRAP_RETRY_DELAY_MS = 500
 
 async function apiFetch(path, options) {
-  const res = await fetch(`${BASE}${path}`, options)
+  const url = `${BASE}${path}`
+  console.log(`[API Fetch] ${options?.method || 'GET'} ${url}`)
+  const res = await fetch(url, options)
+  console.log(`[API Fetch] ${url} -> Status: ${res.status}`)
   if (!res.ok) {
     let detail = ''
     try {
       const payload = await res.json()
       detail = payload?.detail ? `: ${payload.detail}` : ''
+      console.log(`[API Fetch] Error payload:`, payload)
     } catch {
       detail = ''
     }
-    throw new Error(`API ${path} -> ${res.status}${detail}`)
+    const error = `API ${path} -> ${res.status}${detail}`
+    console.error(`[API Fetch] Error:`, error)
+    throw new Error(error)
   }
-  return res.json()
+  const data = await res.json()
+  console.log(`[API Fetch] Success:`, path, data)
+  return data
+}
+
+async function postJsonWithFallback(path) {
+  const targets = [
+    `${ROOT_BASE}${path}`,
+    `${BASE}${path}`,
+  ]
+
+  let lastError = null
+  for (const url of targets) {
+    try {
+      const res = await fetch(url, { method: 'POST' })
+      if (!res.ok) {
+        let detail = ''
+        try {
+          const payload = await res.json()
+          detail = payload?.detail ? `: ${payload.detail}` : ''
+        } catch {
+          detail = ''
+        }
+        throw new Error(`API ${path} -> ${res.status}${detail}`)
+      }
+      return await res.json()
+    } catch (err) {
+      lastError = err
+    }
+  }
+
+  throw lastError || new Error(`API ${path} failed`)
+}
+
+function asArray(value) {
+  return Array.isArray(value) ? value : []
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function loadBootstrapData() {
+  const [myBooksRes, listsRes, wantToReadRes, globalRes] = await Promise.all([
+    apiFetch('/my-books'),
+    apiFetch('/reading-lists'),
+    apiFetch('/want-to-read-books'),
+    apiFetch('/global-library'),
+  ])
+
+  return {
+    books: asArray(myBooksRes?.books),
+    lists: asArray(listsRes?.lists),
+    wantToReadBookIds: asArray(wantToReadRes?.book_ids),
+    wantToReadBooks: asArray(wantToReadRes?.books),
+    globalLibrary: asArray(globalRes?.genres),
+  }
 }
 
 function collectionIdFromName(name) {
@@ -169,9 +235,14 @@ function buildDialogGlow(color, fallback = 'oklch(0.62 0.14 250)') {
   return fallback
 }
 
+function toNumberOrZero(value) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 function normaliseBook(raw) {
-  const totalPages = raw.reading_total_pages || raw.total_pages || 0
-  const currentPage = raw.reading_current_page || raw.current_page || 0
+  const totalPages = toNumberOrZero(raw.reading_total_pages ?? raw.total_pages)
+  const currentPage = toNumberOrZero(raw.reading_current_page ?? raw.current_page)
   const progress =
     totalPages > 0 ? Math.min(100, Math.round((currentPage / totalPages) * 100)) : 0
 
@@ -323,31 +394,38 @@ export default function App() {
   const [globalLibrary, setGlobalLibrary] = useState([])
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
+  const [syncError, setSyncError] = useState(null)
   const [showScraperDialog, setShowScraperDialog] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
     let cancelled = false
     async function load() {
+      let lastError = null
       try {
-        const [myBooksRes, listsRes, wantToReadRes, globalRes] = await Promise.all([
-          apiFetch('/my-books'),
-          apiFetch('/reading-lists'),
-          apiFetch('/want-to-read-books'),
-          apiFetch('/global-library'),
-        ])
+        for (let attempt = 0; attempt <= BOOTSTRAP_RETRIES; attempt += 1) {
+          try {
+            const data = await loadBootstrapData()
+            if (cancelled) return
 
-        if (cancelled) return
+            setBooks(data.books.map(normaliseBook))
+            setCollections(mapReadingLists(data.lists))
+            setWantToReadBookIds(data.wantToReadBookIds)
+            setWantToReadBooks(data.wantToReadBooks.map(normaliseBook))
+            setGlobalLibrary(data.globalLibrary)
+            setError(null)
+            return
+          } catch (err) {
+            lastError = err
+            if (attempt < BOOTSTRAP_RETRIES) {
+              await sleep(BOOTSTRAP_RETRY_DELAY_MS)
+            }
+          }
+        }
 
-        const normalisedBooks = (myBooksRes.books || []).map(normaliseBook)
-        setBooks(normalisedBooks)
-
-        setCollections(mapReadingLists(listsRes.lists || []))
-        setWantToReadBookIds(wantToReadRes.book_ids || [])
-        setWantToReadBooks((wantToReadRes.books || []).map(normaliseBook))
-        setGlobalLibrary(globalRes.genres || [])
-      } catch (err) {
-        if (!cancelled) setError(err.message)
+        if (!cancelled) {
+          setError(lastError?.message || 'Could not load books.')
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -424,19 +502,13 @@ export default function App() {
   }, [view])
 
   async function reloadAppData() {
-    const [myBooksRes, listsRes, wantToReadRes, globalRes] = await Promise.all([
-      apiFetch('/my-books'),
-      apiFetch('/reading-lists'),
-      apiFetch('/want-to-read-books'),
-      apiFetch('/global-library'),
-    ])
+    const data = await loadBootstrapData()
 
-    const normalisedBooks = (myBooksRes.books || []).map(normaliseBook)
-    setBooks(normalisedBooks)
-    setCollections(mapReadingLists(listsRes.lists || []))
-    setWantToReadBookIds(wantToReadRes.book_ids || [])
-    setWantToReadBooks((wantToReadRes.books || []).map(normaliseBook))
-    setGlobalLibrary(globalRes.genres || [])
+    setBooks(data.books.map(normaliseBook))
+    setCollections(mapReadingLists(data.lists))
+    setWantToReadBookIds(data.wantToReadBookIds)
+    setWantToReadBooks(data.wantToReadBooks.map(normaliseBook))
+    setGlobalLibrary(data.globalLibrary)
   }
 
   // Derived views from live books
@@ -571,14 +643,12 @@ export default function App() {
   async function syncFromObsidian() {
     if (syncing) return
     setSyncing(true)
-    setError(null)
+    setSyncError(null)
     try {
-      await apiFetch('/sync/obsidian?dry_run=false', {
-        method: 'POST',
-      })
+      await postJsonWithFallback('/sync/obsidian')
       await reloadAppData()
     } catch (err) {
-      setError(err.message || 'Could not sync from Obsidian.')
+      setSyncError(err.message || 'Could not sync from Obsidian.')
     } finally {
       setSyncing(false)
     }
@@ -664,6 +734,9 @@ export default function App() {
                   </button>
               )}
             </div>
+            {syncError && (
+              <p className="topBarNotice syncErrorNotice">{syncError}</p>
+            )}
           </header>
 
           <div className="mainContent">
@@ -1088,7 +1161,7 @@ function ReadingNowHero({ books, onOpen }) {
   const nextBook = () => setCurrentIndex((i) => (i + 1) % books.length)
   const prevBook = () => setCurrentIndex((i) => (i - 1 + books.length) % books.length)
 
-  const pagesLeft = Math.round((book.pages * (100 - book.progress)) / 100)
+  const pagesLeft = Math.round((toNumberOrZero(book.pages) * (100 - toNumberOrZero(book.progress))) / 100)
   const heroGlowColor = buildHeroGlow(book.color || `hsl(${book.tint})`)
 
   return (
@@ -1793,11 +1866,18 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose, onOpenAut
   const saveTimerRef = useRef(null)
   const lastSavedRef = useRef('')
   const statusMenuRef = useRef(null)
-  const bookId = book.id || book.uid || ''
+  const bookId = [
+    book?._raw?.id,
+    book?.id,
+    book?.uid,
+    getCatalogBookId(book),
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)[0] || ''
   const baseRecord = {
     status: book.status || 'not_started',
-    current_page: book.currentPage || book.pages || 0,
-    total_pages: book.totalPages || book.pages || 0,
+    current_page: book.currentPage ?? book.pages ?? 0,
+    total_pages: book.totalPages ?? book.pages ?? 0,
     start_date: book.startDate || '',
     finish_date: book.finishDate || '',
     notes: '',
@@ -1813,7 +1893,7 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose, onOpenAut
       return () => { cancelled = true }
     }
 
-    apiFetch(`/finished-books/${bookId}`)
+    apiFetch(`/reading-progress/${bookId}`)
       .then((data) => {
         if (cancelled) return
         const next = data?.entry || {}
@@ -1844,12 +1924,6 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose, onOpenAut
   }, [bookId, baseRecord.current_page, baseRecord.total_pages, baseRecord.start_date, baseRecord.finish_date])
 
   const draft = record || baseRecord
-  const currentPage = Number(draft.current_page) || 0
-  const totalPages = Number(draft.total_pages) || 0
-  const progress = totalPages > 0
-    ? Math.min(100, Math.round((currentPage / totalPages) * 100))
-    : 0
-  const progressLabel = totalPages > 0 ? `${formatCompactNumber(currentPage)} / ${formatCompactNumber(totalPages)} pages` : '0 / 0 pages'
 
   const updateField = (field, value) => {
     setRecord((current) => ({
@@ -1869,7 +1943,7 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose, onOpenAut
         finish_date: String(nextRecord.finish_date || '').trim(),
         notes: String(nextRecord.notes || '').trim(),
       }
-      const data = await apiFetch(`/finished-books/${bookId}`, {
+      const data = await apiFetch(`/reading-progress/${bookId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1945,13 +2019,6 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose, onOpenAut
             <div className="finishedCoverWrap">
               <BookCover book={book} glow />
             </div>
-            <div className="finishedProgressRing" style={{ '--progress': `${progress}%` }}>
-              <span>{progress}%</span>
-            </div>
-            <div className="finishedPages">
-              <strong>{progressLabel}</strong>
-              <span>Pages read</span>
-            </div>
           </div>
 
           <div className="finishedCopy">
@@ -1982,7 +2049,7 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose, onOpenAut
                 >
                   <span>{statusLabelMap[draft.status] || 'Finished'}</span>
                   <span className={statusDotClass} />
-                  <span className="finishedStatusCaret">▾</span>
+                  <ChevronDown className="finishedStatusCaret" strokeWidth={2.25} />
                 </button>
                 {statusMenuOpen && (
                   <div className="finishedStatusMenu" role="menu" aria-label="Reading status">
@@ -2018,17 +2085,19 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose, onOpenAut
                     <input
                       type="number"
                       min="0"
+                      className="finishedPageInput"
                       value={draft.current_page}
                       onChange={(event) => updateField('current_page', event.target.value)}
                     />
-                    <span>/</span>
+                    <span className="finishedFieldSep">/</span>
                     <input
                       type="number"
                       min="0"
+                      className="finishedPageInput"
                       value={draft.total_pages}
                       onChange={(event) => updateField('total_pages', event.target.value)}
                     />
-                    <span>pages</span>
+                    <span className="finishedFieldUnit">pages</span>
                   </div>
                 </label>
               </div>
@@ -2195,9 +2264,10 @@ function ScraperDialog({ onClose, onSuccess }) {
 }
 
 function Progress({ value }) {
+  const safeValue = Math.max(0, Math.min(100, toNumberOrZero(value)))
   return (
     <div className="progressTrack">
-      <div style={{ width: `${value}%` }} />
+      <div style={{ width: `${safeValue}%` }} />
     </div>
   )
 }

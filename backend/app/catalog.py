@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import difflib
+import hashlib
 import json
 import re
 import unicodedata
@@ -15,6 +16,7 @@ class CatalogIndex:
     by_uid: dict[str, dict]
     by_title_author: dict[tuple[str, str], dict]
     by_title: dict[str, list[dict]]
+    by_identity_key: dict[str, dict]
 
 
 def _normalize_text(value: object) -> str:
@@ -45,6 +47,64 @@ def _catalog_path(root: Path) -> Path:
     return root / "data" / "books.json"
 
 
+def _snapshot_path(root: Path, name: str) -> Path:
+    return root / "user_data" / name
+
+
+def book_identity_key(title: object, author: object) -> str:
+    """
+    Stable cross-source key for a book.
+
+    We deliberately key off exact Goodreads title + author after whitespace
+    normalization so the Obsidian snapshot and books.json can meet at the same
+    identifier even if their source ids differ.
+    """
+    payload = f"{_normalize_text(title)}\0{_normalize_text(author)}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _load_json_dict(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            payload = json.load(f)
+        return payload if isinstance(payload, dict) else {}
+    except Exception:
+        return {}
+
+
+def _load_snapshot_books(root: Path) -> dict[str, dict]:
+    books: dict[str, dict] = {}
+    for name in ("all_books.json", "obsidian_books.json"):
+        payload = _load_json_dict(_snapshot_path(root, name))
+        snapshot_books = payload.get("books", {})
+        if not isinstance(snapshot_books, dict):
+            continue
+        for book_id, row in snapshot_books.items():
+            if isinstance(row, dict):
+                books[str(book_id)] = row
+    return books
+
+
+def _linked_catalog_uid(row: dict) -> str:
+    linked = row.get("linked_catalog_book") if isinstance(row, dict) else None
+    if isinstance(linked, dict):
+        candidate = str(linked.get("uid") or linked.get("catalog_uid") or linked.get("id") or "").strip()
+        if candidate:
+            return candidate
+    for candidate in (
+        row.get("catalog_uid"),
+        row.get("dataset_book_id"),
+        row.get("uid"),
+        row.get("id"),
+    ):
+        candidate = str(candidate or "").strip()
+        if candidate:
+            return candidate
+    return ""
+
+
 @lru_cache(maxsize=8)
 def _load_catalog_index(path_str: str, mtime: float) -> CatalogIndex:
     path = Path(path_str)
@@ -68,6 +128,7 @@ def _load_catalog_index(path_str: str, mtime: float) -> CatalogIndex:
     by_uid: dict[str, dict] = {}
     by_title_author: dict[tuple[str, str], dict] = {}
     by_title: dict[str, list[dict]] = {}
+    by_identity_key: dict[str, dict] = {}
 
     for row in books:
         uid = str(row.get("uid") or "").strip()
@@ -76,12 +137,14 @@ def _load_catalog_index(path_str: str, mtime: float) -> CatalogIndex:
         by_uid[uid] = row
         title_key = _normalize_text(row.get("title"))
         author_key = _normalize_text(row.get("author"))
+        identity_key = book_identity_key(row.get("title"), row.get("author"))
+        by_identity_key[identity_key] = row
         if title_key and author_key:
             by_title_author[(title_key, author_key)] = row
         if title_key:
             by_title.setdefault(title_key, []).append(row)
 
-    return CatalogIndex(books, by_uid, by_title_author, by_title)
+    return CatalogIndex(books, by_uid, by_title_author, by_title, by_identity_key)
 
 
 def load_catalog_index(root: Path) -> CatalogIndex:
@@ -98,14 +161,57 @@ def has_data(root: Path) -> bool:
 
 
 def get_book(root: Path, book_id: str) -> dict | None:
+    return resolve_book_record(root, book_id)
+
+
+def resolve_book_record(root: Path, book_id: str) -> dict | None:
     book_id = str(book_id or "").strip()
     if not book_id:
         return None
-    return load_catalog_index(root).by_uid.get(book_id)
+    index = load_catalog_index(root)
+    direct = index.by_uid.get(book_id)
+    if direct:
+        result = dict(direct)
+        result["catalog_uid"] = str(direct.get("catalog_uid") or direct.get("uid") or book_id)
+        return result
+
+    snapshots = _load_snapshot_books(root)
+    snapshot = snapshots.get(book_id)
+    if not isinstance(snapshot, dict):
+        return None
+
+    merged = dict(snapshot)
+    merged["id"] = str(snapshot.get("id") or book_id)
+
+    linked_uid = _linked_catalog_uid(snapshot)
+    if linked_uid and linked_uid in index.by_uid:
+        catalog = index.by_uid[linked_uid]
+        merged = {**catalog, **merged}
+        merged["catalog_uid"] = linked_uid
+        merged["linked_catalog_book"] = catalog
+        return merged
+
+    identity_key = book_identity_key(snapshot.get("title"), snapshot.get("author"))
+    catalog = index.by_identity_key.get(identity_key)
+    if catalog:
+        merged = {**catalog, **merged}
+        merged["catalog_uid"] = str(catalog.get("uid") or catalog.get("catalog_uid") or "")
+        merged["linked_catalog_book"] = catalog
+        return merged
+
+    merged.setdefault("catalog_uid", linked_uid)
+    return merged
+
+
+def resolve_canonical_book_id(root: Path, book_id: str) -> str:
+    book = resolve_book_record(root, book_id)
+    if not book:
+        return str(book_id or "").strip()
+    return str(book.get("uid") or book.get("catalog_uid") or book.get("id") or book_id).strip()
 
 
 def get_book_payload(root: Path, book_id: str) -> dict | None:
-    book = get_book(root, book_id)
+    book = resolve_book_record(root, book_id)
     if not book:
         return None
 
