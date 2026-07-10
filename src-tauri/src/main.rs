@@ -120,18 +120,28 @@ fn resolve_python() -> Option<PathBuf> {
 }
 
 fn launch_backend() -> std::io::Result<Option<Child>> {
+  eprintln!("[Rust] launch_backend: starting");
+  
   if is_backend_listening() {
+    eprintln!("[Rust] launch_backend: backend already listening");
     if backend_is_current() {
+      eprintln!("[Rust] launch_backend: backend is current, skipping launch");
       return Ok(None);
     }
 
+    eprintln!("[Rust] launch_backend: killing old backend listener");
     kill_backend_listener();
     thread::sleep(Duration::from_millis(500));
   }
 
   let python = resolve_python().ok_or_else(|| {
+    eprintln!("[Rust] launch_backend: failed to resolve Python interpreter");
     std::io::Error::new(std::io::ErrorKind::NotFound, "could not find a Python interpreter")
   })?;
+
+  eprintln!("[Rust] launch_backend: resolved Python path: {:?}", python);
+  eprintln!("[Rust] launch_backend: project root: {:?}", project_root());
+  eprintln!("[Rust] launch_backend: spawning uvicorn command");
 
   let child = Command::new(python)
     .current_dir(project_root())
@@ -147,27 +157,50 @@ fn launch_backend() -> std::io::Result<Option<Child>> {
     .stdin(Stdio::null())
     .stdout(Stdio::inherit())
     .stderr(Stdio::inherit())
-    .spawn()?;
+    .spawn();
+
+  match &child {
+    Ok(_) => eprintln!("[Rust] launch_backend: successfully spawned backend process"),
+    Err(e) => eprintln!("[Rust] launch_backend: failed to spawn backend: {}", e),
+  }
+
+  let child = child?;
 
   Ok(Some(child))
 }
 
 fn wait_for_backend() -> bool {
+  eprintln!("[Rust] wait_for_backend: starting health check loop");
+  
   let client = match Client::builder().timeout(Duration::from_secs(2)).build() {
     Ok(client) => client,
-    Err(_) => return false,
+    Err(e) => {
+      eprintln!("[Rust] wait_for_backend: failed to build HTTP client: {}", e);
+      return false;
+    }
   };
 
   let deadline = Instant::now() + Duration::from_secs(30);
+  let mut attempts = 0;
+  
   while Instant::now() < deadline {
+    attempts += 1;
+    eprintln!("[Rust] wait_for_backend: health check attempt {} (URL: {})", attempts, HEALTHCHECK_URL);
+    
     if let Ok(response) = client.get(HEALTHCHECK_URL).send() {
+      eprintln!("[Rust] wait_for_backend: got response status: {}", response.status());
       if response.status().is_success() {
+        eprintln!("[Rust] wait_for_backend: health check successful");
         return true;
       }
+    } else {
+      eprintln!("[Rust] wait_for_backend: health check request failed");
     }
+    
     thread::sleep(Duration::from_millis(250));
   }
 
+  eprintln!("[Rust] wait_for_backend: health check timed out after {} attempts", attempts);
   false
 }
 
