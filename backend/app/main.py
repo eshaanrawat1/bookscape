@@ -18,7 +18,7 @@ from .catalog import (
     get_book_payload as load_book_payload,
     get_global_library as load_global_library,
     has_data,
-    resolve_book_record,
+    resolve_book,
     search_books,
 )
 from .data_repository import DataRepository
@@ -120,7 +120,7 @@ class SyncIgnoreIn(BaseModel):
 
 
 class MergeSnapshotBookIn(BaseModel):
-    dataset_book_id: str = ""
+    uid: str = ""
 
 
 class FinishedBookIn(BaseModel):
@@ -169,15 +169,8 @@ def _resolve_progress_book_id(book_id: str) -> str:
     if not isinstance(books_map, dict):
         return clean
 
-    for snapshot_id, row in books_map.items():
-        if not isinstance(row, dict):
-            continue
-        if clean and clean in {
-            str(snapshot_id).strip(),
-            str(row.get("catalog_uid") or "").strip(),
-            str(row.get("dataset_book_id") or "").strip(),
-        }:
-            return str(snapshot_id).strip() or clean
+    if clean in books_map:
+        return clean
 
     return clean
 
@@ -344,14 +337,7 @@ def get_my_books() -> dict:
     for book_id, row in books_map.items():
         if not isinstance(row, dict):
             continue
-        resolved_book = resolve_book_record(ROOT, book_id) or {}
-        catalog_uid = str(
-            row.get("catalog_uid")
-            or row.get("dataset_book_id")
-            or resolved_book.get("catalog_uid")
-            or resolved_book.get("uid")
-            or ""
-        ).strip()
+        resolved_book = resolve_book(ROOT, book_id) or {}
         linked_catalog_book = resolved_book if isinstance(resolved_book, dict) and resolved_book else None
         effective_color = str(row.get("color") or (linked_catalog_book or {}).get("color") or "")
         prog = progress_entries.get(str(book_id), {}) or {}
@@ -370,7 +356,6 @@ def get_my_books() -> dict:
         )
         books.append({
             **row,
-            "catalog_uid": catalog_uid,
             "color": effective_color,
             "reading_status": str(prog.get("status") or row.get("status") or "not_started"),
             "reading_current_page": current_page,
@@ -461,16 +446,9 @@ def _parse_iso_date(value: object) -> date | None:
 
 def _stats_book_payload(book_id: str, row: dict) -> dict:
     obsidian_row = row if isinstance(row, dict) else {}
-    catalog_uid = str(
-        obsidian_row.get("catalog_uid")
-        or obsidian_row.get("dataset_book_id")
-        or ""
-    ).strip()
-    catalog = load_book(ROOT, catalog_uid) if catalog_uid else load_book(ROOT, book_id)
+    catalog = load_book(ROOT, book_id)
     if not isinstance(catalog, dict):
         catalog = {}
-    if not catalog_uid:
-        catalog_uid = str(catalog.get("catalog_uid") or catalog.get("uid") or book_id).strip()
 
     genres = obsidian_row.get("genres") or catalog.get("genres", [])
     if not isinstance(genres, list):
@@ -493,8 +471,6 @@ def _stats_book_payload(book_id: str, row: dict) -> dict:
     review_count = obsidian_row.get("book_review_count") or catalog.get("review_count") or 0
     return {
         "id": book_id,
-        "catalog_uid": catalog_uid,
-        "catalogUid": catalog_uid,
         "title": title,
         "author": author,
         "cover": cover,
@@ -731,13 +707,13 @@ def add_my_book_to_dataset_get_compat(book_id: str) -> dict:
 
 @app.post("/my-books/{book_id}/merge")
 def merge_my_book(book_id: str, payload: MergeSnapshotBookIn) -> dict:
-    dataset_book_id = (payload.dataset_book_id or "").strip()
-    if not dataset_book_id:
-        raise HTTPException(status_code=400, detail="dataset_book_id is required")
-    if not load_book(ROOT, dataset_book_id):
-        raise HTTPException(status_code=404, detail="dataset book not found")
+    target_uid = (payload.uid or "").strip()
+    if not target_uid:
+        raise HTTPException(status_code=400, detail="uid is required")
+    if not load_book(ROOT, target_uid):
+        raise HTTPException(status_code=404, detail="target book not found")
     try:
-        out = merge_snapshot_book_with_dataset(Path(__file__).resolve().parents[2], book_id, dataset_book_id)
+        out = merge_snapshot_book_with_dataset(Path(__file__).resolve().parents[2], book_id, target_uid)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:

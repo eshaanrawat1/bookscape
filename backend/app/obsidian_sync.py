@@ -436,7 +436,7 @@ def add_snapshot_book_to_dataset(root: Path, book_id: str) -> dict:
     return {"book_id": book_id, "rebuild": rebuild}
 
 
-def merge_snapshot_book_with_dataset(root: Path, snapshot_book_id: str, dataset_book_id: str) -> dict:
+def merge_snapshot_book_with_dataset(root: Path, snapshot_book_id: str, uid: str) -> dict:
     repo = DataRepository(root)
     payload = repo.read_obsidian_books_snapshot()
     books = payload.get("books", {})
@@ -446,7 +446,7 @@ def merge_snapshot_book_with_dataset(root: Path, snapshot_book_id: str, dataset_
     books[snapshot_book_id] = row
     payload["books"] = books
     repo.write_obsidian_books_snapshot(payload)
-    return {"book_id": snapshot_book_id, "dataset_book_id": dataset_book_id}
+    return {"book_id": snapshot_book_id, "uid": uid}
 
 
 def unlink_snapshot_book_from_dataset(root: Path, snapshot_book_id: str) -> dict:
