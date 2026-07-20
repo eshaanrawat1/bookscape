@@ -1496,7 +1496,7 @@ function StatsView({ summary, loading, error, year, month, onYearChange, onMonth
               <div className="statsFeature">
                 <div className="statsFeatureHeader">
                   <h2>Densest book</h2>
-                  <p>{formatCompactNumber(summary.densest_book.pages)} pages</p>
+                  <p>{formatCompactNumber(summary.densest_book.totalPages)} pages</p>
                 </div>
                 <BookCard book={summary.densest_book} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
               </div>

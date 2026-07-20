@@ -22,8 +22,7 @@ from .catalog import (
     search_books,
 )
 from .data_repository import DataRepository
-from .finished_books import FinishedBooksStore
-from .reading_lists import ReadingListStore, ReadingProgressStore, WantToReadStore
+from .reading_lists import ReadingListStore
 from .obsidian import (
     load_obsidian_progress_entries,
     run_obsidian_sync,
@@ -33,12 +32,12 @@ from .reading_stats import ReadingDailyStatsStore, build_activity_payload, compu
 app = FastAPI(title="Atlas API", version="0.1.0")
 BACKEND_API_VERSION = 2
 lists = ReadingListStore(Path(__file__).resolve().parents[2])
-want_to_read = WantToReadStore(Path(__file__).resolve().parents[2])
-progress = ReadingProgressStore(Path(__file__).resolve().parents[2])
-finished_books = FinishedBooksStore(Path(__file__).resolve().parents[2])
 ROOT = Path(__file__).resolve().parents[2]
 repo = DataRepository(ROOT)
 daily_stats = ReadingDailyStatsStore(ROOT)
+
+# Run migration on startup to populate user_state.books
+repo.migrate_user_state()
 
 app.add_middleware(
     CORSMiddleware,
@@ -116,7 +115,12 @@ class FinishedBookIn(BaseModel):
 
 
 
-def _hydrate_want_to_read(book_ids: list[str]) -> dict:
+def _hydrate_want_to_read() -> dict:
+    user_state = repo.load_user_state()
+    books_map = user_state.get("books", {})
+    if not isinstance(books_map, dict):
+        books_map = {}
+    book_ids = [uid for uid, row in books_map.items() if isinstance(row, dict) and row.get("want_to_read")]
     books = []
     for book_id in book_ids:
         b = load_book(ROOT, book_id)
@@ -135,37 +139,6 @@ def _hydrate_lists(rows: list[dict]) -> list[dict]:
                 books.append(b)
         out.append({"name": row.get("name", ""), "book_ids": row.get("books", []), "books": books, "count": len(books)})
     return out
-
-
-def _resolve_progress_book_id(book_id: str) -> str:
-    clean = (book_id or "").strip()
-    if not clean:
-        return ""
-
-    progress_entries = progress.list_all()
-    if clean in progress_entries:
-        return clean
-
-    obsidian = repo.read_obsidian_books_snapshot()
-    books_map = obsidian.get("books", {})
-    if not isinstance(books_map, dict):
-        return clean
-
-    if clean in books_map:
-        return clean
-
-    return clean
-
-
-def _book_exists_for_progress(book_id: str) -> bool:
-    resolved_id = _resolve_progress_book_id(book_id)
-    if load_book(ROOT, resolved_id):
-        return True
-    obsidian = repo.read_obsidian_books_snapshot()
-    books_map = obsidian.get("books", {})
-    if isinstance(books_map, dict) and resolved_id in books_map:
-        return True
-    return False
 
 
 @app.get("/reading-lists")
@@ -228,29 +201,51 @@ def remove_book_from_list(name: str, book_id: str) -> dict:
 
 @app.get("/want-to-read-books")
 def get_want_to_read_books() -> dict:
-    return _hydrate_want_to_read(want_to_read.list_all())
+    return _hydrate_want_to_read()
 
 
 @app.post("/want-to-read-books")
 def add_want_to_read_book(payload: AddBookIn) -> dict:
     if not load_book(ROOT, payload.book_id):
         raise HTTPException(status_code=404, detail="book not found")
-    try:
-        want_to_read.add(payload.book_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    return _hydrate_want_to_read(want_to_read.list_all())
+    user_state = repo.load_user_state()
+    books = user_state.setdefault("books", {})
+    existing = books.get(payload.book_id, {}) if isinstance(books.get(payload.book_id), dict) else {}
+    books[payload.book_id] = {**existing, "want_to_read": True}
+    repo.save_user_state(user_state)
+    return _hydrate_want_to_read()
 
 
 @app.delete("/want-to-read-books/{book_id}")
 def remove_want_to_read_book(book_id: str) -> dict:
-    want_to_read.remove(book_id)
-    return _hydrate_want_to_read(want_to_read.list_all())
+    user_state = repo.load_user_state()
+    books = user_state.setdefault("books", {})
+    existing = books.get(book_id, {}) if isinstance(books.get(book_id), dict) else {}
+    books[book_id] = {**existing, "want_to_read": False}
+    repo.save_user_state(user_state)
+    return _hydrate_want_to_read()
 
 
 @app.get("/reading-progress")
 def get_reading_progress() -> dict:
-    return {"entries": progress.list_all()}
+    user_state = repo.load_user_state()
+    books = user_state.get("books", {})
+    if not isinstance(books, dict):
+        books = {}
+    
+    entries = {}
+    for book_id, book_record in books.items():
+        if not isinstance(book_record, dict):
+            continue
+        entries[str(book_id)] = {
+            "status": book_record.get("status", "not_started"),
+            "total_pages": int(book_record.get("total_pages") or 0),
+            "current_page": int(book_record.get("current_page") or 0),
+            "start_date": book_record.get("start_date", ""),
+            "finish_date": book_record.get("finish_date", ""),
+            "notes": book_record.get("notes", ""),
+        }
+    return {"entries": entries}
 
 
 @app.get("/global-library")
@@ -273,79 +268,126 @@ def get_genre_books(genre: str = Query(..., min_length=1), limit: int = Query(de
 
 @app.get("/finished-books/{book_id}")
 def get_finished_book(book_id: str) -> dict:
-    entry = finished_books.get(book_id)
-    if entry:
-        return {"book_id": book_id, "entry": entry}
-
-    if not resolve_book(ROOT, book_id):
-        raise HTTPException(status_code=404, detail="book not found")
-
-    progress_entry = progress.list_all().get(book_id, {})
-    fallback = {
+    user_state = repo.load_user_state()
+    books = user_state.get("books", {})
+    if not isinstance(books, dict):
+        books = {}
+    
+    book_record = books.get(book_id)
+    if not isinstance(book_record, dict):
+        if not resolve_book(ROOT, book_id):
+            raise HTTPException(status_code=404, detail="book not found")
+        # Book exists in catalog but not in user_state - return empty record
+        return {
+            "book_id": book_id,
+            "entry": {
+                "book_id": book_id,
+                "status": "done",
+                "current_page": 0,
+                "total_pages": 0,
+                "start_date": "",
+                "finish_date": "",
+                "notes": "",
+            },
+        }
+    
+    status = str(book_record.get("status") or "not_started").strip().lower()
+    if status != "done":
+        raise HTTPException(status_code=404, detail="book not found or not finished")
+    
+    return {
         "book_id": book_id,
         "entry": {
             "book_id": book_id,
-            "status": "done",
-            "current_page": int(progress_entry.get("current_page") or 0),
-            "total_pages": int(progress_entry.get("total_pages") or 0),
-            "start_date": str(progress_entry.get("start_date") or ""),
-            "finish_date": str(progress_entry.get("finish_date") or ""),
-            "notes": str(progress_entry.get("notes") or ""),
+            "status": status,
+            "current_page": int(book_record.get("current_page") or 0),
+            "total_pages": int(book_record.get("total_pages") or 0),
+            "start_date": str(book_record.get("start_date") or ""),
+            "finish_date": str(book_record.get("finish_date") or ""),
+            "notes": str(book_record.get("notes") or ""),
         },
     }
-    return fallback
 
 
 @app.put("/finished-books/{book_id}")
 def upsert_finished_book(book_id: str, payload: FinishedBookIn) -> dict:
     if not resolve_book(ROOT, book_id):
         raise HTTPException(status_code=404, detail="book not found")
-    row = finished_books.upsert(book_id, payload.model_dump())
-    return {"book_id": book_id, "entry": row}
+    
+    user_state = repo.load_user_state()
+    books = user_state.setdefault("books", {})
+    if not isinstance(books, dict):
+        books = {}
+    
+    # Get existing book record to preserve other fields
+    existing_book = books.get(book_id, {}) if isinstance(books.get(book_id), dict) else {}
+    
+    # Update notes field (this endpoint's actual purpose now)
+    books[book_id] = {
+        **existing_book,
+        "status": "done",
+        "current_page": int(payload.current_page or existing_book.get("current_page") or 0),
+        "total_pages": int(payload.total_pages or existing_book.get("total_pages") or 0),
+        "start_date": (payload.start_date or existing_book.get("start_date") or "").strip(),
+        "finish_date": (payload.finish_date or existing_book.get("finish_date") or "").strip(),
+        "notes": payload.notes or existing_book.get("notes", ""),
+    }
+    
+    repo.save_user_state(user_state)
+    
+    return {"book_id": book_id, "entry": books[book_id]}
 
 
 @app.get("/my-books")
 def get_my_books() -> dict:
-    progress_entries = progress.list_all()
-    saved_want_to_read = set(want_to_read.list_all())
+    user_state = repo.load_user_state()
+    books_map = user_state.get("books", {})
+    if not isinstance(books_map, dict):
+        books_map = {}
+    
     books: list[dict] = []
-    books_map: dict = {}
-
-    obsidian_payload = repo.read_obsidian_books_snapshot()
-    raw_books = obsidian_payload.get("books", {})
-    if isinstance(raw_books, dict):
-        books_map = raw_books
 
     for book_id, row in books_map.items():
         if not isinstance(row, dict):
             continue
+        status = str(row.get("status") or "not_started").strip().lower()
+        if status not in {"reading", "done"}:
+            continue
+        
         resolved_book = resolve_book(ROOT, book_id) or {}
         linked_catalog_book = resolved_book if isinstance(resolved_book, dict) and resolved_book else None
+        
+        # Overlay catalog fields at response time
+        effective_title = str(row.get("title") or (linked_catalog_book or {}).get("title") or "")
+        effective_author = str(row.get("author") or (linked_catalog_book or {}).get("author") or "")
+        effective_image_url = str(row.get("image_url") or (linked_catalog_book or {}).get("image_url") or "")
+        effective_genres = row.get("genres") or (linked_catalog_book or {}).get("genres", [])
+        effective_rating = row.get("rating") or (linked_catalog_book or {}).get("avg_rating") or 0
+        effective_description = str(row.get("description") or (linked_catalog_book or {}).get("description") or "")
         effective_color = str(row.get("color") or (linked_catalog_book or {}).get("color") or "")
-        prog = progress_entries.get(str(book_id), {}) or {}
-        current_page = int(
-            row.get("reading_current_page")
-            or row.get("current_page")
-            or prog.get("current_page")
-            or row.get("total_pages")
-            or 0
-        )
-        total_pages = int(
-            row.get("reading_total_pages")
-            or row.get("total_pages")
-            or prog.get("total_pages")
-            or 0
-        )
+        
+        current_page = int(row.get("current_page") or 0)
+        total_pages = int(row.get("total_pages") or 0)
+        
         books.append({
-            **row,
+            "id": str(book_id),
+            "title": effective_title,
+            "author": effective_author,
+            "image_url": effective_image_url,
+            "genres": effective_genres,
+            "rating": effective_rating,
+            "description": effective_description,
             "color": effective_color,
-            "reading_status": str(prog.get("status") or row.get("status") or "not_started"),
+            "reading_status": status,
             "reading_current_page": current_page,
             "reading_total_pages": total_pages,
-            "reading_finish_date": (prog.get("finish_date") or row.get("finish_date") or ""),
-            "reading_start_date": (prog.get("start_date") or row.get("start_date") or ""),
-            "saved_to_want_to_read": str(book_id) in saved_want_to_read,
+            "reading_finish_date": row.get("finish_date", ""),
+            "reading_start_date": row.get("start_date", ""),
             "linked_catalog_book": linked_catalog_book,
+            "notes": row.get("notes", ""),
+            "liked": row.get("liked", False),
+            "want_to_read": row.get("want_to_read", False),
+            "lists": row.get("lists", []),
         })
 
     books.sort(
@@ -361,9 +403,13 @@ def get_my_books() -> dict:
 
 @app.put("/reading-progress/{book_id}")
 def upsert_reading_progress(book_id: str, payload: ReadingProgressIn) -> dict:
-    resolved_book_id = _resolve_progress_book_id(book_id)
-    if not _book_exists_for_progress(resolved_book_id):
-        raise HTTPException(status_code=404, detail="book not found")
+    # Check if book exists in catalog or user_state
+    if not resolve_book(ROOT, book_id):
+        user_state = repo.load_user_state()
+        books = user_state.get("books", {})
+        if not isinstance(books, dict) or book_id not in books:
+            raise HTTPException(status_code=404, detail="book not found")
+    
     status = (payload.status or "").strip().lower()
     if status not in {"not_started", "reading", "done"}:
         raise HTTPException(status_code=400, detail="invalid status")
@@ -372,44 +418,101 @@ def upsert_reading_progress(book_id: str, payload: ReadingProgressIn) -> dict:
     if total_pages > 0:
         current_page = min(current_page, total_pages)
 
-    row = {
+    user_state = repo.load_user_state()
+    books = user_state.setdefault("books", {})
+    if not isinstance(books, dict):
+        books = {}
+    
+    # Get existing book record to preserve personal fields
+    existing_book = books.get(book_id, {}) if isinstance(books.get(book_id), dict) else {}
+    
+    # Update progress fields only
+    books[book_id] = {
+        **existing_book,
         "status": status,
         "total_pages": total_pages,
         "current_page": current_page,
         "start_date": (payload.start_date or "").strip(),
         "finish_date": (payload.finish_date or "").strip(),
-        "notes": payload.notes or "",
+        "notes": payload.notes or existing_book.get("notes", ""),
     }
-    progress.upsert(resolved_book_id, row)
-    return {"book_id": resolved_book_id, "entry": row, "entries": progress.list_all()}
+    
+    repo.save_user_state(user_state)
+    
+    # Build entries response from user_state.books
+    entries = {}
+    for bid, book_record in books.items():
+        if isinstance(book_record, dict):
+            entries[bid] = {
+                "status": book_record.get("status", "not_started"),
+                "total_pages": int(book_record.get("total_pages") or 0),
+                "current_page": int(book_record.get("current_page") or 0),
+                "start_date": book_record.get("start_date", ""),
+                "finish_date": book_record.get("finish_date", ""),
+                "notes": book_record.get("notes", ""),
+            }
+    
+    return {"book_id": book_id, "entry": books[book_id], "entries": entries}
 
 
 @app.get("/reading-progress/{book_id}")
 def get_reading_progress_entry(book_id: str) -> dict:
-    resolved_book_id = _resolve_progress_book_id(book_id)
-    resolved = resolve_book(ROOT, resolved_book_id) or resolve_book(ROOT, book_id)
-    if not resolved:
-        raise HTTPException(status_code=404, detail="book not found")
-
-    progress_entry = progress.list_all().get(resolved_book_id, {}) or progress.list_all().get(book_id, {})
-    fallback = {
-        "book_id": resolved_book_id,
+    user_state = repo.load_user_state()
+    books = user_state.get("books", {})
+    if not isinstance(books, dict):
+        books = {}
+    
+    book_record = books.get(book_id)
+    if not isinstance(book_record, dict):
+        # Check if book exists in catalog
+        if not resolve_book(ROOT, book_id):
+            raise HTTPException(status_code=404, detail="book not found")
+        # Book exists in catalog but not in user_state - return empty record
+        return {
+            "book_id": book_id,
+            "entry": {
+                "book_id": book_id,
+                "status": "not_started",
+                "current_page": 0,
+                "total_pages": 0,
+                "start_date": "",
+                "finish_date": "",
+                "notes": "",
+            },
+        }
+    
+    return {
+        "book_id": book_id,
         "entry": {
-            "book_id": resolved_book_id,
-            "status": str(progress_entry.get("status") or resolved.get("reading_status") or resolved.get("status") or "not_started"),
-            "current_page": int(progress_entry.get("current_page") or resolved.get("reading_current_page") or resolved.get("current_page") or resolved.get("total_pages") or 0),
-            "total_pages": int(progress_entry.get("total_pages") or resolved.get("reading_total_pages") or resolved.get("total_pages") or 0),
-            "start_date": str(progress_entry.get("start_date") or resolved.get("reading_start_date") or resolved.get("start_date") or ""),
-            "finish_date": str(progress_entry.get("finish_date") or resolved.get("reading_finish_date") or resolved.get("finish_date") or ""),
-            "notes": str(progress_entry.get("notes") or ""),
+            "book_id": book_id,
+            "status": str(book_record.get("status") or "not_started"),
+            "current_page": int(book_record.get("current_page") or 0),
+            "total_pages": int(book_record.get("total_pages") or 0),
+            "start_date": str(book_record.get("start_date") or ""),
+            "finish_date": str(book_record.get("finish_date") or ""),
+            "notes": str(book_record.get("notes") or ""),
         },
     }
-    return fallback
 
 
 @app.get("/reading-stats")
 def get_reading_stats() -> dict:
-    entries = progress.list_all()
+    user_state = repo.load_user_state()
+    books = user_state.get("books", {})
+    if not isinstance(books, dict):
+        books = {}
+    
+    entries = {}
+    for book_id, book_record in books.items():
+        if not isinstance(book_record, dict):
+            continue
+        entries[str(book_id)] = {
+            "status": book_record.get("status", "not_started"),
+            "total_pages": int(book_record.get("total_pages") or 0),
+            "current_page": int(book_record.get("current_page") or 0),
+            "start_date": book_record.get("start_date", ""),
+            "finish_date": book_record.get("finish_date", ""),
+        }
     return {
         "periods": compute_reading_stats(entries),
         "activity": build_activity_payload(daily_stats.list_daily()),
@@ -427,40 +530,34 @@ def _parse_iso_date(value: object) -> date | None:
 
 
 def _stats_book_payload(book_id: str, row: dict) -> dict:
-    obsidian_row = row if isinstance(row, dict) else {}
+    book_row = row if isinstance(row, dict) else {}
     catalog = load_book(ROOT, book_id)
     if not isinstance(catalog, dict):
         catalog = {}
 
-    genres = obsidian_row.get("genres") or catalog.get("genres", [])
+    genres = book_row.get("genres") or catalog.get("genres", [])
     if not isinstance(genres, list):
         genres = [genres]
     clean_genres = [str(genre).strip() for genre in genres if str(genre).strip()]
 
-    total_pages = int(
-        obsidian_row.get("reading_total_pages")
-        or obsidian_row.get("total_pages")
-        or catalog.get("page_count")
-        or 0
-    )
-    start_date = str(obsidian_row.get("start_date") or obsidian_row.get("reading_start_date") or "").strip()
-    finish_date = str(obsidian_row.get("finish_date") or obsidian_row.get("reading_finish_date") or "").strip()
-    title = str(obsidian_row.get("title") or catalog.get("title") or "Untitled")
-    author = str(obsidian_row.get("author") or catalog.get("author") or "")
-    cover = str(obsidian_row.get("image_url") or obsidian_row.get("cover") or catalog.get("image_url") or "")
-    rating = obsidian_row.get("book_rating") or catalog.get("avg_rating") or 0
-    rating_count = obsidian_row.get("book_rating_count") or catalog.get("rating_count") or 0
-    review_count = obsidian_row.get("book_review_count") or catalog.get("review_count") or 0
+    total_pages = int(book_row.get("total_pages") or catalog.get("page_count") or 0)
+    start_date = str(book_row.get("start_date") or "").strip()
+    finish_date = str(book_row.get("finish_date") or "").strip()
+    title = str(book_row.get("title") or catalog.get("title") or "Untitled")
+    author = str(book_row.get("author") or catalog.get("author") or "")
+    cover = str(book_row.get("image_url") or catalog.get("image_url") or "")
+    rating = book_row.get("rating") or catalog.get("avg_rating") or 0
+    rating_count = catalog.get("rating_count") or 0
+    review_count = catalog.get("review_count") or 0
     return {
         "id": book_id,
         "title": title,
         "author": author,
         "cover": cover,
-        "color": str(obsidian_row.get("color") or catalog.get("color") or ""),
+        "color": str(book_row.get("color") or catalog.get("color") or ""),
         "tint": "220 30% 45%",
-        "genre": clean_genres[0] if clean_genres else str(obsidian_row.get("genre") or catalog.get("genre") or ""),
+        "genre": clean_genres[0] if clean_genres else str(book_row.get("genre") or catalog.get("genre") or ""),
         "genres": clean_genres,
-        "pages": total_pages,
         "totalPages": total_pages,
         "currentPage": total_pages,
         "startDate": start_date,
@@ -470,28 +567,19 @@ def _stats_book_payload(book_id: str, row: dict) -> dict:
         "ratingCount": int(rating_count or 0),
         "progress": 100,
         "status": "done",
-        "format": [],
-        "blurb": str(obsidian_row.get("description") or catalog.get("description") or ""),
-        "_raw": {**obsidian_row, **({"linked_catalog_book": catalog} if catalog else {})},
+        "blurb": str(book_row.get("description") or catalog.get("description") or ""),
+        "_raw": {**book_row, **({"linked_catalog_book": catalog} if catalog else {})},
     }
 
 
 def _build_stats_summary(year: int | None = None, month: int | None = None) -> dict:
-    finished_rows = finished_books.list_all()
-    progress_rows = progress.list_all()
-    obsidian_payload = repo.read_obsidian_books_snapshot()
-    obsidian_rows = obsidian_payload.get("books", {})
-    if not isinstance(obsidian_rows, dict):
-        obsidian_rows = {}
+    user_state = repo.load_user_state()
+    books = user_state.get("books", {})
+    if not isinstance(books, dict):
+        books = {}
 
     available_years: set[int] = set()
-    for row in obsidian_rows.values():
-        if not isinstance(row, dict):
-            continue
-        finish_date = _parse_iso_date(row.get("finish_date") or row.get("reading_finish_date"))
-        if finish_date:
-            available_years.add(finish_date.year)
-    for row in progress_rows.values():
+    for row in books.values():
         if not isinstance(row, dict):
             continue
         finish_date = _parse_iso_date(row.get("finish_date"))
@@ -499,15 +587,12 @@ def _build_stats_summary(year: int | None = None, month: int | None = None) -> d
             available_years.add(finish_date.year)
 
     selected: dict[str, dict] = {}
-    all_book_ids = set(obsidian_rows.keys()) | set(finished_rows.keys()) | set(progress_rows.keys())
-    for book_id in all_book_ids:
-        obsidian_row = obsidian_rows.get(book_id, {}) if isinstance(obsidian_rows.get(book_id), dict) else {}
-        finished_row = finished_rows.get(book_id, {}) if isinstance(finished_rows.get(book_id), dict) else {}
-        progress_row = progress_rows.get(book_id, {}) if isinstance(progress_rows.get(book_id), dict) else {}
-        row = {**obsidian_row, **finished_row, **progress_row}
+    for book_id, row in books.items():
+        if not isinstance(row, dict):
+            continue
         if str(row.get("status") or "done").strip().lower() != "done":
             continue
-        finish_date = _parse_iso_date(row.get("finish_date") or row.get("reading_finish_date"))
+        finish_date = _parse_iso_date(row.get("finish_date"))
         if not finish_date:
             continue
         if year is not None and finish_date.year != year:
@@ -516,20 +601,20 @@ def _build_stats_summary(year: int | None = None, month: int | None = None) -> d
             continue
         selected[str(book_id)] = row
 
-    books: list[dict] = []
+    books_list: list[dict] = []
     genres: set[str] = set()
     for book_id, row in selected.items():
-        finish_date = _parse_iso_date(row.get("finish_date") or row.get("reading_finish_date"))
+        finish_date = _parse_iso_date(row.get("finish_date"))
         book = _stats_book_payload(book_id, row)
-        books.append({
+        books_list.append({
             **book,
             "finishDateObj": finish_date.isoformat() if finish_date else "",
         })
         for genre in book.get("genres", []):
             genres.add(genre)
 
-    books.sort(key=lambda item: (str(item.get("finishDate") or ""), str(item.get("title") or "")), reverse=True)
-    densest_book = max(books, key=lambda item: int(item.get("pages") or 0), default=None)
+    books_list.sort(key=lambda item: (str(item.get("finishDate") or ""), str(item.get("title") or "")), reverse=True)
+    densest_book = max(books_list, key=lambda item: int(item.get("totalPages") or 0), default=None)
 
     def _time_spent_days(item: dict) -> int:
         start = _parse_iso_date(item.get("startDate"))
@@ -538,7 +623,7 @@ def _build_stats_summary(year: int | None = None, month: int | None = None) -> d
             return 0
         return max(1, (finish - start).days + 1)
 
-    most_time_spent = max(books, key=_time_spent_days, default=None)
+    most_time_spent = max(books_list, key=_time_spent_days, default=None)
     most_time_spent_days = _time_spent_days(most_time_spent) if most_time_spent else 0
     year_label = str(year) if year is not None else "All time"
     if year is not None and month is not None:
@@ -555,8 +640,8 @@ def _build_stats_summary(year: int | None = None, month: int | None = None) -> d
         "month": month,
         "period_label": period_label,
         "available_years": sorted(available_years, reverse=True),
-        "books_read": len(books),
-        "pages_read": sum(int(book.get("pages") or 0) for book in books),
+        "books_read": len(books_list),
+        "pages_read": sum(int(book.get("totalPages") or 0) for book in books_list),
         "genres_covered": len(genres),
         "genre_list": sorted(genres),
         "densest_book": densest_book,
@@ -624,8 +709,6 @@ def _run_sync_obsidian(*, dry_run: bool = False) -> dict:
         "created_books": res.created_books,
         "updated_books": res.updated_books,
         "updated_progress_entries": res.updated_progress_entries,
-        "removed_bracket_author_entries": res.removed_bracket_author_entries,
-        "proposed_books": [{"id": b.get("id"), "title": b.get("title"), "author": b.get("author")} for b in res.proposed_books],
         "periods": res.periods,
         "activity": build_activity_payload(daily_stats.list_daily()),
     }

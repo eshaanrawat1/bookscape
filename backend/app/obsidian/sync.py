@@ -5,7 +5,6 @@ import os
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator
 
 from ..data_repository import DataRepository
 from ..reading_stats import compute_reading_stats
@@ -21,11 +20,9 @@ class SyncResult:
     created_books: int
     updated_books: int
     updated_progress_entries: int
-    removed_bracket_author_entries: int
     vault_path: str
     preview_path: str
     dry_run: bool
-    proposed_books: list[dict]
     periods: dict
 
 
@@ -43,38 +40,35 @@ def _resolve_vault_path(root: Path | None = None) -> Path:
     return DEFAULT_OBSIDIAN_VAULT.expanduser()
 
 
-def _scan_vault(vault_path: Path) -> Iterator[tuple[dict, int]]:
-    """Yields (book, scanned_count) for every parseable .md file."""
-    scanned_count = 0
-    for md in vault_path.rglob("*.md"):
-        scanned_count += 1
-        book = parse_book(md)
-        if book:
-            yield book, scanned_count
+def load_obsidian_progress_entries(root: Path) -> tuple[dict[str, dict], dict]:
+    """
+    Returns progress entries from user_state.books.
+    Vault scan is only used during sync — not here.
+    """
+    if root is None:
+        raise ValueError("root is required")
 
-
-def load_obsidian_progress_entries(root: Path | None = None) -> tuple[dict[str, dict], dict]:
-    vault_path = _resolve_vault_path(root)
-    if not vault_path.exists():
-        raise FileNotFoundError(f"Obsidian vault not found at: {vault_path}")
+    repo = DataRepository(root)
+    user_state = repo.load_user_state()
+    books = user_state.get("books", {})
+    if not isinstance(books, dict):
+        books = {}
 
     entries: dict[str, dict] = {}
-    scanned_files = 0
-    parsed_books = 0
-
-    for book, scanned_count in _scan_vault(vault_path):
-        scanned_files = scanned_count
-        parsed_books += 1
-        entries[book["id"]] = {
-            "status": book["status"],
-            "total_pages": int(book["total_pages"] or 0),
-            "current_page": int(book["current_page"] or 0),
-            "start_date": book["start_date"],
-            "finish_date": book["finish_date"],
-            "notes": "",
+    for uid, book_record in books.items():
+        if not isinstance(book_record, dict):
+            continue
+        entries[str(uid)] = {
+            "status": book_record.get("status", "not_started"),
+            "total_pages": int(book_record.get("total_pages") or 0),
+            "current_page": int(book_record.get("current_page") or 0),
+            "start_date": book_record.get("start_date", ""),
+            "finish_date": book_record.get("finish_date", ""),
+            "notes": book_record.get("notes", ""),
         }
 
-    return entries, {"vault_path": str(vault_path), "scanned_files": scanned_files, "parsed_books": parsed_books}
+    vault_path = repo.read_obsidian_books_snapshot().get("vault_path", "")
+    return entries, {"vault_path": str(vault_path), "scanned_files": 0, "parsed_books": len(entries)}
 
 
 def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
@@ -93,7 +87,10 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
         existing_snapshot_books = {}
 
     user_state = repo.load_user_state()
-    progress_entries = user_state.setdefault("reading_progress", {})
+    books = user_state.setdefault("books", {})
+    if not isinstance(books, dict):
+        books = {}
+        user_state["books"] = books
 
     scanned_files = 0
     parsed_books = 0
@@ -102,26 +99,31 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
     updated_progress_entries = 0
     all_synced_books_map: dict[str, dict] = {}
 
-    for book, scanned_count in _scan_vault(vault_path):
-        scanned_files = scanned_count
-        parsed_books += 1
-        book_id = book["id"]
+    for md in vault_path.rglob("*.md"):
+        scanned_files += 1
+        book = parse_book(md)
+        if not book:
+            continue
 
-        progress_row = {
-            "status": book["status"],
-            "total_pages": int(book["total_pages"] or 0),
-            "current_page": int(book["current_page"] or 0),
-            "start_date": book["start_date"],
-            "finish_date": book["finish_date"],
-            "notes": "",
+        parsed_books += 1
+        uid = book["uid"]  # uid is the canonical key — parser.py guarantees this exists
+
+        existing_book = books.get(uid) if isinstance(books.get(uid), dict) else {}
+
+        synced_row = {
+            **book,
+            # Personal fields — preserved across syncs, never overwritten
+            "notes":        existing_book.get("notes", ""),
+            "liked":        existing_book.get("liked", False),
+            "want_to_read": existing_book.get("want_to_read", False),
+            "lists":        existing_book.get("lists", []),
         }
-        progress_entries[book_id] = progress_row
+
+        books[uid] = synced_row
+        all_synced_books_map[uid] = synced_row
         updated_progress_entries += 1
 
-        synced_row = {**book}
-        all_synced_books_map[book_id] = synced_row
-
-        if book_id in existing_snapshot_books:
+        if uid in existing_snapshot_books:
             updated_books += 1
         else:
             created_books += 1
@@ -141,16 +143,29 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
     with preview_path.open("w", encoding="utf-8") as f:
         json.dump(preview_payload, f, indent=2)
 
-    all_books_payload = {
+    repo.write_obsidian_books_snapshot({
         "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         "vault_path": str(vault_path),
         "books": all_synced_books_map,
         "count": len(all_synced_books_map),
-    }
-    repo.write_obsidian_books_snapshot(all_books_payload)
+    })
 
     if not dry_run:
+        user_state["books"] = books
         repo.save_user_state(user_state)
+
+    # Compute stats from the full books map (not just synced books)
+    progress_entries = {
+        uid: {
+            "status":       r.get("status", "not_started"),
+            "total_pages":  int(r.get("total_pages") or 0),
+            "current_page": int(r.get("current_page") or 0),
+            "start_date":   r.get("start_date", ""),
+            "finish_date":  r.get("finish_date", ""),
+        }
+        for uid, r in books.items()
+        if isinstance(r, dict)
+    }
 
     return SyncResult(
         scanned_files=scanned_files,
@@ -158,10 +173,8 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
         created_books=created_books,
         updated_books=updated_books,
         updated_progress_entries=updated_progress_entries,
-        removed_bracket_author_entries=0,
         vault_path=str(vault_path),
         preview_path=str(preview_path),
         dry_run=dry_run,
-        proposed_books=[],
         periods=compute_reading_stats(progress_entries),
     )
