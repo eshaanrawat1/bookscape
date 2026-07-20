@@ -9,8 +9,6 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
-
-import numpy as np
 import yaml
 
 from .data_repository import DataRepository
@@ -253,10 +251,6 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
         }
         progress_entries[book_id] = progress_row
         updated_progress_entries += 1
-
-        prior_snapshot_row = existing_snapshot_books.get(book_id, {})
-        if not isinstance(prior_snapshot_row, dict):
-            prior_snapshot_row = {}
 
         synced_row = {**book}
         all_synced_books_map[book_id] = synced_row
