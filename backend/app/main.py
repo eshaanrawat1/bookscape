@@ -24,7 +24,7 @@ from .catalog import (
 from .data_repository import DataRepository
 from .finished_books import FinishedBooksStore
 from .reading_lists import ReadingListStore, ReadingProgressStore, WantToReadStore
-from .obsidian_sync import (
+from .obsidian import (
     load_obsidian_progress_entries,
     run_obsidian_sync,
 )
