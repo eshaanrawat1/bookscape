@@ -15,6 +15,7 @@ import yaml
 
 from .data_repository import DataRepository
 from .reading_stats import compute_reading_stats
+
 try:
     from pipeline.embed_books import generate_embeddings  # type: ignore[import]
 except ModuleNotFoundError:
@@ -30,6 +31,7 @@ except ModuleNotFoundError:
             embs.append(vec / norm)
         ids = [str(b.get("id", i)) for i, b in enumerate(books)]
         return np.array(embs, dtype=np.float32), ids, "hash_fallback"
+
 
 DEFAULT_OBSIDIAN_VAULT = Path("~/Obsidian/Books")
 
@@ -49,10 +51,6 @@ class SyncResult:
     periods: dict
 
 
-def _ignored_path(root: Path) -> Path:
-    return root / "user_data" / "obsidian_sync_ignored.json"
-
-
 def _resolve_vault_path(root: Path | None = None) -> Path:
     env_value = os.getenv("OBSIDIAN_VAULT_PATH", "").strip()
     if env_value:
@@ -67,36 +65,6 @@ def _resolve_vault_path(root: Path | None = None) -> Path:
     return DEFAULT_OBSIDIAN_VAULT.expanduser()
 
 
-def _load_ignored_keys(root: Path) -> set[str]:
-    path = _ignored_path(root)
-    if not path.exists():
-        return set()
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            payload = json.load(f) or {}
-        keys = payload.get("keys", [])
-        if not isinstance(keys, list):
-            return set()
-        return {str(k) for k in keys if str(k).strip()}
-    except Exception:
-        return set()
-
-
-def _save_ignored_keys(root: Path, keys: set[str]) -> None:
-    path = _ignored_path(root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"keys": sorted(keys), "updated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z"}
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
-
-
-def _slugify(text: str) -> str:
-    s = (text or "").strip().lower()
-    s = re.sub(r"[^a-z0-9]+", "-", s)
-    s = re.sub(r"-{2,}", "-", s).strip("-")
-    return s or "book"
-
-
 def _normalize_name(value: object) -> str:
     text = str(value or "").strip()
     text = re.sub(r"\[\[|\]\]", "", text).strip()
@@ -106,70 +74,7 @@ def _normalize_name(value: object) -> str:
     text = text.replace("-", " ")
     text = re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
     text = re.sub(r"\s+", " ", text)
-    return text
-
-
-def _norm_key(title: object, author: object) -> str:
-    t = re.sub(r"\s+", " ", _normalize_name(title).lower())
-    a = re.sub(r"\s+", " ", _normalize_name(author).lower())
-    return f"{t}::{a}"
-
-
-def _link_fields_from_row(row: dict | None) -> dict[str, str]:
-    row = row or {}
-    catalog_uid = str(row.get("catalog_uid") or row.get("dataset_book_id") or "").strip()
-    dataset_book_id = str(row.get("dataset_book_id") or catalog_uid).strip()
-    dataset_link_type = str(row.get("dataset_link_type") or "").strip()
-    dataset_linked_at = str(row.get("dataset_linked_at") or "").strip()
-    return {
-        "catalog_uid": catalog_uid,
-        "dataset_book_id": dataset_book_id,
-        "dataset_link_type": dataset_link_type,
-        "dataset_linked_at": dataset_linked_at,
-    }
-
-
-def _preserve_link_fields(row: dict, prior_row: dict | None = None, *, clear: bool = False) -> dict:
-    prior = prior_row or {}
-    current = _link_fields_from_row(row)
-    prior_links = _link_fields_from_row(prior)
-    if clear:
-        row["catalog_uid"] = ""
-        row["dataset_book_id"] = ""
-        row["dataset_link_type"] = ""
-        row["dataset_linked_at"] = ""
-        return row
-
-    row["catalog_uid"] = current["catalog_uid"] or prior_links["catalog_uid"]
-    row["dataset_book_id"] = current["dataset_book_id"] or prior_links["dataset_book_id"] or row["catalog_uid"]
-    row["dataset_link_type"] = current["dataset_link_type"] or prior_links["dataset_link_type"]
-    row["dataset_linked_at"] = current["dataset_linked_at"] or prior_links["dataset_linked_at"]
-    return row
-
-
-def _hamming_similarity(a: str, b: str) -> float:
-    """
-    Normalized Hamming similarity over padded strings.
-    Returns 1.0 for exact match, 0.0 for total mismatch.
-    """
-    a = a or ""
-    b = b or ""
-    n = max(len(a), len(b))
-    if n == 0:
-        return 1.0
-    pa = a.ljust(n)
-    pb = b.ljust(n)
-    mismatches = sum(1 for i in range(n) if pa[i] != pb[i])
-    return max(0.0, 1.0 - (mismatches / n))
-
-
-def _is_probable_duplicate(key: str, existing_keys: set[str], threshold: float = 0.95) -> bool:
-    if key in existing_keys:
-        return True
-    for candidate in existing_keys:
-        if _hamming_similarity(key, candidate) >= threshold:
-            return True
-    return False
+    return text.strip()
 
 
 def _to_int(value: object, default: int = 0) -> int:
@@ -208,26 +113,6 @@ def _normalize_status(value: object) -> str:
     return "not_started"
 
 
-def _has_progress_metadata(fm: dict) -> bool:
-    keys = (
-        "author",
-        "total_pages",
-        "page_count",
-        "pages",
-        "status",
-        "reading_status",
-        "current_page",
-        "currentPage",
-        "start_date",
-        "startDate",
-        "finish_date",
-        "finishDate",
-        "completed_date",
-        "completedDate",
-    )
-    return any(str(fm.get(key) or "").strip() for key in keys)
-
-
 def _parse_frontmatter(md_text: str) -> dict:
     if not md_text.startswith("---"):
         return {}
@@ -243,48 +128,28 @@ def _parse_frontmatter(md_text: str) -> dict:
 
 
 def _extract_description(md_text: str) -> str:
-    """
-    Extract text under `## Description` until the next heading.
-    """
     m = re.search(r"(?im)^##\s+Description\s*$", md_text)
     if not m:
         return ""
     rest = md_text[m.end():]
     next_heading = re.search(r"(?im)^##\s+", rest)
     block = rest[: next_heading.start()] if next_heading else rest
-    lines = [ln.strip() for ln in block.splitlines()]
-    lines = [ln for ln in lines if ln]
+    lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
     return "\n".join(lines).strip()
 
 
 def _extract_book(path: Path, fm: dict) -> dict:
+    uid = str(fm.get("uid") or "").strip()
     title = _normalize_name(fm.get("title") or path.stem)
-    author = _normalize_name(fm.get("author"))
-    book_id = _slugify(fm.get("id") or f"{title}-{author}")
-    start_date = _parse_date_str(fm.get("start_date") or fm.get("startDate"))
-    finish_date = _parse_date_str(
-        fm.get("completed_date")
-        or fm.get("completedDate")
-        or fm.get("finish_date")
-        or fm.get("finishDate")
-    )
+    author = _normalize_name(fm.get("author") or "")
 
-    total_pages = _to_int(
-        fm.get("total_pages")
-        or fm.get("page_count")
-        or fm.get("pages")
-        or fm.get("totalPages"),
-        default=0,
-    )
-    current_page = _to_int(
-        fm.get("current_page")
-        or fm.get("currentPage")
-        or fm.get("page")
-        or fm.get("progress"),
-        default=0,
-    )
+    total_pages = _to_int(fm.get("total_pages"))
+    current_page = _to_int(fm.get("current_page"))
 
-    status = _normalize_status(fm.get("status") or fm.get("reading_status"))
+    finish_date = _parse_date_str(fm.get("completed_date") or fm.get("finish_date"))
+    start_date = _parse_date_str(fm.get("start_date"))
+
+    status = _normalize_status(fm.get("status"))
     if status == "not_started":
         if finish_date:
             status = "done"
@@ -300,8 +165,7 @@ def _extract_book(path: Path, fm: dict) -> dict:
     if isinstance(genres_raw, list):
         genres = [_normalize_name(g) for g in genres_raw if _normalize_name(g)]
     else:
-        genres = [_normalize_name(g) for g in str(genres_raw).split(",") if _normalize_name(g)]
-    primary_genre = genres[0] if genres else "unknown"
+        genres = [g.strip() for g in str(genres_raw).split(",") if g.strip()]
 
     description = str(fm.get("description") or "").strip()
     if not description:
@@ -312,7 +176,8 @@ def _extract_book(path: Path, fm: dict) -> dict:
         description = _extract_description(md_text)
 
     return {
-        "id": book_id,
+        "id": uid,
+        "uid": uid,
         "title": title,
         "author": author,
         "status": status,
@@ -325,51 +190,11 @@ def _extract_book(path: Path, fm: dict) -> dict:
         "book_rating_count": str(fm.get("rating_count") or "").strip(),
         "book_review_count": str(fm.get("review_count") or "").strip(),
         "genres": genres,
-        "genre": primary_genre,
+        "genre": genres[0] if genres else "unknown",
         "description": description,
         "source_path": str(path),
         "updated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
     }
-
-
-def _load_existing_norm_keys(root: Path) -> set[str]:
-    keys: set[str] = set()
-    points_path = root / "data" / "runtime" / "catalog" / "books_globe.json"
-    if points_path.exists():
-        try:
-            with points_path.open("r", encoding="utf-8") as f:
-                payload = json.load(f)
-            for row in payload.get("points", []):
-                keys.add(_norm_key(row.get("title"), row.get("author")))
-        except Exception:
-            pass
-    obsidian_books_path = root / "user_data" / "obsidian_books.json"
-    if obsidian_books_path.exists():
-        try:
-            with obsidian_books_path.open("r", encoding="utf-8") as f:
-                payload = json.load(f) or {}
-            books = payload.get("books", {})
-            if isinstance(books, dict):
-                for row in books.values():
-                    if not isinstance(row, dict):
-                        continue
-                    keys.add(_norm_key(row.get("title"), row.get("author")))
-        except Exception:
-            pass
-    all_books_path = root / "user_data" / "all_books.json"
-    if all_books_path.exists():
-        try:
-            with all_books_path.open("r", encoding="utf-8") as f:
-                payload = json.load(f) or {}
-            books = payload.get("books", {})
-            if isinstance(books, dict):
-                for row in books.values():
-                    if not isinstance(row, dict):
-                        continue
-                    keys.add(_norm_key(row.get("title"), row.get("author")))
-        except Exception:
-            pass
-    return keys
 
 
 def _load_existing_embeddings(root: Path) -> tuple[np.ndarray | None, list[str]]:
@@ -398,10 +223,6 @@ def _clean_bracket_author_entries(books_map: dict) -> tuple[dict, int]:
 
 
 def load_obsidian_progress_entries(root: Path | None = None) -> tuple[dict[str, dict], dict]:
-    """
-    Lightweight vault scan for scheduler snapshots.
-    Reads markdown files, extracts progress fields, and returns by-book progress rows.
-    """
     vault_path = _resolve_vault_path(root)
     if not vault_path.exists():
         raise FileNotFoundError(f"Obsidian vault not found at: {vault_path}")
@@ -413,9 +234,7 @@ def load_obsidian_progress_entries(root: Path | None = None) -> tuple[dict[str, 
         scanned_files += 1
         text = md.read_text(encoding="utf-8", errors="ignore")
         fm = _parse_frontmatter(text)
-        if not fm:
-            continue
-        if not _has_progress_metadata(fm):
+        if not fm or not fm.get("uid"):
             continue
         book = _extract_book(md, fm)
         parsed_books += 1
@@ -438,47 +257,33 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
     repo = DataRepository(root)
     user_dir = root / "user_data"
     user_dir.mkdir(parents=True, exist_ok=True)
-    books_path = user_dir / "obsidian_books.json"
     preview_path = user_dir / "obsidian_sync_preview.json"
+
     existing_snapshot = repo.read_obsidian_books_snapshot()
     existing_snapshot_books = existing_snapshot.get("books", {})
     if not isinstance(existing_snapshot_books, dict):
         existing_snapshot_books = {}
 
-    books_payload = {"books": {}}
-    if books_path.exists():
-        with books_path.open("r", encoding="utf-8") as f:
-            books_payload = json.load(f) or {"books": {}}
-    books_map = books_payload.setdefault("books", {})
-    books_map, removed_bracket_author_entries = _clean_bracket_author_entries(books_map)
-    books_payload["books"] = books_map
-
     user_state = repo.load_user_state()
     progress_entries = user_state.setdefault("reading_progress", {})
-
-    existing_keys = _load_existing_norm_keys(root)
-    ignored_keys = _load_ignored_keys(root)
 
     scanned_files = 0
     parsed_books = 0
     created_books = 0
     updated_books = 0
     updated_progress_entries = 0
-    proposed_books: list[dict] = []
-    all_synced_progress_entries: dict[str, dict] = {}
     all_synced_books_map: dict[str, dict] = {}
 
     for md in vault_path.rglob("*.md"):
         scanned_files += 1
         text = md.read_text(encoding="utf-8", errors="ignore")
         fm = _parse_frontmatter(text)
-        if not fm:
-            continue
-        if not _has_progress_metadata(fm):
+        if not fm or not fm.get("uid"):
             continue
 
         book = _extract_book(md, fm)
         parsed_books += 1
+        book_id = book["id"]
 
         progress_row = {
             "status": book["status"],
@@ -488,42 +293,25 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
             "finish_date": book["finish_date"],
             "notes": "",
         }
-        progress_entries[book["id"]] = progress_row
-        all_synced_progress_entries[book["id"]] = progress_row
-        prior_snapshot_row = existing_snapshot_books.get(book["id"], {})
-        if not isinstance(prior_snapshot_row, dict):
-            prior_snapshot_row = {}
-        synced_row = {
-            **book,
-            "reading_status": progress_row["status"],
-            "reading_total_pages": progress_row["total_pages"],
-            "reading_current_page": progress_row["current_page"],
-            "reading_start_date": progress_row["start_date"],
-            "reading_finish_date": progress_row["finish_date"],
-        }
-        all_synced_books_map[book["id"]] = _preserve_link_fields(synced_row, prior_snapshot_row)
+        progress_entries[book_id] = progress_row
         updated_progress_entries += 1
 
-        key = _norm_key(book["title"], book["author"])
-        if key in ignored_keys:
-            continue
-        if _is_probable_duplicate(key, existing_keys, threshold=0.95):
-            continue
+        prior_snapshot_row = existing_snapshot_books.get(book_id, {})
+        if not isinstance(prior_snapshot_row, dict):
+            prior_snapshot_row = {}
 
-        existing = books_map.get(book["id"])
-        if existing:
+        synced_row = {**book}
+        all_synced_books_map[book_id] = synced_row
+
+        if book_id in existing_snapshot_books:
             updated_books += 1
         else:
             created_books += 1
-        books_map[book["id"]] = book
-        proposed_books.append(book)
 
     preview_payload = {
         "dry_run": dry_run,
         "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         "vault_path": str(vault_path),
-        "removed_bracket_author_entries": removed_bracket_author_entries,
-        "ignored_key_count": len(ignored_keys),
         "summary": {
             "scanned_files": scanned_files,
             "parsed_books": parsed_books,
@@ -531,15 +319,10 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
             "updated_books": updated_books,
             "updated_progress_entries": updated_progress_entries,
         },
-        "proposed_books": proposed_books,
-        "proposed_progress_entries": {k: progress_entries[k] for k in [b["id"] for b in proposed_books]},
-        "all_synced_progress_entries": all_synced_progress_entries,
     }
     with preview_path.open("w", encoding="utf-8") as f:
         json.dump(preview_payload, f, indent=2)
 
-    # Persistent, idempotent snapshot for "All Books" independent of dataset-add flow.
-    # Keyed by book id so repeated syncs overwrite rather than duplicate.
     all_books_payload = {
         "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         "vault_path": str(vault_path),
@@ -549,8 +332,6 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
     repo.write_obsidian_books_snapshot(all_books_payload)
 
     if not dry_run:
-        with books_path.open("w", encoding="utf-8") as f:
-            json.dump(books_payload, f, indent=2)
         repo.save_user_state(user_state)
 
     return SyncResult(
@@ -559,11 +340,11 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
         created_books=created_books,
         updated_books=updated_books,
         updated_progress_entries=updated_progress_entries,
-        removed_bracket_author_entries=removed_bracket_author_entries,
+        removed_bracket_author_entries=0,
         vault_path=str(vault_path),
         preview_path=str(preview_path),
         dry_run=dry_run,
-        proposed_books=proposed_books,
+        proposed_books=[],
         periods=compute_reading_stats(progress_entries),
     )
 
@@ -585,16 +366,6 @@ def _append_raw_dataset_row(root: Path, book: dict) -> None:
     }
     with raw_jsonl.open("a", encoding="utf-8") as f:
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
-
-
-def _run_full_rebuild(root: Path) -> None:
-    cmd = [
-        sys.executable,
-        "scripts/rebuild_dashboard_data.py",
-        "--input",
-        "data/raw/books_from_csv.jsonl",
-    ]
-    subprocess.run(cmd, check=True, cwd=root)
 
 
 def _rebuild_status_path(root: Path) -> Path:
@@ -659,16 +430,10 @@ def add_snapshot_book_to_dataset(root: Path, book_id: str) -> dict:
     book = books[book_id]
     _append_raw_dataset_row(root, book)
     rebuild = _run_full_rebuild_async(root, requested_by_book_id=book_id)
-
-    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
-    book["catalog_uid"] = book_id
-    book["dataset_book_id"] = book_id
-    book["dataset_link_type"] = "added_pending_rebuild"
-    book["dataset_linked_at"] = now
     books[book_id] = book
     payload["books"] = books
     repo.write_obsidian_books_snapshot(payload)
-    return {"book_id": book_id, "catalog_uid": book_id, "dataset_book_id": book_id, "link_type": "added_pending_rebuild", "rebuild": rebuild}
+    return {"book_id": book_id, "rebuild": rebuild}
 
 
 def merge_snapshot_book_with_dataset(root: Path, snapshot_book_id: str, dataset_book_id: str) -> dict:
@@ -678,15 +443,10 @@ def merge_snapshot_book_with_dataset(root: Path, snapshot_book_id: str, dataset_
     if not isinstance(books, dict) or snapshot_book_id not in books or not isinstance(books.get(snapshot_book_id), dict):
         raise FileNotFoundError(f"Snapshot book not found: {snapshot_book_id}")
     row = books[snapshot_book_id]
-    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
-    row["catalog_uid"] = str(dataset_book_id or "")
-    row["dataset_book_id"] = str(dataset_book_id or "")
-    row["dataset_link_type"] = "merged"
-    row["dataset_linked_at"] = now
     books[snapshot_book_id] = row
     payload["books"] = books
     repo.write_obsidian_books_snapshot(payload)
-    return {"book_id": snapshot_book_id, "catalog_uid": row["catalog_uid"], "dataset_book_id": row["dataset_book_id"], "link_type": "merged"}
+    return {"book_id": snapshot_book_id, "dataset_book_id": dataset_book_id}
 
 
 def unlink_snapshot_book_from_dataset(root: Path, snapshot_book_id: str) -> dict:
@@ -696,109 +456,7 @@ def unlink_snapshot_book_from_dataset(root: Path, snapshot_book_id: str) -> dict
     if not isinstance(books, dict) or snapshot_book_id not in books or not isinstance(books.get(snapshot_book_id), dict):
         raise FileNotFoundError(f"Snapshot book not found: {snapshot_book_id}")
     row = books[snapshot_book_id]
-    _preserve_link_fields(row, clear=True)
     books[snapshot_book_id] = row
     payload["books"] = books
     repo.write_obsidian_books_snapshot(payload)
-    return {"book_id": snapshot_book_id, "catalog_uid": "", "dataset_book_id": "", "link_type": "unlinked"}
-
-
-def apply_sync_selection(root: Path, selected_book_ids: list[str]) -> dict:
-    repo = DataRepository(root)
-    user_dir = root / "user_data"
-    books_path = user_dir / "obsidian_books.json"
-    preview_path = user_dir / "obsidian_sync_preview.json"
-
-    if not preview_path.exists():
-        raise FileNotFoundError(f"Sync preview file not found: {preview_path}")
-
-    with preview_path.open("r", encoding="utf-8") as f:
-        preview = json.load(f) or {}
-
-    proposed_books = preview.get("proposed_books", [])
-    proposed_progress = preview.get("proposed_progress_entries", {})
-    all_synced_progress = preview.get("all_synced_progress_entries", {})
-    proposed_by_id = {str(b.get("id")): b for b in proposed_books if b.get("id")}
-
-    selected_ids = [str(x) for x in selected_book_ids if str(x) in proposed_by_id]
-
-    books_payload = {"books": {}}
-    if books_path.exists():
-        with books_path.open("r", encoding="utf-8") as f:
-            books_payload = json.load(f) or {"books": {}}
-    books_map = books_payload.setdefault("books", {})
-
-    user_state = repo.load_user_state()
-    progress_entries = user_state.setdefault("reading_progress", {})
-
-    selected_books = [proposed_by_id[book_id] for book_id in selected_ids]
-    for book in selected_books:
-        existing_row = books_map.get(str(book["id"])) if isinstance(books_map, dict) else {}
-        merged_book = _preserve_link_fields(dict(book), existing_row if isinstance(existing_row, dict) else None)
-        books_map[str(book["id"])] = merged_book
-        if str(book["id"]) in proposed_progress:
-            progress_entries[str(book["id"])] = proposed_progress[str(book["id"])]
-
-    # Always sync reading progress for all parsed books, even if books are deselected/ignored for dataset add.
-    if isinstance(all_synced_progress, dict):
-        for book_id, row in all_synced_progress.items():
-            if not book_id or not isinstance(row, dict):
-                continue
-            progress_entries[str(book_id)] = row
-
-    with books_path.open("w", encoding="utf-8") as f:
-        json.dump(books_payload, f, indent=2)
-    repo.save_user_state(user_state)
-
-    # Once a proposed book is accepted, add it to ignore rules so it won't be re-suggested.
-    if selected_books:
-        ignored = _load_ignored_keys(root)
-        for book in selected_books:
-            ignored.add(_norm_key(book.get("title"), book.get("author")))
-        _save_ignored_keys(root, ignored)
-
-    if selected_books:
-        new_embs, new_ids, _method = generate_embeddings(selected_books)
-        base_embs, base_ids = _load_existing_embeddings(root)
-        if base_embs is None:
-            merged_embs = new_embs.astype(np.float32)
-            merged_ids = list(new_ids)
-        else:
-            id_to_idx = {book_id: i for i, book_id in enumerate(base_ids)}
-            merged_embs = base_embs.copy()
-            merged_ids = list(base_ids)
-            for i, book_id in enumerate(new_ids):
-                emb = new_embs[i].astype(np.float32)
-                if book_id in id_to_idx:
-                    merged_embs[id_to_idx[book_id]] = emb
-                else:
-                    merged_embs = np.vstack([merged_embs, emb])
-                    merged_ids.append(book_id)
-                    id_to_idx[book_id] = len(merged_ids) - 1
-
-        artifacts = root / "data" / "runtime" / "vector"
-        artifacts.mkdir(parents=True, exist_ok=True)
-        np.save(artifacts / "embeddings.npy", merged_embs.astype(np.float32))
-        np.save(artifacts / "book_ids.npy", np.array(merged_ids, dtype=object))
-        try:
-            import faiss
-
-            index = faiss.IndexFlatIP(int(merged_embs.shape[1]))
-            index.add(merged_embs.astype(np.float32))
-            faiss.write_index(index, str(artifacts / "books.faiss"))
-        except Exception:
-            pass
-
-    return {
-        "applied_count": len(selected_books),
-        "applied_book_ids": [b["id"] for b in selected_books],
-    }
-
-
-def ignore_future_suggestion(root: Path, title: str, author: str) -> dict:
-    key = _norm_key(title, author)
-    ignored = _load_ignored_keys(root)
-    already = key in ignored
-    ignored.add(key)
-    _save_ignored_keys(root, ignored)
-    return {"ignored_key": key, "already_ignored": already, "ignored_count": len(ignored)}
+    return {"book_id": snapshot_book_id}
