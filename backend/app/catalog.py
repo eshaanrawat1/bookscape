@@ -145,7 +145,7 @@ def resolve_book(root: Path, book_id: str) -> dict | None:
     return None
 
 
-def get_book_payload(root: Path, book_id: str) -> dict | None:
+def get_book_with_similar(root: Path, book_id: str) -> dict | None:
     book = resolve_book(root, book_id)
     if not book:
         return None

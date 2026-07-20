@@ -15,7 +15,7 @@ from .catalog import (
     get_book as load_book,
     get_books_by_author,
     get_books_by_genre,
-    get_book_payload as load_book_payload,
+    get_book_with_similar as load_book_with_similar,
     get_global_library as load_global_library,
     has_data,
     resolve_book,
@@ -76,7 +76,7 @@ def _load_vault_entries_or_skip(mode: str) -> tuple[dict[str, dict], dict] | tup
 
 @app.get("/book/{book_id}")
 def get_book(book_id: str) -> dict:
-    book = load_book_payload(ROOT, book_id)
+    book = load_book_with_similar(ROOT, book_id)
     if not book:
         raise HTTPException(status_code=404, detail="book not found")
     return book
@@ -838,7 +838,7 @@ def scrape_book(payload: ScrapeBookIn) -> dict:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to run scraper: {str(e)}")
         
-    book = load_book_payload(ROOT, book_id)
+    book = load_book_with_similar(ROOT, book_id)
     if not book:
         log_details = ""
         if res.stdout:
