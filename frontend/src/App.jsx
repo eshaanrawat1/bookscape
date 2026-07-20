@@ -256,7 +256,6 @@ function normaliseBook(raw) {
 
   return {
     id: raw.id || raw.uid || '',
-    catalogUid: raw.catalog_uid || raw.uid || '',
     title: raw.title || 'Untitled',
     author: raw.author || '',
     cover: raw.cover || raw.image_url || '',
@@ -283,17 +282,7 @@ function normaliseBook(raw) {
 
 function getCatalogBookId(book) {
   const raw = book?._raw || book || {}
-  const linked = raw.linked_catalog_book || {}
-  return [
-    raw.catalog_uid,
-    book?.catalogUid,
-    linked.uid,
-    linked.id,
-    raw.id,
-  ]
-    .map((value) => String(value || '').trim())
-    .filter(Boolean)
-    .filter((value, index, array) => array.indexOf(value) === index)[0] || ''
+  return String(raw.uid || raw.id || '').trim() || ''
 }
 
 

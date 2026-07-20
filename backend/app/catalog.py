@@ -78,13 +78,13 @@ def _load_snapshot_books(root: Path) -> dict[str, dict]:
 def _load_catalog_index(path_str: str, mtime: float) -> CatalogIndex:
     path = Path(path_str)
     if not path.exists():
-        return CatalogIndex([], {}, {}, [])
+        return CatalogIndex([], {}, {}, {})
 
     try:
         with path.open("r", encoding="utf-8") as f:
             payload = json.load(f)
     except Exception:
-        return CatalogIndex([], {}, {}, [])
+        return CatalogIndex([], {}, {}, {})
 
     if isinstance(payload, dict):
         rows = list(payload.values())
@@ -96,7 +96,7 @@ def _load_catalog_index(path_str: str, mtime: float) -> CatalogIndex:
     books = [row for row in rows if isinstance(row, dict)]
     by_uid: dict[str, dict] = {}
     by_title_author: dict[tuple[str, str], dict] = {}
-    by_title: dict[str, list[dict]] = []
+    by_title: dict[str, list[dict]] = {}
 
     for row in books:
         uid = str(row.get("uid") or "").strip()

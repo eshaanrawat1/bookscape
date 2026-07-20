@@ -26,8 +26,6 @@ from .finished_books import FinishedBooksStore
 from .reading_lists import ReadingListStore, ReadingProgressStore, WantToReadStore
 from .obsidian_sync import (
     add_snapshot_book_to_dataset,
-    apply_sync_selection,
-    ignore_future_suggestion,
     load_obsidian_progress_entries,
     merge_snapshot_book_with_dataset,
     run_obsidian_sync,
@@ -108,15 +106,6 @@ class ReadingProgressIn(BaseModel):
     start_date: str = ""
     finish_date: str = ""
     notes: str = ""
-
-
-class SyncSelectionIn(BaseModel):
-    book_ids: list[str] = []
-
-
-class SyncIgnoreIn(BaseModel):
-    title: str = ""
-    author: str = ""
 
 
 class MergeSnapshotBookIn(BaseModel):
@@ -295,7 +284,7 @@ def get_finished_book(book_id: str) -> dict:
     if entry:
         return {"book_id": book_id, "entry": entry}
 
-    if not resolve_book_record(ROOT, book_id):
+    if not resolve_book(ROOT, book_id):
         raise HTTPException(status_code=404, detail="book not found")
 
     progress_entry = progress.list_all().get(book_id, {})
@@ -316,7 +305,7 @@ def get_finished_book(book_id: str) -> dict:
 
 @app.put("/finished-books/{book_id}")
 def upsert_finished_book(book_id: str, payload: FinishedBookIn) -> dict:
-    if not resolve_book_record(ROOT, book_id):
+    if not resolve_book(ROOT, book_id):
         raise HTTPException(status_code=404, detail="book not found")
     row = finished_books.upsert(book_id, payload.model_dump())
     return {"book_id": book_id, "entry": row}
@@ -405,7 +394,7 @@ def upsert_reading_progress(book_id: str, payload: ReadingProgressIn) -> dict:
 @app.get("/reading-progress/{book_id}")
 def get_reading_progress_entry(book_id: str) -> dict:
     resolved_book_id = _resolve_progress_book_id(book_id)
-    resolved = resolve_book_record(ROOT, resolved_book_id) or resolve_book_record(ROOT, book_id)
+    resolved = resolve_book(ROOT, resolved_book_id) or resolve_book(ROOT, book_id)
     if not resolved:
         raise HTTPException(status_code=404, detail="book not found")
 
@@ -652,34 +641,6 @@ def _run_sync_obsidian(*, dry_run: bool = False) -> dict:
 @app.post("/sync/obsidian")
 def sync_obsidian(dry_run: bool = Query(default=False)) -> dict:
     return _run_sync_obsidian(dry_run=dry_run)
-
-
-@app.post("/sync/obsidian/apply")
-def apply_obsidian_sync_selection(payload: SyncSelectionIn) -> dict:
-    try:
-        out = apply_sync_selection(Path(__file__).resolve().parents[2], payload.book_ids)
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"apply failed: {e}") from e
-
-    return {
-        "ok": True,
-        "applied_count": out.get("applied_count", 0),
-        "applied_book_ids": out.get("applied_book_ids", []),
-        "periods": compute_reading_stats(progress.list_all()),
-        "activity": build_activity_payload(daily_stats.list_daily()),
-    }
-
-
-@app.post("/sync/obsidian/ignore")
-def ignore_obsidian_suggestion(payload: SyncIgnoreIn) -> dict:
-    title = (payload.title or "").strip()
-    author = (payload.author or "").strip()
-    if not title and not author:
-        raise HTTPException(status_code=400, detail="title or author is required")
-    out = ignore_future_suggestion(Path(__file__).resolve().parents[2], title=title, author=author)
-    return {"ok": True, **out}
 
 
 @app.post("/my-books/{book_id}/add-to-dataset")
