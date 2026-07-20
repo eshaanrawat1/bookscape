@@ -25,11 +25,8 @@ from .data_repository import DataRepository
 from .finished_books import FinishedBooksStore
 from .reading_lists import ReadingListStore, ReadingProgressStore, WantToReadStore
 from .obsidian_sync import (
-    add_snapshot_book_to_dataset,
     load_obsidian_progress_entries,
-    merge_snapshot_book_with_dataset,
     run_obsidian_sync,
-    unlink_snapshot_book_from_dataset,
 )
 from .reading_stats import ReadingDailyStatsStore, build_activity_payload, compute_reading_stats
 
@@ -106,10 +103,6 @@ class ReadingProgressIn(BaseModel):
     start_date: str = ""
     finish_date: str = ""
     notes: str = ""
-
-
-class MergeSnapshotBookIn(BaseModel):
-    uid: str = ""
 
 
 class FinishedBookIn(BaseModel):
@@ -641,44 +634,6 @@ def _run_sync_obsidian(*, dry_run: bool = False) -> dict:
 @app.post("/sync/obsidian")
 def sync_obsidian(dry_run: bool = Query(default=False)) -> dict:
     return _run_sync_obsidian(dry_run=dry_run)
-
-
-@app.post("/my-books/{book_id}/add-to-dataset")
-def add_my_book_to_dataset(book_id: str) -> dict:
-    try:
-        out = add_snapshot_book_to_dataset(Path(__file__).resolve().parents[2], book_id)
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"dataset add failed: {e}") from e
-    return {"ok": True, **out}
-
-
-@app.post("/my-books/{book_id}/merge")
-def merge_my_book(book_id: str, payload: MergeSnapshotBookIn) -> dict:
-    target_uid = (payload.uid or "").strip()
-    if not target_uid:
-        raise HTTPException(status_code=400, detail="uid is required")
-    if not load_book(ROOT, target_uid):
-        raise HTTPException(status_code=404, detail="target book not found")
-    try:
-        out = merge_snapshot_book_with_dataset(Path(__file__).resolve().parents[2], book_id, target_uid)
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"merge failed: {e}") from e
-    return {"ok": True, **out}
-
-
-@app.post("/my-books/{book_id}/unlink")
-def unlink_my_book(book_id: str) -> dict:
-    try:
-        out = unlink_snapshot_book_from_dataset(Path(__file__).resolve().parents[2], book_id)
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"unlink failed: {e}") from e
-    return {"ok": True, **out}
 
 
 # ---------------------------------------------------------------------------
