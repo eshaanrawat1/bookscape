@@ -296,12 +296,6 @@ function getCatalogBookId(book) {
     .filter((value, index, array) => array.indexOf(value) === index)[0] || ''
 }
 
-function normalizeIdentityText(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-}
 
 function resolveSavedWantToReadBook(book, savedBooks) {
   const targetId = getCatalogBookId(book)

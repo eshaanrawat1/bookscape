@@ -18,14 +18,12 @@ from .catalog import (
     get_book_payload as load_book_payload,
     get_global_library as load_global_library,
     has_data,
-    recommend_books,
     resolve_book_record,
     search_books,
-    suggest_titles,
 )
 from .data_repository import DataRepository
 from .finished_books import FinishedBooksStore
-from .reading_lists import LikedBooksStore, ReadingListStore, ReadingProgressStore, WantToReadStore
+from .reading_lists import ReadingListStore, ReadingProgressStore, WantToReadStore
 from .obsidian_sync import (
     add_snapshot_book_to_dataset,
     apply_sync_selection,
@@ -40,7 +38,6 @@ from .reading_stats import ReadingDailyStatsStore, build_activity_payload, compu
 app = FastAPI(title="Atlas API", version="0.1.0")
 BACKEND_API_VERSION = 2
 lists = ReadingListStore(Path(__file__).resolve().parents[2])
-liked = LikedBooksStore(Path(__file__).resolve().parents[2])
 want_to_read = WantToReadStore(Path(__file__).resolve().parents[2])
 progress = ReadingProgressStore(Path(__file__).resolve().parents[2])
 finished_books = FinishedBooksStore(Path(__file__).resolve().parents[2])
@@ -63,9 +60,6 @@ def health() -> dict:
     return {"ok": True, "has_data": has_data(ROOT), "backend_api_version": BACKEND_API_VERSION}
 
 
-@app.get("/data-health")
-def data_health() -> dict:
-    return repo.data_health()
 
 
 def _load_vault_entries_or_skip(mode: str) -> tuple[dict[str, dict], dict] | tuple[None, dict]:
@@ -94,14 +88,6 @@ def get_book(book_id: str) -> dict:
 def search(q: str = Query(..., min_length=1), limit: int = Query(default=10, ge=1, le=50)) -> dict:
     return {"query": q, "results": search_books(ROOT, q, limit=limit)}
 
-@app.get("/search/suggest")
-def search_suggest(q: str = Query(..., min_length=1), limit: int = Query(default=8, ge=1, le=20)) -> dict:
-    return {"query": q, "suggestions": suggest_titles(ROOT, q, limit=limit)}
-
-
-@app.get("/recommendations")
-def recommendations(book_id: str = Query(...), limit: int = Query(default=5, ge=1, le=20)) -> dict:
-    return {"book_id": book_id, "results": recommend_books(ROOT, book_id, limit=limit)}
 
 
 class CreateListIn(BaseModel):
@@ -146,13 +132,6 @@ class FinishedBookIn(BaseModel):
     notes: str = ""
 
 
-def _hydrate_liked(book_ids: list[str]) -> dict:
-    books = []
-    for book_id in book_ids:
-        b = load_book(ROOT, book_id)
-        if b:
-            books.append(b)
-    return {"book_ids": [b.get("id") for b in books], "books": books, "count": len(books)}
 
 
 def _hydrate_want_to_read(book_ids: list[str]) -> dict:
@@ -270,26 +249,6 @@ def remove_book_from_list(name: str, book_id: str) -> dict:
     return {"lists": _hydrate_lists(lists.list_all())}
 
 
-@app.get("/liked-books")
-def get_liked_books() -> dict:
-    return _hydrate_liked(liked.list_all())
-
-
-@app.post("/liked-books")
-def add_liked_book(payload: AddBookIn) -> dict:
-    if not load_book(ROOT, payload.book_id):
-        raise HTTPException(status_code=404, detail="book not found")
-    try:
-        liked.add(payload.book_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    return _hydrate_liked(liked.list_all())
-
-
-@app.delete("/liked-books/{book_id}")
-def remove_liked_book(book_id: str) -> dict:
-    liked.remove(book_id)
-    return _hydrate_liked(liked.list_all())
 
 
 @app.get("/want-to-read-books")
@@ -846,19 +805,6 @@ def api_remove_book_from_list(name: str, book_id: str) -> dict:
     return remove_book_from_list(name, book_id)
 
 
-@api_router.get("/liked-books")
-def api_get_liked_books() -> dict:
-    return get_liked_books()
-
-
-@api_router.post("/liked-books")
-def api_add_liked_book(payload: AddBookIn) -> dict:
-    return add_liked_book(payload)
-
-
-@api_router.delete("/liked-books/{book_id}")
-def api_remove_liked_book(book_id: str) -> dict:
-    return remove_liked_book(book_id)
 
 
 @api_router.get("/want-to-read-books")
@@ -921,19 +867,9 @@ def api_search(q: str = Query(..., min_length=1), limit: int = Query(default=10,
     return search(q=q, limit=limit)
 
 
-@api_router.get("/search/suggest")
-def api_search_suggest(q: str = Query(..., min_length=1), limit: int = Query(default=8, ge=1, le=20)) -> dict:
-    return search_suggest(q=q, limit=limit)
-
-
 @api_router.get("/book/{book_id}")
 def api_get_book(book_id: str) -> dict:
     return get_book(book_id)
-
-
-@api_router.get("/recommendations")
-def api_recommendations(book_id: str = Query(...), limit: int = Query(default=5, ge=1, le=20)) -> dict:
-    return recommendations(book_id=book_id, limit=limit)
 
 
 @api_router.get("/stats")

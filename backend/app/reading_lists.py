@@ -86,33 +86,6 @@ class ReadingListStore:
         raise KeyError("List not found")
 
 
-class LikedBooksStore:
-    def __init__(self, root: Path) -> None:
-        self.repo = DataRepository(root)
-
-    def list_all(self) -> list[str]:
-        payload = self.repo.load_user_state()
-        out = payload.get("liked_book_ids", [])
-        if not isinstance(out, list):
-            return []
-        return [str(x) for x in out if x]
-
-    def add(self, book_id: str) -> None:
-        if not book_id:
-            raise ValueError("book_id is required")
-        payload = self.repo.load_user_state()
-        ids = payload.setdefault("liked_book_ids", [])
-        if book_id not in ids:
-            ids.append(book_id)
-            self.repo.save_user_state(payload)
-
-    def remove(self, book_id: str) -> None:
-        payload = self.repo.load_user_state()
-        ids = payload.setdefault("liked_book_ids", [])
-        payload["liked_book_ids"] = [x for x in ids if x != book_id]
-        self.repo.save_user_state(payload)
-
-
 class WantToReadStore:
     def __init__(self, root: Path) -> None:
         self.repo = DataRepository(root)
