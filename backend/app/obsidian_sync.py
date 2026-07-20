@@ -16,23 +16,6 @@ import yaml
 from .data_repository import DataRepository
 from .reading_stats import compute_reading_stats
 
-try:
-    from pipeline.embed_books import generate_embeddings  # type: ignore[import]
-except ModuleNotFoundError:
-    def generate_embeddings(books: list[dict], dim: int = 64) -> tuple:  # type: ignore[misc]
-        import hashlib
-
-        embs = []
-        for b in books:
-            seed = (str(b.get("title", "")) + str(b.get("author", ""))).encode()
-            h = hashlib.sha256(seed).digest()
-            vec = np.array([((h[i % len(h)] / 255.0) * 2 - 1) for i in range(dim)], dtype=np.float32)
-            norm = float(np.linalg.norm(vec)) or 1.0
-            embs.append(vec / norm)
-        ids = [str(b.get("id", i)) for i, b in enumerate(books)]
-        return np.array(embs, dtype=np.float32), ids, "hash_fallback"
-
-
 DEFAULT_OBSIDIAN_VAULT = Path("~/Obsidian/Books")
 
 
@@ -195,31 +178,6 @@ def _extract_book(path: Path, fm: dict) -> dict:
         "source_path": str(path),
         "updated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
     }
-
-
-def _load_existing_embeddings(root: Path) -> tuple[np.ndarray | None, list[str]]:
-    emb_path = root / "data" / "runtime" / "vector" / "embeddings.npy"
-    ids_path = root / "data" / "runtime" / "vector" / "book_ids.npy"
-    if not emb_path.exists() or not ids_path.exists():
-        return None, []
-    try:
-        embs = np.load(emb_path).astype(np.float32)
-        ids = np.load(ids_path, allow_pickle=True).tolist()
-        return embs, [str(x) for x in ids]
-    except Exception:
-        return None, []
-
-
-def _clean_bracket_author_entries(books_map: dict) -> tuple[dict, int]:
-    cleaned = {}
-    removed = 0
-    for book_id, row in books_map.items():
-        author = str((row or {}).get("author") or "")
-        if author.strip().startswith("[[") and author.strip().endswith("]]"):
-            removed += 1
-            continue
-        cleaned[book_id] = row
-    return cleaned, removed
 
 
 def load_obsidian_progress_entries(root: Path | None = None) -> tuple[dict[str, dict], dict]:

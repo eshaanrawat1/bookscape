@@ -654,18 +654,6 @@ def add_my_book_to_dataset(book_id: str) -> dict:
     return {"ok": True, **out}
 
 
-@app.get("/my-books/{book_id}/add-to-dataset")
-def add_my_book_to_dataset_get_compat(book_id: str) -> dict:
-    # Compatibility path for proxy stacks that downgrade redirected POST -> GET.
-    try:
-        out = add_snapshot_book_to_dataset(Path(__file__).resolve().parents[2], book_id)
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"dataset add failed: {e}") from e
-    return {"ok": True, **out, "method_compat": "GET"}
-
-
 @app.post("/my-books/{book_id}/merge")
 def merge_my_book(book_id: str, payload: MergeSnapshotBookIn) -> dict:
     target_uid = (payload.uid or "").strip()

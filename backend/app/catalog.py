@@ -126,10 +126,6 @@ def has_data(root: Path) -> bool:
     return bool(load_catalog_index(root).books)
 
 
-def get_book(root: Path, book_id: str) -> dict | None:
-    return resolve_book(root, book_id)
-
-
 def resolve_book(root: Path, book_id: str) -> dict | None:
     """Resolve a book by uid only - checks catalog first, then snapshots."""
     book_id = str(book_id or "").strip()
