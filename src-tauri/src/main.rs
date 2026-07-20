@@ -191,6 +191,10 @@ fn wait_for_backend() -> bool {
       eprintln!("[Rust] wait_for_backend: got response status: {}", response.status());
       if response.status().is_success() {
         eprintln!("[Rust] wait_for_backend: health check successful");
+        // Add a small delay to ensure backend is fully ready to handle all endpoints
+        eprintln!("[Rust] wait_for_backend: waiting for backend to fully initialize");
+        thread::sleep(Duration::from_millis(500));
+        eprintln!("[Rust] wait_for_backend: backend initialization delay complete");
         return true;
       }
     } else {
