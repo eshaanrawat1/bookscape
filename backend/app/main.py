@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from .catalog import (
     get_book as load_book,
     get_books_by_author,
+    get_books_by_genre,
     get_book_payload as load_book_payload,
     get_global_library as load_global_library,
     has_data,
@@ -327,6 +328,13 @@ def get_global_library() -> dict:
 def get_author_books(author: str = Query(..., min_length=1)) -> dict:
     books = get_books_by_author(ROOT, author)
     return {"author": author, "books": books, "count": len(books)}
+
+
+@app.get("/genre-books")
+@app.get("/api/genre-books")
+def get_genre_books(genre: str = Query(..., min_length=1), limit: int = Query(default=100, ge=1, le=200)) -> dict:
+    books = get_books_by_genre(ROOT, genre, limit)
+    return {"genre": genre, "books": books, "count": len(books)}
 
 
 @app.get("/finished-books/{book_id}")

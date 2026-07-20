@@ -336,6 +336,20 @@ function authorNameFromView(view) {
   }
 }
 
+function genreViewId(genre) {
+  return `genre:${encodeURIComponent(String(genre || '').trim())}`
+}
+
+function genreNameFromView(view) {
+  if (!String(view || '').startsWith('genre:')) return ''
+  const raw = String(view).slice('genre:'.length)
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return raw
+  }
+}
+
 const mainNav = [
   { id: 'library', label: 'Library', icon: LibraryIcon },
   { id: 'search', label: 'Search', icon: SearchIcon },
@@ -385,6 +399,9 @@ export default function App() {
   const [authorBooks, setAuthorBooks] = useState([])
   const [authorLoading, setAuthorLoading] = useState(false)
   const [authorError, setAuthorError] = useState(null)
+  const [genreBooks, setGenreBooks] = useState([])
+  const [genreLoading, setGenreLoading] = useState(false)
+  const [genreError, setGenreError] = useState(null)
 
   // Live data from the API
   const [books, setBooks] = useState([])
@@ -501,6 +518,47 @@ export default function App() {
     }
   }, [view])
 
+  useEffect(() => {
+    if (!view.startsWith('genre:')) {
+      setGenreBooks([])
+      setGenreError(null)
+      setGenreLoading(false)
+      return undefined
+    }
+
+    const genreName = genreNameFromView(view)
+    if (!genreName) {
+      setGenreBooks([])
+      setGenreError('Could not load genre books.')
+      setGenreLoading(false)
+      return undefined
+    }
+
+    let cancelled = false
+    setGenreLoading(true)
+    setGenreError(null)
+
+    async function loadGenreBooks() {
+      try {
+        const data = await apiFetch(`/genre-books?genre=${encodeURIComponent(genreName)}&limit=100`)
+        if (cancelled) return
+        setGenreBooks((data.books || []).map(normaliseBook))
+      } catch (err) {
+        if (!cancelled) {
+          setGenreBooks([])
+          setGenreError(err.message || 'Could not load genre books.')
+        }
+      } finally {
+        if (!cancelled) setGenreLoading(false)
+      }
+    }
+
+    loadGenreBooks()
+    return () => {
+      cancelled = true
+    }
+  }, [view])
+
   async function reloadAppData() {
     const data = await loadBootstrapData()
 
@@ -524,11 +582,14 @@ export default function App() {
     ? collections.find((c) => `collection:${c.id}` === view)
     : null
   const activeAuthorName = authorNameFromView(view)
+  const activeGenreName = genreNameFromView(view)
   const meta = activeCollection
     ? activeCollection
     : view.startsWith('author:')
       ? { title: activeAuthorName || 'Author', subtitle: 'Every book we have by this author.' }
-      : viewMeta[view]
+      : view.startsWith('genre:')
+        ? { title: activeGenreName || 'Genre', subtitle: 'Top books in this genre.' }
+        : viewMeta[view]
   const openBookDialog = (book) => setSelected({ book, variant: 'standard' })
   const openFinishedBookDialog = (book) => setSelected({ book, variant: 'finished', preferLiveStatus: true })
   const openAuthorPage = (author) => {
@@ -541,6 +602,18 @@ export default function App() {
   }
   const goBackFromAuthor = () => {
     setView(previousView && !previousView.startsWith('author:') ? previousView : 'library')
+    setMobileNav(false)
+  }
+  const openGenrePage = (genre) => {
+    const cleanGenre = String(genre || '').trim()
+    if (!cleanGenre) return
+    setPreviousView((current) => (view.startsWith('genre:') ? current : view))
+    setSelected(null)
+    setMobileNav(false)
+    setView(genreViewId(cleanGenre))
+  }
+  const goBackFromGenre = () => {
+    setView(previousView && !previousView.startsWith('genre:') ? previousView : 'library')
     setMobileNav(false)
   }
 
@@ -772,6 +845,11 @@ export default function App() {
                 authorBooks={authorBooks}
                 authorLoading={authorLoading}
                 authorError={authorError}
+                genreBooks={genreBooks}
+                genreLoading={genreLoading}
+                genreError={genreError}
+                onOpenGenre={openGenrePage}
+                onGoBackFromGenre={goBackFromGenre}
                 statsSummary={statsSummary}
                 statsLoading={statsLoading}
                 statsError={statsError}
@@ -1030,6 +1108,11 @@ function ViewContent({
   authorBooks,
   authorLoading,
   authorError,
+  genreBooks,
+  genreLoading,
+  genreError,
+  onOpenGenre,
+  onGoBackFromGenre,
   statsSummary,
   statsLoading,
   statsError,
@@ -1086,6 +1169,7 @@ function ViewContent({
             books={genreSection.books}
             onOpen={onOpen}
             onOpenAuthor={onOpenAuthor}
+            onSeeAll={onOpenGenre}
           />
         ))}
       </div>
@@ -1102,6 +1186,20 @@ function ViewContent({
         onOpen={onOpen}
         onOpenAuthor={onOpenAuthor}
         onBack={onGoBackFromAuthor}
+      />
+    )
+  }
+
+  if (view.startsWith('genre:')) {
+    return (
+      <GenreView
+        genre={genreNameFromView(view)}
+        books={genreBooks}
+        loading={genreLoading}
+        error={genreError}
+        onOpen={onOpen}
+        onOpenAuthor={onOpenAuthor}
+        onBack={onGoBackFromGenre}
       />
     )
   }
@@ -1206,7 +1304,7 @@ function ReadingNowHero({ books, onOpen }) {
   )
 }
 
-function Shelf({ title, subtitle, books, onOpen, onOpenAuthor }) {
+function Shelf({ title, subtitle, books, onOpen, onOpenAuthor, onSeeAll }) {
   if (!books.length) return null
 
   return (
@@ -1216,7 +1314,9 @@ function Shelf({ title, subtitle, books, onOpen, onOpenAuthor }) {
           <h2>{title}</h2>
           {subtitle && <p>{subtitle}</p>}
         </div>
-        <button>See all</button>
+        {onSeeAll && (
+          <button onClick={() => onSeeAll(title)}>See all</button>
+        )}
       </div>
       <div className="shelfScroll">
         {books.map((book) => (
@@ -1629,6 +1729,40 @@ function AuthorView({ author, books, loading, error, onOpen, onOpenAuthor, onBac
         <div className="emptyState">
           <h2>No books found</h2>
           <p>We couldn't find any titles in the catalog for this author.</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function GenreView({ genre, books, loading, error, onOpen, onOpenAuthor, onBack }) {
+  return (
+    <div className="stack">
+      <div className="shelfHeader">
+        <div>
+          <h2>{genre || 'Genre'}</h2>
+          <p>Top books in this genre</p>
+        </div>
+        <button type="button" className="secondaryButton" onClick={onBack}>
+          Back to Library
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="emptyState">
+          <p>Loading genre books…</p>
+        </div>
+      ) : error ? (
+        <div className="emptyState">
+          <h2>Could not load genre</h2>
+          <p>{error}</p>
+        </div>
+      ) : books.length > 0 ? (
+        <BookGrid books={books} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
+      ) : (
+        <div className="emptyState">
+          <h2>No books found</h2>
+          <p>We couldn't find any titles in the catalog for this genre.</p>
         </div>
       )}
     </div>

@@ -375,3 +375,29 @@ def get_books_by_author(root: Path, author: str) -> list[dict]:
 
     matched.sort(key=lambda item: (str(item.get("title") or "").lower(), str(item.get("uid") or "")))
     return matched
+
+
+def get_books_by_genre(root: Path, genre: str, limit: int = 100) -> list[dict]:
+    index = load_catalog_index(root)
+    query = str(genre or "").strip()
+    if not query:
+        return []
+
+    matched = []
+    seen: set[str] = set()
+    for book in index.books:
+        book_genres = book.get("genres", [])
+        if not isinstance(book_genres, list):
+            book_genres = [book_genres]
+        
+        if any(str(g or "").strip() == query for g in book_genres):
+            book_uid = str(book.get("uid") or "").strip()
+            if not book_uid or book_uid in seen:
+                continue
+            seen.add(book_uid)
+            matched.append(book)
+            if len(matched) >= limit:
+                break
+
+    matched.sort(key=lambda item: int(item.get("rating_count", 0) or 0), reverse=True)
+    return matched
