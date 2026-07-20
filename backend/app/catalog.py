@@ -207,30 +207,6 @@ def search_books(root: Path, query: str, limit: int = 10) -> list[dict]:
     return out
 
 
-def suggest_titles(root: Path, query: str, limit: int = 8) -> list[str]:
-    index = load_catalog_index(root)
-    q = str(query or "").lower().strip()
-    if not q:
-        return []
-
-    titles = [str(book.get("title", "")).strip() for book in index.books if book.get("title")]
-    prefix = [title for title in titles if title.lower().startswith(q)]
-    contains = [title for title in titles if q in title.lower() and not title.lower().startswith(q)]
-    fuzzy = difflib.get_close_matches(query, titles, n=limit * 2, cutoff=0.6)
-
-    merged = []
-    seen = set()
-    for title in [*prefix, *contains, *fuzzy]:
-        key = title.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        merged.append(title)
-        if len(merged) >= limit:
-            break
-    return merged
-
-
 def get_global_library(root: Path) -> list[dict]:
     index = load_catalog_index(root)
     all_books = index.books
@@ -264,23 +240,6 @@ def get_global_library(root: Path) -> list[dict]:
             })
         library.append({"genre": genre, "books": mapped})
     return library
-
-
-def recommend_books(root: Path, book_id: str, limit: int = 5) -> list[dict]:
-    index = load_catalog_index(root)
-    book = index.by_uid.get(str(book_id or "").strip())
-    if not book:
-        return []
-
-    out = []
-    for sid in book.get("similar_book_ids", []) or []:
-        similar = index.by_uid.get(str(sid))
-        if not similar:
-            continue
-        out.append(similar)
-        if len(out) >= limit:
-            break
-    return out
 
 
 def get_books_by_author(root: Path, author: str) -> list[dict]:
