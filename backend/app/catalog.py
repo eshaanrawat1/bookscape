@@ -5,11 +5,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from .utils import (
-    normalize_author,
-    read_json,
-    split_author_field,
-)
+from .utils import normalize_author, read_json, split_author_field
 
 
 @dataclass(frozen=True)
@@ -20,26 +16,6 @@ class CatalogIndex:
 
 def _catalog_path(root: Path) -> Path:
     return root / "data" / "books.json"
-
-
-@lru_cache(maxsize=16)
-def _load_snapshot_books_cached(path_str: str, mtime: float) -> dict[str, dict]:
-    payload = read_json(Path(path_str), {})
-    if not isinstance(payload, dict):
-        return {}
-    raw_books = payload.get("books", {})
-    if not isinstance(raw_books, dict):
-        return {}
-    return {str(k): v for k, v in raw_books.items() if isinstance(v, dict)}
-
-
-def _load_snapshot_books(root: Path) -> dict[str, dict]:
-    books: dict[str, dict] = {}
-    for name in ("all_books.json", "obsidian_books.json"):
-        path = root / "user_data" / name
-        mtime = path.stat().st_mtime if path.exists() else 0.0
-        books.update(_load_snapshot_books_cached(str(path), mtime))
-    return books
 
 
 @lru_cache(maxsize=8)
@@ -74,7 +50,7 @@ def has_data(root: Path) -> bool:
 
 
 def resolve_book(root: Path, book_id: str) -> dict | None:
-    """Resolve a book by uid only - checks catalog first, then snapshots."""
+    """Resolve a book by uid from the catalog."""
     book_id = str(book_id or "").strip()
     if not book_id:
         return None
@@ -84,15 +60,7 @@ def resolve_book(root: Path, book_id: str) -> dict | None:
     if direct:
         return dict(direct)
 
-    snapshot = _load_snapshot_books(root).get(book_id)
-    if isinstance(snapshot, dict):
-        return dict(snapshot)
-
     return None
-
-
-# Alias for backward compatibility - remove later
-get_book = resolve_book
 
 
 def get_book_with_similar(root: Path, book_id: str) -> dict | None:
@@ -209,7 +177,7 @@ def get_global_library(root: Path) -> list[dict]:
 
 
 def get_books_by_author(root: Path, author: str) -> list[dict]:
-    query = _normalize_author(author)
+    query = normalize_author(author)
     if not query:
         return []
 
@@ -219,8 +187,8 @@ def get_books_by_author(root: Path, author: str) -> list[dict]:
 
     for book in index.books:
         author_field = book.get("author", "")
-        candidates = [_normalize_author(author_field)] + [
-            _normalize_author(part) for part in _split_author_field(author_field)
+        candidates = [(author_field)] + [
+            normalize_author(part) for part in split_author_field(author_field)
         ]
         if any(c and (c == query or c in query or query in c) for c in candidates):
             book_uid = str(book.get("uid") or "").strip()

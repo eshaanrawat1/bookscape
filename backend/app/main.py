@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .catalog import (
-    get_book as load_book,
+    resolve_book as load_book,
     get_book_with_similar as load_book_with_similar,
     get_books_by_author,
     get_books_by_genre,
@@ -45,8 +45,6 @@ app.add_middleware(
 
 repo = DataRepository(ROOT)
 lists = ReadingListStore(ROOT)
-
-repo.migrate_user_state()
 
 router = APIRouter(prefix="/api")
 
