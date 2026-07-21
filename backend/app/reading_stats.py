@@ -1,26 +1,23 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 
 
-def _to_int(value: object, default: int = 0) -> int:
+def _to_int(value: object) -> int:
     if value is None:
         return default
-    if isinstance(value, int):
-        return max(0, value)
+
     raw = str(value).strip().replace(",", "")
     digits = "".join(ch for ch in raw if ch.isdigit())
-    if not digits:
-        return default
-    return max(0, int(digits))
+    return max(0, int(digits)) if digits else 0
 
 
-def _parse_date_str(value: object) -> str:
+def _parse_date(value: object) -> date | None:
     try:
         s = str(value).strip()
-        return date.fromisoformat(s).isoformat()
-    except:
-        return ""
+        return date.fromisoformat(s) if s else None
+    except Exception:
+        return None
 
 
 def compute_reading_stats(entries: dict[str, dict], today: date | None = None) -> dict:
@@ -34,7 +31,7 @@ def compute_reading_stats(entries: dict[str, dict], today: date | None = None) -
             continue
 
         pages = _to_int(row.get("total_pages"))
-        rows.append({"finish_date": finish_date, "pages": pages})
+        rows.append({"finish_date": finish, "pages": pages})
 
     def for_period(period: str) -> tuple[list[dict], int]:
         if period == "daily":
@@ -50,7 +47,7 @@ def compute_reading_stats(entries: dict[str, dict], today: date | None = None) -
 
         if not rows:
             return [], 1
-            
+
         earliest = min(r["finish_date"] for r in rows)
         return rows, max(1, (now - earliest).days + 1)
 

@@ -24,7 +24,7 @@ from .catalog import (
 from .data_repository import DataRepository
 from .obsidian import load_obsidian_progress_entries, run_obsidian_sync
 from .reading_lists import ReadingListStore
-from .reading_stats import ReadingDailyStatsStore, build_activity_payload, compute_reading_stats
+from .reading_stats import compute_reading_stats
 
 
 # App setup
@@ -43,7 +43,6 @@ app.add_middleware(
 
 repo = DataRepository(ROOT)
 lists = ReadingListStore(ROOT)
-daily_stats = ReadingDailyStatsStore(ROOT)
 
 repo.migrate_user_state()
 
