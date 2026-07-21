@@ -152,88 +152,7 @@ class ReadingDailyStatsStore:
                 continue
             out[str(k)] = row
         return out
-
-    def run_snapshot(
-        self,
-        entries: dict[str, dict],
-        *,
-        run_date: date | None = None,
-        force: bool = False,
-        mode: str = "manual",
-    ) -> SnapshotRunResult:
-        tz = ZoneInfo(self.tz)
-        now_dt = datetime.now(tz)
-        day = run_date or now_dt.date()
-        day_str = day.isoformat()
-        payload = self._read()
-        meta = payload.setdefault("meta", {})
-        if mode == "scheduled" and not force and meta.get("last_processed_date") == day_str:
-            return SnapshotRunResult(
-                date=day_str,
-                mode=mode,
-                pages_read=0,
-                books_completed=0,
-                books_touched=0,
-                skipped=True,
-                reason="already_processed",
-                last_run_at=str(meta.get("last_run_at") or ""),
-            )
-
-        snapshot = payload.setdefault("snapshot", {})
-        daily = payload.setdefault("daily", {})
-        current: dict[str, dict] = {}
-        for book_id, row in (entries or {}).items():
-            if not book_id or not isinstance(row, dict):
-                continue
-            current[str(book_id)] = {
-                "current_page": _to_int(row.get("current_page"), default=0),
-                "total_pages": _to_int(row.get("total_pages"), default=0),
-                "status": str(row.get("status") or "not_started").strip().lower(),
-                "finish_date": _parse_date_str(row.get("finish_date")),
-            }
-
-        pages_delta = 0
-        books_completed = 0
-        books_touched = 0
-
-        for book_id, cur in current.items():
-            prev = snapshot.get(book_id, {}) if isinstance(snapshot.get(book_id), dict) else {}
-            prev_page = _to_int(prev.get("current_page"), default=0)
-            delta = max(0, cur["current_page"] - prev_page)
-            if delta > 0:
-                pages_delta += delta
-                books_touched += 1
-
-            prev_status = str(prev.get("status") or "not_started").strip().lower()
-            done_transition = prev_status != "done" and cur["status"] == "done"
-            done_on_day = prev_status != "done" and cur["finish_date"] == day_str
-            if done_transition or done_on_day:
-                books_completed += 1
-
-        existing = daily.get(day_str, {}) if isinstance(daily.get(day_str), dict) else {}
-        daily[day_str] = {
-            "pages_read": _to_int(existing.get("pages_read"), default=0) + pages_delta,
-            "books_completed": _to_int(existing.get("books_completed"), default=0) + books_completed,
-            "books_touched": _to_int(existing.get("books_touched"), default=0) + books_touched,
-            "updated_at": now_dt.isoformat(timespec="seconds"),
-        }
-        payload["snapshot"] = current
-        meta["last_run_at"] = now_dt.isoformat(timespec="seconds")
-        meta["last_processed_date"] = day_str
-        meta["timezone"] = self.tz
-        meta["version"] = 1
-        payload["meta"] = meta
-        self._write(payload)
-        return SnapshotRunResult(
-            date=day_str,
-            mode=mode,
-            pages_read=pages_delta,
-            books_completed=books_completed,
-            books_touched=books_touched,
-            skipped=False,
-            reason="ok",
-            last_run_at=str(meta.get("last_run_at") or ""),
-        )
+        
 
     @staticmethod
     def _normalize_entries(entries: dict[str, dict]) -> dict[str, dict]:
@@ -274,172 +193,34 @@ class ReadingDailyStatsStore:
             "books_touched": books_touched,
         }
 
-    def run_login_backup(self, entries: dict[str, dict], *, run_date: date | None = None) -> dict:
-        """
-        Called at first machine-open/login run for a day.
-        - Finalizes previous day with fallback reserve snapshot if nightly was missed.
-        - Stores today's reserve snapshot (once).
-        """
-        tz = ZoneInfo(self.tz)
-        now_dt = datetime.now(tz)
-        day = run_date or now_dt.date()
-        day_str = day.isoformat()
-        prev_day_str = (day - timedelta(days=1)).isoformat()
-        payload = self._read()
-        snapshot = payload.setdefault("snapshot", {})
-        reserve = payload.setdefault("reserve", {})
-        daily = payload.setdefault("daily", {})
-
-        # Fallback finalize for missed nightly run (yesterday only).
-        fallback_applied = False
-        if prev_day_str not in daily and isinstance(reserve.get(prev_day_str), dict):
-            prev_res = reserve.get(prev_day_str, {})
-            reserve_snapshot = prev_res.get("snapshot", {})
-            if isinstance(reserve_snapshot, dict):
-                delta = self._compute_delta(snapshot if isinstance(snapshot, dict) else {}, reserve_snapshot, prev_day_str)
-                daily[prev_day_str] = {
-                    **delta,
-                    "updated_at": now_dt.isoformat(timespec="seconds"),
-                    "source": "fallback_login",
-                }
-                payload["snapshot"] = reserve_snapshot
-                fallback_applied = True
-
-        if day_str not in reserve:
-            curr_snapshot = self._normalize_entries(entries)
-            reserve[day_str] = {
-                "snapshot": curr_snapshot,
-                "taken_at": now_dt.isoformat(timespec="seconds"),
-            }
-
-        payload["reserve"] = reserve
-        payload["daily"] = daily
-        meta = payload.setdefault("meta", {})
-        meta["last_run_at"] = now_dt.isoformat(timespec="seconds")
-        meta["timezone"] = self.tz
-        payload["meta"] = meta
-        self._write(payload)
-        return {
-            "date": day_str,
-            "mode": "login_backup",
-            "fallback_applied": fallback_applied,
-            "reserve_taken": True,
-        }
-
-    def run_nightly_finalize(self, entries: dict[str, dict], *, run_date: date | None = None, force: bool = False) -> dict:
-        """
-        Finalize today's daily record from reserve(start-of-day) -> current(end-of-day).
-        """
-        tz = ZoneInfo(self.tz)
-        now_dt = datetime.now(tz)
-        day = run_date or now_dt.date()
-        day_str = day.isoformat()
-        payload = self._read()
-        snapshot = payload.setdefault("snapshot", {})
-        reserve = payload.setdefault("reserve", {})
-        daily = payload.setdefault("daily", {})
-
-        if day_str in daily and not force:
-            return {"date": day_str, "mode": "nightly_finalize", "skipped": True, "reason": "already_finalized"}
-
-        current = self._normalize_entries(entries)
-        baseline = snapshot if isinstance(snapshot, dict) else {}
-        if isinstance(reserve.get(day_str), dict):
-            reserve_snap = reserve.get(day_str, {}).get("snapshot", {})
-            if isinstance(reserve_snap, dict):
-                baseline = reserve_snap
-
-        delta = self._compute_delta(baseline, current, day_str)
-        daily[day_str] = {
-            **delta,
-            "updated_at": now_dt.isoformat(timespec="seconds"),
-            "source": "nightly_finalize",
-        }
-        payload["snapshot"] = current
-        if day_str in reserve:
-            del reserve[day_str]
-        payload["reserve"] = reserve
-        payload["daily"] = daily
-        meta = payload.setdefault("meta", {})
-        meta["last_run_at"] = now_dt.isoformat(timespec="seconds")
-        meta["last_processed_date"] = day_str
-        meta["timezone"] = self.tz
-        payload["meta"] = meta
-        self._write(payload)
-        return {"date": day_str, "mode": "nightly_finalize", "skipped": False, **delta}
-
-
-def _intensity_levels(values: list[int]) -> list[int]:
-    non_zero = sorted([v for v in values if v > 0])
-    if not non_zero:
-        return [0 for _ in values]
-    p25 = non_zero[max(0, int(len(non_zero) * 0.25) - 1)]
-    p50 = non_zero[max(0, int(len(non_zero) * 0.50) - 1)]
-    p75 = non_zero[max(0, int(len(non_zero) * 0.75) - 1)]
-    p90 = non_zero[max(0, int(len(non_zero) * 0.90) - 1)]
-    out = []
-    for v in values:
-        if v <= 0:
-            out.append(0)
-        elif v <= p25:
-            out.append(1)
-        elif v <= p50:
-            out.append(2)
-        elif v <= p75:
-            out.append(3)
-        elif v <= p90:
-            out.append(4)
-        else:
-            out.append(5)
-    return out
-
 
 def build_activity_payload(daily_rows: dict[str, dict], today: date | None = None, lookback_days: int = 366) -> dict:
     now = today or date.today()
     start = now - timedelta(days=lookback_days - 1)
     dates = [start + timedelta(days=i) for i in range(lookback_days)]
-    pages = []
-    completed = []
-    touched = []
+
+    pages, completed, touched = [], [], []
+
     for d in dates:
         row = daily_rows.get(d.isoformat(), {}) if isinstance(daily_rows.get(d.isoformat()), dict) else {}
         pages.append(_to_int(row.get("pages_read"), default=0))
         completed.append(_to_int(row.get("books_completed"), default=0))
         touched.append(_to_int(row.get("books_touched"), default=0))
-    levels = _intensity_levels(pages)
+
     days = [
         {
             "date": d.isoformat(),
             "pagesRead": pages[i],
             "booksCompleted": completed[i],
-            "booksTouched": touched[i],
-            "intensityLevel": levels[i],
+            "booksTouched": touched[i]
         }
         for i, d in enumerate(dates)
     ]
 
-    active_days = sum(1 for x in pages if x > 0)
-    day_set = {d for i, d in enumerate(dates) if pages[i] > 0}
-    cur_streak = 0
-    probe = now
-    while probe in day_set:
-        cur_streak += 1
-        probe = probe - timedelta(days=1)
-    longest = 0
-    run = 0
-    for d in dates:
-        if d in day_set:
-            run += 1
-            longest = max(longest, run)
-        else:
-            run = 0
     total_pages_year = sum(pages)
     return {
         "days": days,
         "summary": {
-            "activeDays": active_days,
-            "currentStreak": cur_streak,
-            "longestStreak": longest,
             "totalPagesYear": total_pages_year,
         },
     }

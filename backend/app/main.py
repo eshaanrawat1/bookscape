@@ -506,43 +506,6 @@ def get_stats(
         "most_time_spent_days": _days_spent(longest) if longest else 0,
     }
 
-
-# Daily reading snapshots
-
-@router.post("/reading-stats/snapshot/run")
-def run_reading_snapshot(force: bool = Query(default=False)) -> dict:
-    entries, source = _load_vault_entries_or_skip("manual_snapshot")
-    if entries is None:
-        return {"ok": False, "snapshot": source}
-    result = daily_stats.run_snapshot(entries, force=force, mode="manual")
-    return {
-        "ok": True,
-        "snapshot": {
-            "date": result.date, "mode": result.mode,
-            "pages_read": result.pages_read, "books_completed": result.books_completed,
-            "books_touched": result.books_touched, "skipped": result.skipped,
-            "reason": result.reason, "last_run_at": result.last_run_at,
-            "source": source,
-        },
-    }
-
-
-@router.post("/reading-stats/snapshot/login-backup")
-def run_login_backup_snapshot() -> dict:
-    entries, source = _load_vault_entries_or_skip("login_backup")
-    if entries is None:
-        return {"ok": False, "snapshot": source}
-    return {"ok": True, "snapshot": {**daily_stats.run_login_backup(entries), "source": source}}
-
-
-@router.post("/reading-stats/snapshot/nightly-finalize")
-def run_nightly_finalize_snapshot(force: bool = Query(default=False)) -> dict:
-    entries, source = _load_vault_entries_or_skip("nightly_finalize")
-    if entries is None:
-        return {"ok": False, "snapshot": source}
-    return {"ok": True, "snapshot": {**daily_stats.run_nightly_finalize(entries, force=force), "source": source}}
-
-
 # Obsidian 
 
 @router.post("/sync/obsidian")
