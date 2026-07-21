@@ -83,7 +83,5 @@ def parse_book(path: Path) -> dict | None:
         "review_count":     int(fm.get("review_count") or 0),
         "genres":           genres,
         "genre":            genres[0] if genres else "unknown",
-        "description":      str(fm.get("description") or "").strip() or _extract_description(text),
-        "source_path":      str(path),
-        "updated_at":       datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "description":      str(fm.get("description") or "").strip() or _extract_description(text)
     }
