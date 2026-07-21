@@ -98,18 +98,6 @@ def _default_daily_payload(timezone: str) -> dict:
     }
 
 
-@dataclass
-class SnapshotRunResult:
-    date: str
-    mode: str
-    pages_read: int
-    books_completed: int
-    books_touched: int
-    skipped: bool
-    reason: str
-    last_run_at: str
-
-
 class ReadingDailyStatsStore:
     def __init__(self, root: Path, timezone: str | None = None) -> None:
         tz = timezone or os.getenv("READING_SNAPSHOT_TIMEZONE", "America/Los_Angeles")
@@ -152,46 +140,6 @@ class ReadingDailyStatsStore:
                 continue
             out[str(k)] = row
         return out
-        
-
-    @staticmethod
-    def _normalize_entries(entries: dict[str, dict]) -> dict[str, dict]:
-        current: dict[str, dict] = {}
-        for book_id, row in (entries or {}).items():
-            if not book_id or not isinstance(row, dict):
-                continue
-            current[str(book_id)] = {
-                "current_page": _to_int(row.get("current_page"), default=0),
-                "total_pages": _to_int(row.get("total_pages"), default=0),
-                "status": str(row.get("status") or "not_started").strip().lower(),
-                "finish_date": _parse_date_str(row.get("finish_date")),
-            }
-        return current
-
-    @staticmethod
-    def _compute_delta(prev_snapshot: dict[str, dict], curr_snapshot: dict[str, dict], day_str: str) -> dict:
-        pages_delta = 0
-        books_completed = 0
-        books_touched = 0
-        for book_id, cur in curr_snapshot.items():
-            prev = prev_snapshot.get(book_id, {}) if isinstance(prev_snapshot.get(book_id), dict) else {}
-            prev_page = _to_int(prev.get("current_page"), default=0)
-            delta = max(0, _to_int(cur.get("current_page"), default=0) - prev_page)
-            if delta > 0:
-                pages_delta += delta
-                books_touched += 1
-            prev_status = str(prev.get("status") or "not_started").strip().lower()
-            cur_status = str(cur.get("status") or "not_started").strip().lower()
-            cur_finish = _parse_date_str(cur.get("finish_date"))
-            done_transition = prev_status != "done" and cur_status == "done"
-            done_on_day = prev_status != "done" and cur_finish == day_str
-            if done_transition or done_on_day:
-                books_completed += 1
-        return {
-            "pages_read": pages_delta,
-            "books_completed": books_completed,
-            "books_touched": books_touched,
-        }
 
 
 def build_activity_payload(daily_rows: dict[str, dict], today: date | None = None, lookback_days: int = 366) -> dict:
