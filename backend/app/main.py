@@ -26,8 +26,9 @@ from .obsidian import load_obsidian_progress_entries, run_obsidian_sync
 from .reading_lists import ReadingListStore
 from .reading_stats import compute_reading_stats
 
-
+# ---------------------------------------------------------------------------
 # App setup
+# ---------------------------------------------------------------------------
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_API_VERSION = 2
@@ -47,6 +48,11 @@ lists = ReadingListStore(ROOT)
 repo.migrate_user_state()
 
 router = APIRouter(prefix="/api")
+
+
+# ---------------------------------------------------------------------------
+# Pydantic Schemas
+# ---------------------------------------------------------------------------
 
 class CreateListIn(BaseModel):
     name: str
@@ -69,6 +75,10 @@ class ScrapeBookIn(BaseModel):
     url: str
 
 
+# ---------------------------------------------------------------------------
+# Internal Helpers
+# ---------------------------------------------------------------------------
+
 def _books_map() -> dict[str, dict]:
     """Return user_state.books, always a plain dict."""
     raw = repo.load_user_state().get("books", {})
@@ -89,9 +99,15 @@ def _book_entry(record: dict, book_id: str) -> dict:
 
 
 def _empty_entry(book_id: str, status: str = "not_started") -> dict:
-    return {"book_id": book_id, "status": status,
-            "current_page": 0, "total_pages": 0,
-            "start_date": "", "finish_date": "", "notes": ""}
+    return {
+        "book_id": book_id,
+        "status": status,
+        "current_page": 0,
+        "total_pages": 0,
+        "start_date": "",
+        "finish_date": "",
+        "notes": "",
+    }
 
 
 def _hydrate_lists(rows: list[dict]) -> list[dict]:
@@ -108,9 +124,11 @@ def _hydrate_lists(rows: list[dict]) -> list[dict]:
 
 
 def _hydrate_want_to_read() -> dict:
-    books = [b for uid, row in _books_map().items()
-             if isinstance(row, dict) and row.get("want_to_read")
-             if (b := load_book(ROOT, uid))]
+    books = [
+        b for uid, row in _books_map().items()
+        if isinstance(row, dict) and row.get("want_to_read")
+        if (b := load_book(ROOT, uid))
+    ]
     return {"book_ids": [b.get("id") for b in books], "books": books, "count": len(books)}
 
 
@@ -128,7 +146,9 @@ def _load_vault_entries_or_skip(mode: str) -> tuple[dict[str, dict], dict] | tup
         return load_obsidian_progress_entries(ROOT)
     except Exception as e:
         return None, {
-            "date": "", "mode": mode, "skipped": True,
+            "date": "",
+            "mode": mode,
+            "skipped": True,
             "reason": f"vault_read_failed: {e}",
             "source": {"vault_path": "", "scanned_files": 0, "parsed_books": 0},
         }
@@ -179,6 +199,7 @@ def _run_sync_obsidian(*, dry_run: bool = False) -> dict:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"sync failed: {e}") from e
+
     return {
         "ok": True,
         "dry_run": res.dry_run,
@@ -190,9 +211,12 @@ def _run_sync_obsidian(*, dry_run: bool = False) -> dict:
         "updated_books": res.updated_books,
         "updated_progress_entries": res.updated_progress_entries,
         "periods": res.periods,
-        "activity": build_activity_payload(daily_stats.list_daily()),
     }
 
+
+# ---------------------------------------------------------------------------
+# Base & Sync Routes
+# ---------------------------------------------------------------------------
 
 @app.get("/health")
 @app.get("/api/health")
@@ -205,7 +229,9 @@ def sync_obsidian_root(dry_run: bool = Query(default=False)) -> dict:
     return _run_sync_obsidian(dry_run=dry_run)
 
 
-# Catalog
+# ---------------------------------------------------------------------------
+# Catalog Routes
+# ---------------------------------------------------------------------------
 
 @router.get("/book/{book_id}")
 def get_book(book_id: str) -> dict:
@@ -237,7 +263,9 @@ def get_genre_books(genre: str = Query(..., min_length=1), limit: int = Query(de
     return {"genre": genre, "books": books, "count": len(books)}
 
 
-# My books
+# ---------------------------------------------------------------------------
+# My Books Routes
+# ---------------------------------------------------------------------------
 
 @router.get("/my-books")
 def get_my_books() -> dict:
@@ -276,7 +304,9 @@ def get_my_books() -> dict:
     return {"books": books, "count": len(books)}
 
 
-# Reading progress
+# ---------------------------------------------------------------------------
+# Reading Progress Routes
+# ---------------------------------------------------------------------------
 
 @router.get("/reading-progress")
 def get_reading_progress() -> dict:
@@ -315,7 +345,7 @@ def upsert_reading_progress(book_id: str, payload: ReadingProgressIn) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Finished books (legacy alias — same store, status hardcoded to "done")
+# Finished Books Routes (Legacy Alias)
 # ---------------------------------------------------------------------------
 
 @router.get("/finished-books/{book_id}")
@@ -347,7 +377,9 @@ def upsert_finished_book(book_id: str, payload: ReadingProgressIn) -> dict:
     return {"book_id": book_id, "entry": _book_entry(_books_map()[book_id], book_id)}
 
 
-# Want to read
+# ---------------------------------------------------------------------------
+# Want to Read Routes
+# ---------------------------------------------------------------------------
 
 @router.get("/want-to-read-books")
 def get_want_to_read_books() -> dict:
@@ -368,7 +400,9 @@ def remove_want_to_read_book(book_id: str) -> dict:
     return _hydrate_want_to_read()
 
 
-# Reading lists / collections
+# ---------------------------------------------------------------------------
+# Reading Lists / Collections Routes
+# ---------------------------------------------------------------------------
 
 @router.get("/reading-lists")
 def get_reading_lists() -> dict:
@@ -424,7 +458,9 @@ def remove_book_from_list(name: str, book_id: str) -> dict:
     return {"lists": _hydrate_lists(lists.list_all())}
 
 
-# Stats
+# ---------------------------------------------------------------------------
+# Reading Stats Routes
+# ---------------------------------------------------------------------------
 
 @router.get("/reading-stats")
 def get_reading_stats() -> dict:
@@ -439,7 +475,7 @@ def get_reading_stats() -> dict:
         for bid, row in _books_map().items()
         if isinstance(row, dict)
     }
-    return {"periods": compute_reading_stats(entries), "activity": build_activity_payload(daily_stats.list_daily())}
+    return {"periods": compute_reading_stats(entries)}
 
 
 @router.get("/stats")
@@ -505,14 +541,19 @@ def get_stats(
         "most_time_spent_days": _days_spent(longest) if longest else 0,
     }
 
-# Obsidian 
+
+# ---------------------------------------------------------------------------
+# Obsidian Router Endpoint
+# ---------------------------------------------------------------------------
 
 @router.post("/sync/obsidian")
 def sync_obsidian(dry_run: bool = Query(default=False)) -> dict:
     return _run_sync_obsidian(dry_run=dry_run)
 
 
-# Scraper
+# ---------------------------------------------------------------------------
+# Scraper Endpoint
+# ---------------------------------------------------------------------------
 
 @router.post("/scrape-book")
 def scrape_book(payload: ScrapeBookIn) -> dict:
@@ -544,5 +585,6 @@ def scrape_book(payload: ScrapeBookIn) -> dict:
             detail += f" Details: {' | '.join(warnings)}"
         raise HTTPException(status_code=404, detail=detail)
     return {"ok": True, "book": book}
+
 
 app.include_router(router)
