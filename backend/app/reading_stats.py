@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-import json
-import os
-from dataclasses import dataclass
 from datetime import date, timedelta
-from pathlib import Path
 
 
 def _to_int(value: object, default: int = 0) -> int:
@@ -20,139 +16,51 @@ def _to_int(value: object, default: int = 0) -> int:
 
 
 def _parse_date_str(value: object) -> str:
-    if value is None:
-        return ""
-    s = str(value).strip()
-    if not s:
-        return ""
     try:
+        s = str(value).strip()
         return date.fromisoformat(s).isoformat()
-    except ValueError:
+    except:
         return ""
 
 
 def compute_reading_stats(entries: dict[str, dict], today: date | None = None) -> dict:
     now = today or date.today()
+
     rows = []
     for row in entries.values():
-        finish = _parse_date_str((row or {}).get("finish_date"))
-        status = str((row or {}).get("status") or "").strip().lower()
+        finish = _parse_date(row.get("finish_date"))
+        status = str(row.get("status") or "").strip().lower()
         if status != "done" or not finish:
             continue
-        finish_d = date.fromisoformat(finish)
-        pages = _to_int((row or {}).get("total_pages"), default=_to_int((row or {}).get("current_page"), default=0))
-        rows.append({"finish_date": finish_d, "pages": pages})
+
+        pages = _to_int(row.get("total_pages"))
+        rows.append({"finish_date": finish_date, "pages": pages})
 
     def for_period(period: str) -> tuple[list[dict], int]:
         if period == "daily":
-            picked = [r for r in rows if r["finish_date"] == now]
-            return picked, 1
+            return [r for r in rows if r["finish_date"] == now], 1
+
         if period == "monthly":
             picked = [r for r in rows if r["finish_date"].year == now.year and r["finish_date"].month == now.month]
             return picked, now.day
+
         if period == "yearly":
             picked = [r for r in rows if r["finish_date"].year == now.year]
             return picked, now.timetuple().tm_yday
-        picked = list(rows)
-        if not picked:
-            return picked, 1
-        earliest = min(r["finish_date"] for r in picked)
-        return picked, max(1, (now - earliest).days + 1)
 
-    completion_days = sorted({r["finish_date"] for r in rows})
-    streak = 0
-    if completion_days:
-        day = completion_days[-1]
-        day_set = set(completion_days)
-        streak = 1
-        while (day - timedelta(days=1)) in day_set:
-            day = day - timedelta(days=1)
-            streak += 1
+        if not rows:
+            return [], 1
+            
+        earliest = min(r["finish_date"] for r in rows)
+        return rows, max(1, (now - earliest).days + 1)
 
     out = {}
     for period in ("daily", "monthly", "yearly", "all"):
         picked, days_passed = for_period(period)
-        unique_days = len({r["finish_date"] for r in picked})
         out[period] = {
             "totalBooksRead": len(picked),
             "totalPagesRead": sum(r["pages"] for r in picked),
-            "daysReadStreak": streak,
-            "daysRead": unique_days,
+            "daysRead": len({r["finish_date"] for r in picked}),
             "daysPassed": days_passed,
         }
     return out
-
-
-def _default_daily_payload(timezone: str) -> dict:
-    return {
-        "daily": {},
-    }
-
-
-class ReadingDailyStatsStore:
-    def __init__(self, root: Path, timezone: str | None = None) -> None:
-        tz = timezone or os.getenv("READING_SNAPSHOT_TIMEZONE", "America/Los_Angeles")
-        self.tz = tz
-        self.path = root / "user_data" / "reading_daily_stats.json"
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        if not self.path.exists():
-            self._write(_default_daily_payload(self.tz))
-
-    def _read(self) -> dict:
-        try:
-            with self.path.open("r", encoding="utf-8") as f:
-                payload = json.load(f) or {}
-            if not isinstance(payload, dict):
-                return _default_daily_payload(self.tz)
-            payload.setdefault("daily", {})
-            return payload
-        except Exception:
-            return _default_daily_payload(self.tz)
-
-    def _write(self, payload: dict) -> None:
-        with self.path.open("w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2)
-
-    def list_daily(self) -> dict[str, dict]:
-        payload = self._read()
-        raw = payload.get("daily", {})
-        if not isinstance(raw, dict):
-            return {}
-        out: dict[str, dict] = {}
-        for k, row in raw.items():
-            if not isinstance(row, dict):
-                continue
-            out[str(k)] = row
-        return out
-
-
-def build_activity_payload(daily_rows: dict[str, dict], today: date | None = None, lookback_days: int = 366) -> dict:
-    now = today or date.today()
-    start = now - timedelta(days=lookback_days - 1)
-    dates = [start + timedelta(days=i) for i in range(lookback_days)]
-
-    pages, completed, touched = [], [], []
-
-    for d in dates:
-        row = daily_rows.get(d.isoformat(), {}) if isinstance(daily_rows.get(d.isoformat()), dict) else {}
-        pages.append(_to_int(row.get("pages_read"), default=0))
-        completed.append(_to_int(row.get("books_completed"), default=0))
-        touched.append(_to_int(row.get("books_touched"), default=0))
-
-    days = [
-        {
-            "date": d.isoformat(),
-            "pagesRead": pages[i],
-            "booksCompleted": completed[i],
-            "booksTouched": touched[i]
-        }
-        for i, d in enumerate(dates)
-    ]
-
-    total_pages_year = sum(pages)
-    return {
-        "days": days,
-        "summary": {
-            "totalPagesYear": total_pages_year,
-        },
-    }
