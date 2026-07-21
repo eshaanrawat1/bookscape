@@ -26,9 +26,8 @@ from .obsidian import load_obsidian_progress_entries, run_obsidian_sync
 from .reading_lists import ReadingListStore
 from .reading_stats import ReadingDailyStatsStore, build_activity_payload, compute_reading_stats
 
-# ---------------------------------------------------------------------------
+
 # App setup
-# ---------------------------------------------------------------------------
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_API_VERSION = 2
@@ -46,16 +45,9 @@ repo = DataRepository(ROOT)
 lists = ReadingListStore(ROOT)
 daily_stats = ReadingDailyStatsStore(ROOT)
 
-# One-time migration into user_state.books on startup (idempotent)
 repo.migrate_user_state()
 
-# Single router — everything lives at /api/*
 router = APIRouter(prefix="/api")
-
-
-# ---------------------------------------------------------------------------
-# Pydantic models
-# ---------------------------------------------------------------------------
 
 class CreateListIn(BaseModel):
     name: str
@@ -77,10 +69,6 @@ class ReadingProgressIn(BaseModel):
 class ScrapeBookIn(BaseModel):
     url: str
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _books_map() -> dict[str, dict]:
     """Return user_state.books, always a plain dict."""
@@ -207,10 +195,6 @@ def _run_sync_obsidian(*, dry_run: bool = False) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Routes outside /api prefix (health + obsidian sync legacy path)
-# ---------------------------------------------------------------------------
-
 @app.get("/health")
 @app.get("/api/health")
 def health() -> dict:
@@ -222,9 +206,7 @@ def sync_obsidian_root(dry_run: bool = Query(default=False)) -> dict:
     return _run_sync_obsidian(dry_run=dry_run)
 
 
-# ---------------------------------------------------------------------------
 # Catalog
-# ---------------------------------------------------------------------------
 
 @router.get("/book/{book_id}")
 def get_book(book_id: str) -> dict:
@@ -256,9 +238,7 @@ def get_genre_books(genre: str = Query(..., min_length=1), limit: int = Query(de
     return {"genre": genre, "books": books, "count": len(books)}
 
 
-# ---------------------------------------------------------------------------
-# My books (active shelf)
-# ---------------------------------------------------------------------------
+# My books
 
 @router.get("/my-books")
 def get_my_books() -> dict:
@@ -297,9 +277,7 @@ def get_my_books() -> dict:
     return {"books": books, "count": len(books)}
 
 
-# ---------------------------------------------------------------------------
 # Reading progress
-# ---------------------------------------------------------------------------
 
 @router.get("/reading-progress")
 def get_reading_progress() -> dict:
@@ -370,9 +348,7 @@ def upsert_finished_book(book_id: str, payload: ReadingProgressIn) -> dict:
     return {"book_id": book_id, "entry": _book_entry(_books_map()[book_id], book_id)}
 
 
-# ---------------------------------------------------------------------------
 # Want to read
-# ---------------------------------------------------------------------------
 
 @router.get("/want-to-read-books")
 def get_want_to_read_books() -> dict:
@@ -393,9 +369,7 @@ def remove_want_to_read_book(book_id: str) -> dict:
     return _hydrate_want_to_read()
 
 
-# ---------------------------------------------------------------------------
 # Reading lists / collections
-# ---------------------------------------------------------------------------
 
 @router.get("/reading-lists")
 def get_reading_lists() -> dict:
@@ -451,9 +425,7 @@ def remove_book_from_list(name: str, book_id: str) -> dict:
     return {"lists": _hydrate_lists(lists.list_all())}
 
 
-# ---------------------------------------------------------------------------
 # Stats
-# ---------------------------------------------------------------------------
 
 @router.get("/reading-stats")
 def get_reading_stats() -> dict:
@@ -535,9 +507,7 @@ def get_stats(
     }
 
 
-# ---------------------------------------------------------------------------
 # Daily reading snapshots
-# ---------------------------------------------------------------------------
 
 @router.post("/reading-stats/snapshot/run")
 def run_reading_snapshot(force: bool = Query(default=False)) -> dict:
@@ -573,18 +543,14 @@ def run_nightly_finalize_snapshot(force: bool = Query(default=False)) -> dict:
     return {"ok": True, "snapshot": {**daily_stats.run_nightly_finalize(entries, force=force), "source": source}}
 
 
-# ---------------------------------------------------------------------------
-# Obsidian sync
-# ---------------------------------------------------------------------------
+# Obsidian 
 
 @router.post("/sync/obsidian")
 def sync_obsidian(dry_run: bool = Query(default=False)) -> dict:
     return _run_sync_obsidian(dry_run=dry_run)
 
 
-# ---------------------------------------------------------------------------
 # Scraper
-# ---------------------------------------------------------------------------
 
 @router.post("/scrape-book")
 def scrape_book(payload: ScrapeBookIn) -> dict:
