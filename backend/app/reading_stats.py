@@ -3,9 +3,8 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 
 def _to_int(value: object, default: int = 0) -> int:
@@ -86,15 +85,7 @@ def compute_reading_stats(entries: dict[str, dict], today: date | None = None) -
 
 def _default_daily_payload(timezone: str) -> dict:
     return {
-        "snapshot": {},
-        "reserve": {},
         "daily": {},
-        "meta": {
-            "version": 1,
-            "timezone": timezone,
-            "last_run_at": "",
-            "last_processed_date": "",
-        },
     }
 
 
@@ -113,14 +104,7 @@ class ReadingDailyStatsStore:
                 payload = json.load(f) or {}
             if not isinstance(payload, dict):
                 return _default_daily_payload(self.tz)
-            payload.setdefault("snapshot", {})
-            payload.setdefault("reserve", {})
             payload.setdefault("daily", {})
-            payload.setdefault("meta", {})
-            payload["meta"].setdefault("timezone", self.tz)
-            payload["meta"].setdefault("version", 1)
-            payload["meta"].setdefault("last_run_at", "")
-            payload["meta"].setdefault("last_processed_date", "")
             return payload
         except Exception:
             return _default_daily_payload(self.tz)
