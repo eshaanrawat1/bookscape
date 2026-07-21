@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import difflib
-import hashlib
 import json
 import re
 import unicodedata
@@ -14,22 +13,15 @@ from pathlib import Path
 class CatalogIndex:
     books: list[dict]
     by_uid: dict[str, dict]
-    by_title_author: dict[tuple[str, str], dict]
-    by_title: dict[str, list[dict]]
 
 
-def _normalize_text(value: object) -> str:
-    return " ".join(str(value or "").strip().lower().split())
-
-
-def _normalize_author_text(value: object) -> str:
+def _normalize_author(value: object) -> str:
     text = str(value or "").strip()
     if not text:
         return ""
     text = unicodedata.normalize("NFKD", text)
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
-    text = re.sub(r"[\[\]\(\)]", " ", text)
-    text = re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
+    text = re.sub(r"[^\w\s]", " ", text)
     return " ".join(text.lower().split())
 
 
@@ -38,53 +30,47 @@ def _split_author_field(value: object) -> list[str]:
     if not raw:
         return []
     parts = re.split(r"\s+(?:&|and|with|x)\s+|[;/]", raw, flags=re.IGNORECASE)
-    cleaned = [part.strip() for part in parts if str(part or "").strip()]
-    return cleaned or [raw]
+    return [p.strip() for p in parts if p.strip()] or [raw]
 
 
 def _catalog_path(root: Path) -> Path:
     return root / "data" / "books.json"
 
 
-def _snapshot_path(root: Path, name: str) -> Path:
-    return root / "user_data" / name
-
-
-def _load_json_dict(path: Path) -> dict:
+def _load_json(path: Path) -> dict | list:
     if not path.exists():
         return {}
     try:
         with path.open("r", encoding="utf-8") as f:
-            payload = json.load(f)
-        return payload if isinstance(payload, dict) else {}
+            data = json.load(f)
+        return data if isinstance(data, (dict, list)) else {}
     except Exception:
         return {}
+
+
+@lru_cache(maxsize=16)
+def _load_snapshot_books_cached(path_str: str, mtime: float) -> dict[str, dict]:
+    payload = _load_json(Path(path_str))
+    if not isinstance(payload, dict):
+        return {}
+    raw_books = payload.get("books", {})
+    if not isinstance(raw_books, dict):
+        return {}
+    return {str(k): v for k, v in raw_books.items() if isinstance(v, dict)}
 
 
 def _load_snapshot_books(root: Path) -> dict[str, dict]:
     books: dict[str, dict] = {}
     for name in ("all_books.json", "obsidian_books.json"):
-        payload = _load_json_dict(_snapshot_path(root, name))
-        snapshot_books = payload.get("books", {})
-        if not isinstance(snapshot_books, dict):
-            continue
-        for book_id, row in snapshot_books.items():
-            if isinstance(row, dict):
-                books[str(book_id)] = row
+        path = root / "user_data" / name
+        mtime = path.stat().st_mtime if path.exists() else 0.0
+        books.update(_load_snapshot_books_cached(str(path), mtime))
     return books
 
 
 @lru_cache(maxsize=8)
 def _load_catalog_index(path_str: str, mtime: float) -> CatalogIndex:
-    path = Path(path_str)
-    if not path.exists():
-        return CatalogIndex([], {}, {}, {})
-
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            payload = json.load(f)
-    except Exception:
-        return CatalogIndex([], {}, {}, {})
+    payload = _load_json(Path(path_str))
 
     if isinstance(payload, dict):
         rows = list(payload.values())
@@ -94,31 +80,18 @@ def _load_catalog_index(path_str: str, mtime: float) -> CatalogIndex:
         rows = []
 
     books = [row for row in rows if isinstance(row, dict)]
-    by_uid: dict[str, dict] = {}
-    by_title_author: dict[tuple[str, str], dict] = {}
-    by_title: dict[str, list[dict]] = {}
+    by_uid = {
+        str(row["uid"]).strip(): row
+        for row in books
+        if str(row.get("uid") or "").strip()
+    }
 
-    for row in books:
-        uid = str(row.get("uid") or "").strip()
-        if not uid:
-            continue
-        by_uid[uid] = row
-        title_key = _normalize_text(row.get("title"))
-        author_key = _normalize_text(row.get("author"))
-        if title_key and author_key:
-            by_title_author[(title_key, author_key)] = row
-        if title_key:
-            by_title.setdefault(title_key, []).append(row)
-
-    return CatalogIndex(books, by_uid, by_title_author, by_title)
+    return CatalogIndex(books=books, by_uid=by_uid)
 
 
 def load_catalog_index(root: Path) -> CatalogIndex:
     path = _catalog_path(root)
-    try:
-        mtime = float(path.stat().st_mtime)
-    except Exception:
-        mtime = 0.0
+    mtime = path.stat().st_mtime if path.exists() else 0.0
     return _load_catalog_index(str(path), mtime)
 
 
@@ -131,18 +104,21 @@ def resolve_book(root: Path, book_id: str) -> dict | None:
     book_id = str(book_id or "").strip()
     if not book_id:
         return None
-    
+
     index = load_catalog_index(root)
     direct = index.by_uid.get(book_id)
     if direct:
         return dict(direct)
-    
-    snapshots = _load_snapshot_books(root)
-    snapshot = snapshots.get(book_id)
+
+    snapshot = _load_snapshot_books(root).get(book_id)
     if isinstance(snapshot, dict):
         return dict(snapshot)
-    
+
     return None
+
+
+# Alias for backward compatibility - remove later
+get_book = resolve_book
 
 
 def get_book_with_similar(root: Path, book_id: str) -> dict | None:
@@ -151,11 +127,12 @@ def get_book_with_similar(root: Path, book_id: str) -> dict | None:
         return None
 
     index = load_catalog_index(root)
-    similar_books = []
-    for sid in book.get("similar_book_ids", []) or []:
-        similar = index.by_uid.get(str(sid))
-        if similar:
-            similar_books.append(similar)
+    similar_ids = book.get("similar_book_ids") or []
+    similar_books = [
+        index.by_uid[str(sid)]
+        for sid in similar_ids
+        if str(sid) in index.by_uid
+    ]
 
     result = dict(book)
     result["similar_books"] = similar_books
@@ -163,43 +140,51 @@ def get_book_with_similar(root: Path, book_id: str) -> dict | None:
 
 
 def search_books(root: Path, query: str, limit: int = 10) -> list[dict]:
-    index = load_catalog_index(root)
     q = str(query or "").lower().strip()
     if not q:
         return []
 
+    index = load_catalog_index(root)
     scored = []
+
     for point in index.books:
-        title_lower = str(point.get("title", "")).lower().strip()
+        title = str(point.get("title", "")).strip()
+        title_lower = title.lower()
         if not title_lower:
             continue
+
         genres = point.get("genres", [])
         genres_text = " ".join(str(g) for g in genres) if isinstance(genres, list) else str(genres or "")
         text_lower = f"{title_lower} {point.get('author', '')} {point.get('genre', '')} {genres_text} {point.get('description', '')}".lower()
-        lex_score = 0
+
         if title_lower.startswith(q):
             lex_score = 5
         elif q in title_lower:
             lex_score = 4
         elif q in text_lower:
             lex_score = 2
+        else:
+            lex_score = 0
+
         sim = difflib.SequenceMatcher(None, q, title_lower[: max(len(q), 24)]).ratio()
         fuzzy_score = 2 if sim >= 0.78 else 1 if sim >= 0.66 else 0
-        scored.append((lex_score + fuzzy_score, sim, point))
+        total_score = lex_score + fuzzy_score
+
+        if total_score > 0:
+            scored.append((total_score, sim, point))
 
     scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
+
     out = []
     seen = set()
-    for score, _, point in scored:
-        if score <= 0:
-            continue
+    for _, _, point in scored:
         key = point.get("uid") or f"{point.get('title', '')}::{point.get('author', '')}"
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(point)
-        if len(out) >= limit:
-            break
+        if key not in seen:
+            seen.add(key)
+            out.append(point)
+            if len(out) >= limit:
+                break
+
     return out
 
 
@@ -208,87 +193,92 @@ def get_global_library(root: Path) -> list[dict]:
     all_books = index.books
     if not all_books:
         return []
-        
+
     top_genres = ["Romantasy", "Romance", "Fantasy", "Dark Academia", "Contemporary", "Fiction", "High Fantasy", "Mystery"]
+    top_genres_set = set(top_genres)
+
+    # Single-pass grouping by genre
+    by_genre: dict[str, list[dict]] = {g: [] for g in top_genres}
+    for book in all_books:
+        genres = book.get("genres") or []
+        for g in genres:
+            if g in top_genres_set:
+                by_genre[g].append(book)
 
     library = []
     for genre in top_genres:
-        genre_books = [book for book in all_books if genre in (book.get("genres", []) or [])]
+        genre_books = by_genre[genre]
         genre_books.sort(key=lambda x: int(x.get("rating_count", 0) or 0), reverse=True)
-        mapped = []
-        for book in genre_books[:30]:
-            mapped.append({
-                "id": book.get("uid", ""),
-                "title": book.get("title", "Untitled"),
-                "author": book.get("author", ""),
-                "cover": book.get("image_url", ""),
-                "color": book.get("color", ""),
+        mapped = [
+            {
+                "id": b.get("uid", ""),
+                "title": b.get("title", "Untitled"),
+                "author": b.get("author", ""),
+                "cover": b.get("image_url", ""),
+                "color": b.get("color", ""),
                 "tint": "220 30% 45%",
                 "genre": genre,
-                "genres": book.get("genres", []),
-                "avg_rating": book.get("avg_rating", 0),
-                "rating_count": book.get("rating_count", 0),
-                "review_count": book.get("review_count", 0),
-                "book_rating": book.get("avg_rating", 0),
-                "description": book.get("description", ""),
-                "total_pages": book.get("page_count", 0),
+                "genres": b.get("genres", []),
+                "avg_rating": b.get("avg_rating", 0),
+                "rating_count": b.get("rating_count", 0),
+                "review_count": b.get("review_count", 0),
+                "book_rating": b.get("avg_rating", 0),
+                "description": b.get("description", ""),
+                "total_pages": b.get("page_count", 0),
                 "status": "not_started",
-            })
+            }
+            for b in genre_books[:30]
+        ]
         library.append({"genre": genre, "books": mapped})
+
     return library
 
 
 def get_books_by_author(root: Path, author: str) -> list[dict]:
-    index = load_catalog_index(root)
-    query = _normalize_author_text(author)
+    query = _normalize_author(author)
     if not query:
         return []
 
+    index = load_catalog_index(root)
     matched = []
     seen: set[str] = set()
+
     for book in index.books:
         author_field = book.get("author", "")
-        author_candidates = [_normalize_author_text(author_field)]
-        author_candidates.extend(_normalize_author_text(part) for part in _split_author_field(author_field))
-        if any(
-            candidate and (
-                candidate == query
-                or candidate in query
-                or query in candidate
-            )
-            for candidate in author_candidates
-        ):
+        candidates = [_normalize_author(author_field)] + [
+            _normalize_author(part) for part in _split_author_field(author_field)
+        ]
+        if any(c and (c == query or c in query or query in c) for c in candidates):
             book_uid = str(book.get("uid") or "").strip()
-            if not book_uid or book_uid in seen:
-                continue
-            seen.add(book_uid)
-            matched.append(book)
+            if book_uid and book_uid not in seen:
+                seen.add(book_uid)
+                matched.append(book)
 
     matched.sort(key=lambda item: (str(item.get("title") or "").lower(), str(item.get("uid") or "")))
     return matched
 
 
 def get_books_by_genre(root: Path, genre: str, limit: int = 100) -> list[dict]:
-    index = load_catalog_index(root)
     query = str(genre or "").strip()
     if not query:
         return []
 
+    index = load_catalog_index(root)
     matched = []
     seen: set[str] = set()
+
     for book in index.books:
         book_genres = book.get("genres", [])
         if not isinstance(book_genres, list):
             book_genres = [book_genres]
-        
+
         if any(str(g or "").strip() == query for g in book_genres):
             book_uid = str(book.get("uid") or "").strip()
-            if not book_uid or book_uid in seen:
-                continue
-            seen.add(book_uid)
-            matched.append(book)
-            if len(matched) >= limit:
-                break
+            if book_uid and book_uid not in seen:
+                seen.add(book_uid)
+                matched.append(book)
+                if len(matched) >= limit:
+                    break
 
     matched.sort(key=lambda item: int(item.get("rating_count", 0) or 0), reverse=True)
     return matched
