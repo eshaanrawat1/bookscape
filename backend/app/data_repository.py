@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from pathlib import Path
+
+from .utils import read_json, write_json
 
 
 def _utc_now() -> str:
@@ -33,21 +34,11 @@ class DataRepository:
         }
 
     def _read_json(self, path: Path, default: dict) -> dict:
-        if not path.exists():
-            return default
-        try:
-            with path.open("r", encoding="utf-8") as f:
-                payload = json.load(f)
-            if not isinstance(payload, dict):
-                return default
-            return payload
-        except Exception:
-            return default
+        payload = read_json(path, default)
+        return payload if isinstance(payload, dict) else default
 
     def _write_json(self, path: Path, payload: dict) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2)
+        write_json(path, payload)
 
     def load_user_state(self) -> dict:
         if not self.user_state_path.exists():
@@ -150,15 +141,11 @@ class DataRepository:
         finished_books: dict[str, dict] = {}
         finished_books_path = self.user_dir / "finished_books.json"
         if finished_books_path.exists():
-            try:
-                with finished_books_path.open("r", encoding="utf-8") as f:
-                    finished_payload = json.load(f)
-                if isinstance(finished_payload, dict):
-                    raw = finished_payload.get("books", {})
-                    if isinstance(raw, dict):
-                        finished_books = {str(k): v for k, v in raw.items() if isinstance(v, dict)}
-            except Exception:
-                pass
+            finished_payload = read_json(finished_books_path, {})
+            if isinstance(finished_payload, dict):
+                raw = finished_payload.get("books", {})
+                if isinstance(raw, dict):
+                    finished_books = {str(k): v for k, v in raw.items() if isinstance(v, dict)}
 
         # --- Source 3: obsidian snapshot (display metadata) ---
         obsidian_books: dict[str, dict] = {}

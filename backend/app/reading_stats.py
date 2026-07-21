@@ -2,22 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-
-def _to_int(value: object) -> int:
-    if value is None:
-        return default
-
-    raw = str(value).strip().replace(",", "")
-    digits = "".join(ch for ch in raw if ch.isdigit())
-    return max(0, int(digits)) if digits else 0
-
-
-def _parse_date(value: object) -> date | None:
-    try:
-        s = str(value).strip()
-        return date.fromisoformat(s) if s else None
-    except Exception:
-        return None
+from .utils import parse_iso_date, to_int
 
 
 def compute_reading_stats(entries: dict[str, dict], today: date | None = None) -> dict:
@@ -25,12 +10,12 @@ def compute_reading_stats(entries: dict[str, dict], today: date | None = None) -
 
     rows = []
     for row in entries.values():
-        finish = _parse_date(row.get("finish_date"))
+        finish = parse_iso_date(row.get("finish_date"))
         status = str(row.get("status") or "").strip().lower()
         if status != "done" or not finish:
             continue
 
-        pages = _to_int(row.get("total_pages"))
+        pages = to_int(row.get("total_pages"))
         rows.append({"finish_date": finish, "pages": pages})
 
     def for_period(period: str) -> tuple[list[dict], int]:

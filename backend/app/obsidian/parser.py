@@ -6,25 +6,23 @@ from datetime import date, datetime
 from pathlib import Path
 import yaml
 
+from ..utils import normalize_text, parse_iso_date_string
+
 
 def _normalize_name(value: object) -> str:
-    """Strip Obsidian wiki-link brackets and normalize unicode."""
+    """Strip Obsidian wiki-link brackets and normalize unicode (preserve casing)."""
     text = str(value or "").strip()
     text = re.sub(r"\[\[|\]\]", "", text).strip()
+    # Normalize unicode but preserve original casing
     text = unicodedata.normalize("NFKD", text)
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
-    text = re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
+    text = re.sub(r"[^\w\s]", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
 
-def _parse_date(value: object) -> str:
-    s = str(value or "").strip()
-    if not s:
-        return ""
-    try:
-        return date.fromisoformat(s).isoformat()
-    except ValueError:
-        return ""
+def _normalize_genre(value: object) -> str:
+    """Normalize genre name (preserve casing)."""
+    return _normalize_name(value)
 
 
 def _parse_frontmatter(md_text: str) -> dict:
@@ -63,7 +61,7 @@ def parse_book(path: Path) -> dict | None:
 
     genres_raw = fm.get("genres") or ""
     genres = (
-        [_normalize_name(g) for g in genres_raw if _normalize_name(g)]
+        [_normalize_genre(g) for g in genres_raw if _normalize_genre(g)]
         if isinstance(genres_raw, list)
         else [g.strip() for g in str(genres_raw).split(",") if g.strip()]
     )
@@ -75,8 +73,8 @@ def parse_book(path: Path) -> dict | None:
         "status":           str(fm.get("status") or "not_started"),
         "total_pages":      int(fm.get("total_pages") or 0),
         "current_page":     int(fm.get("current_page") or 0),
-        "start_date":       _parse_date(fm.get("start_date")),
-        "finish_date":      _parse_date(fm.get("completed_date")),
+        "start_date":       parse_iso_date_string(fm.get("start_date")),
+        "finish_date":      parse_iso_date_string(fm.get("completed_date")),
         "image_url":        str(fm.get("image") or "").strip(),
         "rating":           float(fm.get("rating_value") or 0),
         "rating_count":     int(fm.get("rating_count") or 0),

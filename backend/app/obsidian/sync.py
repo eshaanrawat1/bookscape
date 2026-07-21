@@ -71,7 +71,7 @@ def load_obsidian_progress_entries(root: Path) -> tuple[dict[str, dict], dict]:
     return entries, {"vault_path": str(vault_path), "scanned_files": 0, "parsed_books": len(entries)}
 
 
-def run_obsidian_sync(root: Path, *, dry_run: bool = True) -> SyncResult:
+def run_obsidian_sync(root: Path, *, dry_run: bool = False) -> SyncResult:
     vault_path = _resolve_vault_path(root)
     if not vault_path.exists():
         raise FileNotFoundError(f"Obsidian vault not found at: {vault_path}")

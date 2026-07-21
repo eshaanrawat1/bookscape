@@ -25,6 +25,7 @@ from .data_repository import DataRepository
 from .obsidian import load_obsidian_progress_entries, run_obsidian_sync
 from .reading_lists import ReadingListStore
 from .reading_stats import compute_reading_stats
+from .utils import parse_iso_date, to_int
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -154,12 +155,6 @@ def _load_vault_entries_or_skip(mode: str) -> tuple[dict[str, dict], dict] | tup
         }
 
 
-def _parse_iso_date(value: object) -> date | None:
-    raw = str(value or "").strip()
-    try:
-        return date.fromisoformat(raw[:10]) if raw else None
-    except Exception:
-        return None
 
 
 def _stats_book_payload(book_id: str, row: dict) -> dict:
@@ -488,7 +483,7 @@ def get_stats(
     available_years = {
         fd.year
         for row in books.values()
-        if isinstance(row, dict) and (fd := _parse_iso_date(row.get("finish_date")))
+        if isinstance(row, dict) and (fd := parse_iso_date(row.get("finish_date")))
     }
 
     selected = {
@@ -496,7 +491,7 @@ def get_stats(
         for bid, row in books.items()
         if isinstance(row, dict)
         and str(row.get("status") or "").strip().lower() == "done"
-        and (fd := _parse_iso_date(row.get("finish_date")))
+        and (fd := parse_iso_date(row.get("finish_date")))
         and (year is None or fd.year == year)
         and (month is None or fd.month == month)
     }
@@ -504,7 +499,7 @@ def get_stats(
     books_list: list[dict] = []
     genres: set[str] = set()
     for book_id, row in selected.items():
-        fd = _parse_iso_date(row.get("finish_date"))
+        fd = parse_iso_date(row.get("finish_date"))
         book = _stats_book_payload(book_id, row)
         books_list.append({**book, "finishDateObj": fd.isoformat() if fd else ""})
         genres.update(book.get("genres", []))
@@ -512,7 +507,7 @@ def get_stats(
     books_list.sort(key=lambda b: (str(b.get("finishDate") or ""), str(b.get("title") or "")), reverse=True)
 
     def _days_spent(b: dict) -> int:
-        s, f = _parse_iso_date(b.get("startDate")), _parse_iso_date(b.get("finishDate"))
+        s, f = parse_iso_date(b.get("startDate")), parse_iso_date(b.get("finishDate"))
         return max(1, (f - s).days + 1) if s and f and f >= s else 0
 
     densest = max(books_list, key=lambda b: int(b.get("totalPages") or 0), default=None)

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import difflib
-import json
-import re
-import unicodedata
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+
+from .utils import (
+    normalize_author,
+    read_json,
+    split_author_field,
+)
 
 
 @dataclass(frozen=True)
@@ -15,42 +18,13 @@ class CatalogIndex:
     by_uid: dict[str, dict]
 
 
-def _normalize_author(value: object) -> str:
-    text = str(value or "").strip()
-    if not text:
-        return ""
-    text = unicodedata.normalize("NFKD", text)
-    text = "".join(ch for ch in text if not unicodedata.combining(ch))
-    text = re.sub(r"[^\w\s]", " ", text)
-    return " ".join(text.lower().split())
-
-
-def _split_author_field(value: object) -> list[str]:
-    raw = str(value or "").strip()
-    if not raw:
-        return []
-    parts = re.split(r"\s+(?:&|and|with|x)\s+|[;/]", raw, flags=re.IGNORECASE)
-    return [p.strip() for p in parts if p.strip()] or [raw]
-
-
 def _catalog_path(root: Path) -> Path:
     return root / "data" / "books.json"
 
 
-def _load_json(path: Path) -> dict | list:
-    if not path.exists():
-        return {}
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, (dict, list)) else {}
-    except Exception:
-        return {}
-
-
 @lru_cache(maxsize=16)
 def _load_snapshot_books_cached(path_str: str, mtime: float) -> dict[str, dict]:
-    payload = _load_json(Path(path_str))
+    payload = read_json(Path(path_str), {})
     if not isinstance(payload, dict):
         return {}
     raw_books = payload.get("books", {})
@@ -70,7 +44,7 @@ def _load_snapshot_books(root: Path) -> dict[str, dict]:
 
 @lru_cache(maxsize=8)
 def _load_catalog_index(path_str: str, mtime: float) -> CatalogIndex:
-    payload = _load_json(Path(path_str))
+    payload = read_json(Path(path_str), {})
 
     if isinstance(payload, dict):
         rows = list(payload.values())
