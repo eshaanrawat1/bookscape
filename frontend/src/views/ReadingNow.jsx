@@ -1,0 +1,95 @@
+import { useState } from 'react'
+import { Clock3, ChevronLeft, ChevronRight } from 'lucide-react'
+import { toNumberOrZero } from '../utils.js'
+import { buildHeroGlow } from '../color.js'
+import BookCover from '../components/BookCover.jsx'
+import Progress from '../components/Progress.jsx'
+import Shelf from '../components/Shelf.jsx'
+
+function ReadingNowHero({ books, onOpen }) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+
+  if (!books || books.length === 0) return null
+
+  // In case the list shrinks
+  const safeIndex = currentIndex >= books.length ? 0 : currentIndex
+  const book = books[safeIndex]
+
+  const nextBook = () => setCurrentIndex((i) => (i + 1) % books.length)
+  const prevBook = () => setCurrentIndex((i) => (i - 1 + books.length) % books.length)
+
+  const pagesLeft = Math.round((toNumberOrZero(book.pages) * (100 - toNumberOrZero(book.progress))) / 100)
+  const heroGlowColor = buildHeroGlow(book.color || `hsl(${book.tint})`)
+
+  return (
+    <section className="heroCard paperGrain">
+      <div className="heroGlow" style={{ '--hero-glow': heroGlowColor }} />
+      <div className="heroInner">
+        <button className="heroCover" onClick={() => onOpen(book)}>
+          <BookCover book={book} glow />
+        </button>
+        <div className="heroCopy">
+          <div className="heroHeader">
+            <span className="pill">
+              <Clock3 />
+              Continue reading
+            </span>
+            {books.length > 1 && (
+              <div className="carouselControls">
+                <button className="carouselButton" onClick={prevBook} aria-label="Previous book">
+                  <ChevronLeft />
+                </button>
+                <button className="carouselButton" onClick={nextBook} aria-label="Next book">
+                  <ChevronRight />
+                </button>
+              </div>
+            )}
+          </div>
+          <h2>{book.title}</h2>
+          <p className="bookMeta">
+            {book.author} · {book.genre}
+          </p>
+          <p className="heroBlurb">{book.blurb}</p>
+          <div className="progressBlock">
+            <div>
+              <span>{book.progress}%</span>
+              <span>{pagesLeft} pages left</span>
+            </div>
+            <Progress value={book.progress} />
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function ReadingNow({
+  currentlyReading,
+  wantToRead,
+  collections,
+  booksByIds,
+  onOpen,
+  onOpenAuthor,
+  onOpenReadingNow,
+}) {
+  return (
+    <div className="stack">
+      {currentlyReading.length > 0 && <ReadingNowHero books={currentlyReading} onOpen={onOpenReadingNow} />}
+      <Shelf title="Up next" subtitle="Saved for the right moment." books={wantToRead.slice(0, 6)} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
+      {collections
+        .filter((collection) => (collection.books?.length || collection.bookIds?.length || 0) > 0)
+        .map((collection) => (
+          <Shelf
+            key={collection.id}
+            title={collection.name}
+            subtitle="Collection"
+            books={collection.books?.length ? collection.books : booksByIds(collection.bookIds)}
+            onOpen={onOpen}
+            onOpenAuthor={onOpenAuthor}
+          />
+        ))}
+    </div>
+  )
+}
+
+export default ReadingNow
