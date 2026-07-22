@@ -1,7 +1,6 @@
 /archive
 /artifacts
 /data
-/user_data
 
 .venv/
 __pycache__/

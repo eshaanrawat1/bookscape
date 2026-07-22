@@ -28,7 +28,6 @@ async function apiFetch(path, options) {
 
 async function postJsonWithFallback(path) {
   const targets = [
-    `${ROOT_BASE}${path}`,
     `${BASE}${path}`,
   ]
 

@@ -20,6 +20,7 @@
   --sidebar-foreground: oklch(0.3 0.025 52);
   --sidebar-accent: oklch(0.88 0.03 70);
   --sidebar-border: oklch(0.86 0.022 72);
+  --ember-soft: oklch(0.72 0.12 62);
   --shadow-warm: 0 14px 30px -12px rgba(60, 40, 20, 0.55);
   --shadow-panel: 0 18px 40px -20px rgba(60, 40, 20, 0.5);
   --radius: 0.875rem;
@@ -219,9 +220,8 @@ svg {
 }
 
 .navButton.active {
-  background: var(--primary);
-  color: var(--primary-foreground);
-  box-shadow: 0 8px 18px rgba(125, 74, 26, 0.18);
+  background: var(--sidebar-accent);
+  color: var(--sidebar-foreground);
 }
 
 .collectionButton {
@@ -239,8 +239,8 @@ svg {
   width: 1.2rem;
   height: 1.2rem;
   border-radius: 999px;
-  background: oklch(0.68 0.14 60);
-  box-shadow: 0 0 0 3px var(--card);
+  background: var(--ember-soft);
+  box-shadow: 0 0 0 3px var(--card), 0 0 12px 2px oklch(0.72 0.12 62 / 0.4);
 }
 
 .collectionNameButton {
