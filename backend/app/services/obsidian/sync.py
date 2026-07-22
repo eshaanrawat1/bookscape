@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from ..data_repository import DataRepository
-from ..reading_stats import compute_reading_stats
+from ...repository import DataRepository
+from ...reading import compute_reading_stats
 from .parser import parse_book
 
 DEFAULT_OBSIDIAN_VAULT = Path("~/Obsidian/Books")

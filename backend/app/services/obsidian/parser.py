@@ -6,7 +6,7 @@ from datetime import date, datetime
 from pathlib import Path
 import yaml
 
-from ..utils import normalize_text, parse_iso_date_string
+from ...utils import normalize_text, parse_iso_date_string
 
 
 def _normalize_name(value: object) -> str:

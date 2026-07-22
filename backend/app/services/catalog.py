@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from .utils import normalize_author, read_json, split_author_field
+from ..utils import normalize_author, read_json, split_author_field
 
 
 @dataclass(frozen=True)
