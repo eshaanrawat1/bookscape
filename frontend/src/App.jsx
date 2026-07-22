@@ -388,6 +388,8 @@ export default function App() {
           collections={collections}
           onCreateCollection={createCollection}
           onRenameCollection={renameCollection}
+          onSync={syncFromObsidian}
+          onAddBook={() => setShowScraperDialog(true)}
           onSelect={(nextView) => {
             setView(nextView)
             setMobileNav(false)
@@ -402,6 +404,8 @@ export default function App() {
                 collections={collections}
                 onCreateCollection={createCollection}
                 onRenameCollection={renameCollection}
+                onSync={syncFromObsidian}
+                onAddBook={() => setShowScraperDialog(true)}
                 onSelect={(nextView) => {
                   setView(nextView)
                   setMobileNav(false)
