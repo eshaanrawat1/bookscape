@@ -334,15 +334,15 @@ function genreNameFromView(view) {
 }
 
 const mainNav = [
-  { id: 'library', label: 'Library', icon: LibraryIcon },
-  { id: 'search', label: 'Search', icon: SearchIcon },
-  { id: 'stats', label: 'Statistics', icon: BarChartIcon },
+  { id: 'library', label: 'Library', icon: Library },
+  { id: 'search', label: 'Search', icon: Search },
+  { id: 'stats', label: 'Statistics', icon: BarChart3 },
 ]
 
 const shelfNav = [
-  { id: 'reading-now', label: 'Reading Now', icon: BookOpenIcon },
-  { id: 'want-to-read', label: 'Want to Read', icon: BookmarkIcon },
-  { id: 'finished', label: 'Finished', icon: CheckIcon },
+  { id: 'reading-now', label: 'Reading Now', icon: BookOpen },
+  { id: 'want-to-read', label: 'Want to Read', icon: Bookmark },
+  { id: 'finished', label: 'Finished', icon: CheckCircle2 },
 ]
 
 const monthOptions = [
@@ -745,7 +745,7 @@ export default function App() {
           <header className="topBar">
             <div className="titleGroup">
               <button className="mobileMenuButton" onClick={() => setMobileNav(true)} aria-label="Open menu">
-                <MenuIcon />
+                <Menu />
               </button>
               <div>
                 <h1>{meta.title || meta.name}</h1>
@@ -762,7 +762,7 @@ export default function App() {
                   aria-label="Sync from Obsidian"
                   title="Sync from Obsidian"
                 >
-                  <SyncIcon spinning={syncing} />
+                  <RefreshCcw className={syncing ? 'syncIcon spinning' : 'syncIcon'} />
                   <span>{syncing ? 'Syncing' : 'Sync'}</span>
                 </button>
               )}
@@ -774,7 +774,7 @@ export default function App() {
                   aria-label="Add Book by URL"
                   title="Add Book by URL"
                 >
-                  <PlusIcon />
+                  <Plus />
                   <span>Add Book</span>
                 </button>
               )}
@@ -786,7 +786,7 @@ export default function App() {
                   title={`Delete ${activeCollection.name}`}
                   onClick={() => deleteCollection(activeCollection)}
                   >
-                    <TrashIcon />
+                    <Trash2 />
                   </button>
               )}
             </div>
@@ -946,7 +946,7 @@ function Sidebar({ active, collections, onSelect, onCreateCollection, onRenameCo
     <aside className="sidebar paperGrain">
       <div className="brand">
         <div className="brandMark">
-          <FlameIcon />
+          <Flame />
         </div>
         <div>
           <p className="brandName">Bookscape</p>
@@ -972,7 +972,7 @@ function Sidebar({ active, collections, onSelect, onCreateCollection, onRenameCo
         <div className="sectionHeader">
           <p className="sectionLabel">Collections</p>
           <button className="plusButton" aria-label="New collection" onClick={createCollection} disabled={saving}>
-            <PlusIcon />
+            <Plus />
           </button>
         </div>
         <div className="collectionList">
@@ -1255,16 +1255,16 @@ function ReadingNowHero({ books, onOpen }) {
         <div className="heroCopy">
           <div className="heroHeader">
             <span className="pill">
-              <ClockIcon />
+              <Clock3 />
               Continue reading
             </span>
             {books.length > 1 && (
               <div className="carouselControls">
                 <button className="carouselButton" onClick={prevBook} aria-label="Previous book">
-                  <ChevronLeftIcon />
+                  <ChevronLeft />
                 </button>
                 <button className="carouselButton" onClick={nextBook} aria-label="Next book">
-                  <ChevronRightIcon />
+                  <ChevronRight />
                 </button>
               </div>
             )}
@@ -1396,7 +1396,7 @@ function SearchHeader({ draft, onDraftChange, onSubmit, inputRef }) {
   return (
     <form className="pageSearchHeader" onSubmit={onSubmit}>
       <div className="pageSearchField">
-        <SearchIcon />
+        <Search />
         <input
           ref={inputRef}
           type="search"
@@ -1852,7 +1852,7 @@ function BookDialog({
         onClick={(event) => event.stopPropagation()}
       >
         <button className="dialogClose" onClick={onClose} aria-label="Close details">
-          <CloseIcon />
+          <X />
         </button>
         <div className="dialogTop">
           <div className="dialogCover">
@@ -1874,19 +1874,19 @@ function BookDialog({
             <div className="dialogStatsRow">
               {displayBook.rating > 0 && (
                 <span className="dialogStatItem">
-                  <StarMiniIcon />
+                  <Star />
                   <span>{displayBook.rating.toFixed(1)}{displayBook.ratingCount > 0 ? ` (${formatCompactNumber(displayBook.ratingCount)})` : ''}</span>
                 </span>
               )}
               {displayBook.reviewCount > 0 && (
                 <span className="dialogStatItem">
-                  <ReviewIcon />
+                  <MessageSquareText />
                   <span>{formatCompactNumber(displayBook.reviewCount)}</span>
                 </span>
               )}
               {displayBook.pages > 0 && (
                 <span className="dialogStatItem">
-                  <PagesIcon />
+                  <FileText />
                   <span>{formatCompactNumber(displayBook.pages)} pages</span>
                 </span>
               )}
@@ -1916,7 +1916,7 @@ function BookDialog({
                     title="Add to collections"
                     aria-expanded={collectionMenuOpen}
                   >
-                    <PlusIcon />
+                    <Plus />
                   </button>
                   {collectionMenuOpen && collections.length > 0 && (
                     <div className="collectionPicker" role="menu" aria-label="Add to collection">
@@ -1944,7 +1944,7 @@ function BookDialog({
                   aria-label={isSavedToWantToRead ? 'Remove from Want to read' : 'Save to Want to read'}
                   title={isSavedToWantToRead ? 'Remove from Want to read' : 'Save to Want to read'}
                 >
-                  <HeartIcon filled={isSavedToWantToRead} />
+                  <Heart fill={isSavedToWantToRead ? 'currentColor' : 'none'} />
                 </button>
               </div>
 
@@ -2128,7 +2128,7 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose, onOpenAut
     <div className="dialogScrim finishedScrim" onClick={onClose}>
       <article className="bookDialog finishedBookDialog paperGrain" onClick={(event) => event.stopPropagation()}>
         <button className="dialogClose" onClick={onClose} aria-label="Close details">
-          <CloseIcon />
+          <X />
         </button>
 
         <div className="finishedDialogTop">
@@ -2317,7 +2317,7 @@ function ScraperDialog({ onClose, onSuccess }) {
     <div className="dialogScrim" onClick={onClose}>
       <article className="bookDialog paperGrain scraperDialog" onClick={(e) => e.stopPropagation()}>
         <button className="dialogIconButton dialogClose" onClick={onClose} aria-label="Close dialog">
-          <CloseIcon />
+          <X />
         </button>
         
         <h2>Add Book to Library</h2>
@@ -2350,7 +2350,7 @@ function ScraperDialog({ onClose, onSuccess }) {
 
           {loading && (
             <div className="scraperStatus">
-              <SyncIcon spinning={true} />
+              <RefreshCcw className="syncIcon spinning" />
               <span className="scraperStatusText">
                 {statusMessage}
               </span>
@@ -2392,88 +2392,9 @@ function Progress({ value }) {
 function StarRating({ value }) {
   return (
     <span className="starRating">
-      <StarIcon />
+      <Star />
       {value.toFixed(1)}
     </span>
   )
 }
 
-function BookOpenIcon() {
-  return <BookOpen />
-}
-
-function LibraryIcon() {
-  return <Library />
-}
-
-function BookmarkIcon() {
-  return <Bookmark />
-}
-
-function CheckIcon() {
-  return <CheckCircle2 />
-}
-
-function FlameIcon() {
-  return <Flame />
-}
-
-function PlusIcon() {
-  return <Plus />
-}
-
-function SearchIcon() {
-  return <Search />
-}
-
-function MenuIcon() {
-  return <Menu />
-}
-
-function ClockIcon() {
-  return <Clock3 />
-}
-
-function StarIcon() {
-  return <Star />
-}
-
-function CloseIcon() {
-  return <X />
-}
-
-function SyncIcon({ spinning = false }) {
-  return <RefreshCcw className={spinning ? 'syncIcon spinning' : 'syncIcon'} />
-}
-
-function HeartIcon({ filled = false }) {
-  return filled ? <Heart fill="currentColor" /> : <Heart />
-}
-
-function StarMiniIcon() {
-  return <Star />
-}
-
-function PagesIcon() {
-  return <FileText />
-}
-
-function ReviewIcon() {
-  return <MessageSquareText />
-}
-
-function TrashIcon() {
-  return <Trash2 />
-}
-
-function ChevronLeftIcon() {
-  return <ChevronLeft />
-}
-
-function ChevronRightIcon() {
-  return <ChevronRight />
-}
-
-function BarChartIcon() {
-  return <BarChart3 />
-}
