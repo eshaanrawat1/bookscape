@@ -5,7 +5,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from ..repository import DataRepository
-from ..services.catalog import resolve_book as load_book
+from ..services.catalog import resolve_book
 
 
 class ReadingProgressIn(BaseModel):

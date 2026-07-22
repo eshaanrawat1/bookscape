@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ...repository import DataRepository
-from ...reading import compute_reading_stats
+from ..reading import compute_reading_stats
 from .parser import parse_book
 
 DEFAULT_OBSIDIAN_VAULT = Path("~/Obsidian/Books")
