@@ -57,23 +57,15 @@ def split_author_field(value: object) -> list[str]:
 # Date Parsing
 
 def parse_iso_date(value: object) -> date | None:
-    """Parse ISO date string (YYYY-MM-DD) to date object."""
     raw = str(value or "").strip()
     try:
         return date.fromisoformat(raw[:10]) if raw else None
     except Exception:
         return None
 
-
 def parse_iso_date_string(value: object) -> str:
-    """Parse ISO date string"""
-    raw = str(value or "").strip()
-    if not raw:
-        return ""
-    try:
-        return date.fromisoformat(raw).isoformat()
-    except Exception:
-        return ""
+    d = parse_iso_date(value)
+    return d.isoformat() if d else ""
 
 
 
