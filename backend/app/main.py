@@ -287,11 +287,6 @@ def get_my_books() -> dict:
 # Reading Progress Routes
 # ---------------------------------------------------------------------------
 
-@router.get("/reading-progress")
-def get_reading_progress() -> dict:
-    return {"entries": {bid: _book_entry(row, bid) for bid, row in _books_map().items() if isinstance(row, dict)}}
-
-
 @router.get("/reading-progress/{book_id}")
 def get_reading_progress_entry(book_id: str) -> dict:
     record = _books_map().get(book_id)
@@ -322,7 +317,7 @@ def upsert_reading_progress(book_id: str, payload: ReadingProgressIn) -> dict:
     )
     return {"book_id": book_id, "entry": _book_entry(_books_map()[book_id], book_id)}
 
-    
+
 # ---------------------------------------------------------------------------
 # Want to Read Routes
 # ---------------------------------------------------------------------------
