@@ -5,8 +5,6 @@ function GenreView({ genre, books, loading, error, onOpen, onOpenAuthor, onBack 
     <div className="stack">
       <div className="shelfHeader">
         <div>
-          <h2>{genre || 'Genre'}</h2>
-          <p>Top books in this genre</p>
         </div>
         <button type="button" className="secondaryButton" onClick={onBack}>
           Back to Library

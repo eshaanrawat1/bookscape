@@ -24,27 +24,21 @@ function ReadingNowHero({ books, onOpen }) {
   return (
     <section className="heroCard paperGrain">
       <div className="heroGlow" style={{ '--hero-glow': heroGlowColor }} />
+      {books.length > 1 && (
+        <div className="carouselControls">
+          <button className="carouselButton" onClick={prevBook} aria-label="Previous book">
+            <ChevronLeft />
+          </button>
+          <button className="carouselButton" onClick={nextBook} aria-label="Next book">
+            <ChevronRight />
+          </button>
+        </div>
+      )}
       <div className="heroInner">
         <button className="heroCover" onClick={() => onOpen(book)}>
           <BookCover book={book} glow />
         </button>
         <div className="heroCopy">
-          <div className="heroHeader">
-            <span className="pill">
-              <Clock3 />
-              Continue reading
-            </span>
-            {books.length > 1 && (
-              <div className="carouselControls">
-                <button className="carouselButton" onClick={prevBook} aria-label="Previous book">
-                  <ChevronLeft />
-                </button>
-                <button className="carouselButton" onClick={nextBook} aria-label="Next book">
-                  <ChevronRight />
-                </button>
-              </div>
-            )}
-          </div>
           <h2>{book.title}</h2>
           <p className="bookMeta">
             {book.author} · {book.genre}
