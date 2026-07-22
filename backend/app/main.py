@@ -140,20 +140,6 @@ def _set_book_field(book_id: str, **fields) -> None:
     repo.save_user_state(user_state)
 
 
-def _load_vault_entries_or_skip(mode: str) -> tuple[dict[str, dict], dict] | tuple[None, dict]:
-    try:
-        return load_obsidian_progress_entries(ROOT)
-    except Exception as e:
-        return None, {
-            "date": "",
-            "mode": mode,
-            "skipped": True,
-            "reason": f"vault_read_failed: {e}",
-            "source": {"vault_path": "", "scanned_files": 0, "parsed_books": 0},
-        }
-
-
-
 
 def _stats_book_payload(book_id: str, row: dict) -> dict:
     catalog = load_book(ROOT, book_id) or {}
@@ -336,40 +322,7 @@ def upsert_reading_progress(book_id: str, payload: ReadingProgressIn) -> dict:
     )
     return {"book_id": book_id, "entry": _book_entry(_books_map()[book_id], book_id)}
 
-
-# ---------------------------------------------------------------------------
-# Finished Books Routes (Legacy Alias)
-# ---------------------------------------------------------------------------
-
-@router.get("/finished-books/{book_id}")
-def get_finished_book(book_id: str) -> dict:
-    record = _books_map().get(book_id)
-    if not isinstance(record, dict):
-        if not resolve_book(ROOT, book_id):
-            raise HTTPException(status_code=404, detail="book not found")
-        return {"book_id": book_id, "entry": _empty_entry(book_id, status="done")}
-    if str(record.get("status") or "").strip().lower() != "done":
-        raise HTTPException(status_code=404, detail="book not found or not finished")
-    return {"book_id": book_id, "entry": _book_entry(record, book_id)}
-
-
-@router.put("/finished-books/{book_id}")
-def upsert_finished_book(book_id: str, payload: ReadingProgressIn) -> dict:
-    if not resolve_book(ROOT, book_id):
-        raise HTTPException(status_code=404, detail="book not found")
-    existing = _books_map().get(book_id) or {}
-    _set_book_field(
-        book_id,
-        status="done",
-        current_page=int(payload.current_page or existing.get("current_page") or 0),
-        total_pages=int(payload.total_pages or existing.get("total_pages") or 0),
-        start_date=(payload.start_date or existing.get("start_date") or "").strip(),
-        finish_date=(payload.finish_date or existing.get("finish_date") or "").strip(),
-        notes=payload.notes or existing.get("notes", ""),
-    )
-    return {"book_id": book_id, "entry": _book_entry(_books_map()[book_id], book_id)}
-
-
+    
 # ---------------------------------------------------------------------------
 # Want to Read Routes
 # ---------------------------------------------------------------------------
