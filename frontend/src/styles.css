@@ -341,6 +341,48 @@ svg {
   height: 1.25rem;
 }
 
+.iconPill {
+  position: fixed;
+  top: 3.2rem;
+  right: 2.2rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-panel);
+  z-index: 25;
+}
+
+.iconPillButton {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sidebar-foreground);
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.iconPillButton:hover:not(:disabled) {
+  background: var(--sidebar-accent);
+}
+
+.iconPillButton:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.iconPillButton svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
 .plusButton {
   display: grid;
   width: 2.25rem;

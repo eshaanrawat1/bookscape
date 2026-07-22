@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Flame, Plus, File, RefreshCcw } from 'lucide-react'
+import { Flame, Plus } from 'lucide-react'
 import { collectionIdFromName } from '../utils.js'
 import { mainNav, shelfNav } from '../constants.js'
 
-function Sidebar({ active, collections, onSelect, onCreateCollection, onRenameCollection, onSync, onAddBook }) {
+function Sidebar({ active, collections, onSelect, onCreateCollection, onRenameCollection }) {
   const [editingId, setEditingId] = useState(null)
   const [draftName, setDraftName] = useState('')
   const [collectionError, setCollectionError] = useState('')
@@ -160,21 +160,6 @@ function Sidebar({ active, collections, onSelect, onCreateCollection, onRenameCo
           })}
         </div>
         {collectionError && <p className="collectionError">{collectionError}</p>}
-      </section>
-
-      <section className="sidebarBottomSection">
-        <div className="sidebarDivider" />
-        <div className="sidebarBottomIcons">
-          <button className="sidebarIconButton" aria-label="File" disabled>
-            <File />
-          </button>
-          <button className="sidebarIconButton" aria-label="Sync" onClick={onSync}>
-            <RefreshCcw />
-          </button>
-          <button className="sidebarIconButton" aria-label="Add Book" onClick={onAddBook}>
-            <Plus />
-          </button>
-        </div>
       </section>
     </aside>
   )

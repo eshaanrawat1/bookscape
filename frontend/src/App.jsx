@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Menu, RefreshCcw, Plus, Trash2 } from 'lucide-react'
+import { Menu, RefreshCcw, Plus, Trash2, File } from 'lucide-react'
 
 // API & Utilities
 import { apiFetch, postJsonWithFallback, BOOTSTRAP_RETRIES, BOOTSTRAP_RETRY_DELAY_MS } from './api.js'
@@ -382,14 +382,32 @@ export default function App() {
 
   return (
     <div className="appRoot">
+      <div className="iconPill">
+        <button className="iconPillButton" aria-label="File" disabled>
+          <File />
+        </button>
+        <button className="iconPillButton" aria-label="Sync" onClick={syncFromObsidian} disabled={syncing}>
+          <RefreshCcw className={syncing ? 'syncIcon spinning' : 'syncIcon'} />
+        </button>
+        <button className="iconPillButton" aria-label="Add Book" onClick={() => setShowScraperDialog(true)}>
+          <Plus />
+        </button>
+        {activeCollection && (
+          <button
+            className="iconPillButton"
+            aria-label={`Delete ${activeCollection.name}`}
+            onClick={() => deleteCollection(activeCollection)}
+          >
+            <Trash2 />
+          </button>
+        )}
+      </div>
       <div className="hearthShell">
         <Sidebar
           active={view}
           collections={collections}
           onCreateCollection={createCollection}
           onRenameCollection={renameCollection}
-          onSync={syncFromObsidian}
-          onAddBook={() => setShowScraperDialog(true)}
           onSelect={(nextView) => {
             setView(nextView)
             setMobileNav(false)
@@ -404,8 +422,6 @@ export default function App() {
                 collections={collections}
                 onCreateCollection={createCollection}
                 onRenameCollection={renameCollection}
-                onSync={syncFromObsidian}
-                onAddBook={() => setShowScraperDialog(true)}
                 onSelect={(nextView) => {
                   setView(nextView)
                   setMobileNav(false)
@@ -426,44 +442,7 @@ export default function App() {
                 <p>{meta?.subtitle || meta?.description}</p>
               </div>
             </div>
-            <div className="topBarActions">
-              {view === 'reading-now' && (
-                <button
-                  type="button"
-                  className="syncButton"
-                  onClick={syncFromObsidian}
-                  disabled={syncing}
-                  aria-label="Sync from Obsidian"
-                  title="Sync from Obsidian"
-                >
-                  <RefreshCcw className={syncing ? 'syncIcon spinning' : 'syncIcon'} />
-                  <span>{syncing ? 'Syncing' : 'Sync'}</span>
-                </button>
-              )}
-              {view === 'library' && (
-                <button
-                  type="button"
-                  className="syncButton"
-                  onClick={() => setShowScraperDialog(true)}
-                  aria-label="Add Book by URL"
-                  title="Add Book by URL"
-                >
-                  <Plus />
-                  <span>Add Book</span>
-                </button>
-              )}
-              {activeCollection && (
-                <button
-                  type="button"
-                  className="deleteCollectionButton"
-                  aria-label={`Delete ${activeCollection.name}`}
-                  title={`Delete ${activeCollection.name}`}
-                  onClick={() => deleteCollection(activeCollection)}
-                >
-                  <Trash2 />
-                </button>
-              )}
-            </div>
+            <div className="topBarActions" />
             {syncError && (
               <p className="topBarNotice syncErrorNotice">{syncError}</p>
             )}
