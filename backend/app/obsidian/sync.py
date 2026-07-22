@@ -33,9 +33,10 @@ def _resolve_vault_path(root: Path | None = None) -> Path:
 
     if root is not None:
         repo = DataRepository(root)
-        snapshot_path = str(repo.read_obsidian_books_snapshot().get("vault_path") or "").strip()
-        if snapshot_path:
-            return Path(snapshot_path).expanduser()
+        user_state = repo.load_user_state()
+        vault_path = str(user_state.get("obsidian_vault_path") or "").strip()
+        if vault_path:
+            return Path(vault_path).expanduser()
 
     return DEFAULT_OBSIDIAN_VAULT.expanduser()
 
@@ -67,7 +68,7 @@ def load_obsidian_progress_entries(root: Path) -> tuple[dict[str, dict], dict]:
             "notes": book_record.get("notes", ""),
         }
 
-    vault_path = repo.read_obsidian_books_snapshot().get("vault_path", "")
+    vault_path = user_state.get("obsidian_vault_path", "")
     return entries, {"vault_path": str(vault_path), "scanned_files": 0, "parsed_books": len(entries)}
 
 
@@ -77,14 +78,9 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = False) -> SyncResult:
         raise FileNotFoundError(f"Obsidian vault not found at: {vault_path}")
 
     repo = DataRepository(root)
-    user_dir = root / "user_data"
-    user_dir.mkdir(parents=True, exist_ok=True)
-    preview_path = user_dir / "obsidian_sync_preview.json"
-
-    existing_snapshot = repo.read_obsidian_books_snapshot()
-    existing_snapshot_books = existing_snapshot.get("books", {})
-    if not isinstance(existing_snapshot_books, dict):
-        existing_snapshot_books = {}
+    data_dir = root / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    preview_path = data_dir / "obsidian_sync_preview.json"
 
     user_state = repo.load_user_state()
     books = user_state.setdefault("books", {})
@@ -97,7 +93,6 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = False) -> SyncResult:
     created_books = 0
     updated_books = 0
     updated_progress_entries = 0
-    all_synced_books_map: dict[str, dict] = {}
 
     for md in vault_path.rglob("*.md"):
         scanned_files += 1
@@ -120,10 +115,9 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = False) -> SyncResult:
         }
 
         books[uid] = synced_row
-        all_synced_books_map[uid] = synced_row
         updated_progress_entries += 1
 
-        if uid in existing_snapshot_books:
+        if uid in existing_book:
             updated_books += 1
         else:
             created_books += 1
@@ -143,14 +137,8 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = False) -> SyncResult:
     with preview_path.open("w", encoding="utf-8") as f:
         json.dump(preview_payload, f, indent=2)
 
-    repo.write_obsidian_books_snapshot({
-        "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
-        "vault_path": str(vault_path),
-        "books": all_synced_books_map,
-        "count": len(all_synced_books_map),
-    })
-
     if not dry_run:
+        user_state["obsidian_vault_path"] = str(vault_path)
         user_state["books"] = books
         repo.save_user_state(user_state)
 

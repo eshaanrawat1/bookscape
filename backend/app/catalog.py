@@ -139,7 +139,6 @@ def get_global_library(root: Path) -> list[dict]:
     top_genres = ["Romantasy", "Romance", "Fantasy", "Dark Academia", "Contemporary", "Fiction", "High Fantasy", "Mystery"]
     top_genres_set = set(top_genres)
 
-    # Single-pass grouping by genre
     by_genre: dict[str, list[dict]] = {g: [] for g in top_genres}
     for book in all_books:
         genres = book.get("genres") or []
