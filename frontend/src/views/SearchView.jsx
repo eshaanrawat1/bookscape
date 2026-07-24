@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { ChevronRight, Search } from 'lucide-react'
+import { ChevronRight, Search, X } from 'lucide-react'
 import BookCover from '../components/BookCover.jsx'
 import BookGrid from '../components/BookGrid.jsx'
 import { formatCompactNumber } from '../utils.js'
@@ -120,6 +120,11 @@ function SearchHeader({
     inputRef?.current?.select?.()
   }, [])
 
+  const clearSearch = () => {
+    onDraftChange('')
+    inputRef.current?.focus?.()
+  }
+
   return (
     <div className="pageSearchHeader">
       <form className="pageSearchField" onSubmit={onSubmit}>
@@ -134,6 +139,16 @@ function SearchHeader({
           aria-expanded={showPreview}
           aria-autocomplete="list"
         />
+        {draft.trim() ? (
+          <button
+            type="button"
+            className="searchClearButton"
+            aria-label="Clear search"
+            onClick={clearSearch}
+          >
+            <X />
+          </button>
+        ) : null}
       </form>
       {showPreview ? (
         <SearchPreviewDropdown
