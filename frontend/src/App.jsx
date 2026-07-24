@@ -44,6 +44,8 @@ export default function App() {
   const [searchResults, setSearchResults] = useState([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchError, setSearchError] = useState(null)
+  const [searchPreviewResults, setSearchPreviewResults] = useState([])
+  const [searchPreviewLoading, setSearchPreviewLoading] = useState(false)
   const [statsSummary, setStatsSummary] = useState(null)
   const [statsLoading, setStatsLoading] = useState(false)
   const [statsError, setStatsError] = useState(null)
@@ -129,6 +131,44 @@ export default function App() {
     loadStats()
     return () => { cancelled = true }
   }, [view, statsYear, statsMonth])
+
+  useEffect(() => {
+    if (view !== 'search') {
+      setSearchPreviewResults([])
+      setSearchPreviewLoading(false)
+      return undefined
+    }
+
+    const nextQuery = searchDraft.trim()
+    const submittedQuery = searchQuery.trim()
+    if (!nextQuery || nextQuery === submittedQuery) {
+      setSearchPreviewResults([])
+      setSearchPreviewLoading(false)
+      return undefined
+    }
+
+    setSearchPreviewResults([])
+    setSearchPreviewLoading(true)
+
+    let cancelled = false
+    const timer = window.setTimeout(async () => {
+      try {
+        const data = await apiFetch(`/search?q=${encodeURIComponent(nextQuery)}&limit=5`)
+        if (cancelled) return
+        setSearchPreviewResults((data.results || []).map(normaliseBook))
+      } catch (err) {
+        if (cancelled) return
+        setSearchPreviewResults([])
+      } finally {
+        if (!cancelled) setSearchPreviewLoading(false)
+      }
+    }, 180)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [view, searchDraft, searchQuery])
 
   useEffect(() => {
     if (!view.startsWith('author:')) {
@@ -476,6 +516,8 @@ export default function App() {
                 searchResults={searchResults}
                 searchLoading={searchLoading}
                 searchError={searchError}
+                searchPreviewResults={searchPreviewResults}
+                searchPreviewLoading={searchPreviewLoading}
                 setSearchDraft={setSearchDraft}
                 globalLibrary={globalLibrary}
                 authorBooks={authorBooks}
@@ -558,6 +600,8 @@ function ViewContent({
   searchResults,
   searchLoading,
   searchError,
+  searchPreviewResults,
+  searchPreviewLoading,
   setSearchDraft,
   globalLibrary,
   authorBooks,
@@ -619,6 +663,8 @@ function ViewContent({
           results={searchResults}
           loading={searchLoading}
           error={searchError}
+          previewResults={searchPreviewResults}
+          previewLoading={searchPreviewLoading}
           onDraftChange={setSearchDraft}
           onSearch={onSearch}
           onOpen={onOpen}

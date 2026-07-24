@@ -1,9 +1,27 @@
-import { useRef, useEffect } from 'react'
-import { Search } from 'lucide-react'
+import { useEffect, useRef } from 'react'
+import { ChevronRight, Search } from 'lucide-react'
+import BookCover from '../components/BookCover.jsx'
 import BookGrid from '../components/BookGrid.jsx'
+import { formatCompactNumber } from '../utils.js'
 
-function SearchView({ draft, query, results, loading, error, onDraftChange, onSearch, onOpen, onOpenAuthor }) {
+function SearchView({
+  draft,
+  query = '',
+  results,
+  loading,
+  error,
+  previewResults = [],
+  previewLoading = false,
+  onDraftChange,
+  onSearch,
+  onOpen,
+  onOpenAuthor,
+}) {
   const inputRef = useRef(null)
+  const draftQuery = draft.trim()
+  const submittedQuery = query.trim()
+  const hasSubmittedResults = Boolean(draftQuery && draftQuery === submittedQuery)
+  const showPreview = Boolean(draftQuery && draftQuery !== submittedQuery && (previewLoading || previewResults.length > 0))
 
   const submitSearch = async (event) => {
     event.preventDefault()
@@ -21,46 +39,90 @@ function SearchView({ draft, query, results, loading, error, onDraftChange, onSe
   if (error) {
     return (
       <div className="stack">
-        <SearchHeader draft={draft} onDraftChange={onDraftChange} onSubmit={submitSearch} inputRef={inputRef} />
+        <SearchHeader
+          draft={draft}
+          query={query}
+          previewResults={previewResults}
+          previewLoading={previewLoading}
+          showPreview={showPreview}
+          onDraftChange={onDraftChange}
+          onSubmit={submitSearch}
+          onOpen={onOpen}
+          inputRef={inputRef}
+        />
         <SearchLanding title="Could not search books" body={error} />
       </div>
     )
   }
 
-  if (!query) {
+  if (hasSubmittedResults) {
     return (
       <div className="stack">
-        <SearchHeader draft={draft} onDraftChange={onDraftChange} onSubmit={submitSearch} inputRef={inputRef} />
-        <SearchLanding
-          title=""
-          body="Type a title or author, then press Enter."
-          emptyText="Search for a book to see results here."
+        <SearchHeader
+          draft={draft}
+          query={query}
+          previewResults={previewResults}
+          previewLoading={previewLoading}
+          showPreview={showPreview}
+          onDraftChange={onDraftChange}
+          onSubmit={submitSearch}
+          onOpen={onOpen}
+          inputRef={inputRef}
         />
+        {results.length > 0 ? (
+          <BookGrid books={results} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
+        ) : (
+          <SearchLanding title="No results found" body="Try a different title, author, or a broader term." />
+        )}
       </div>
     )
   }
 
   return (
     <div className="stack">
-      <SearchHeader draft={draft} onDraftChange={onDraftChange} onSubmit={submitSearch} inputRef={inputRef} />
-      {results.length > 0 ? (
-        <BookGrid books={results} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
-      ) : (
-        <SearchLanding title="No results found" body="Try a different title, author, or a broader term." />
-      )}
+      <SearchHeader
+        draft={draft}
+        query={query}
+        previewResults={previewResults}
+        previewLoading={previewLoading}
+        showPreview={showPreview}
+        onDraftChange={onDraftChange}
+        onSubmit={submitSearch}
+        onOpen={onOpen}
+        inputRef={inputRef}
+      />
+      {!draftQuery ? (
+        <SearchLanding
+          title=""
+          body="Type a title or author, then press Enter."
+          emptyText="Search for a book to see results here."
+        />
+      ) : !showPreview ? (
+        <SearchLanding title="" body="Press Enter to search the full catalog." />
+      ) : null}
     </div>
   )
 }
 
-function SearchHeader({ draft, onDraftChange, onSubmit, inputRef }) {
+function SearchHeader({
+  draft,
+  query = '',
+  previewResults = [],
+  previewLoading = false,
+  showPreview = false,
+  onDraftChange,
+  onSubmit,
+  onOpen,
+  inputRef,
+}) {
   useEffect(() => {
     inputRef?.current?.focus()
     inputRef?.current?.select?.()
   }, [])
 
   return (
-    <form className="pageSearchHeader" onSubmit={onSubmit}>
-      <div className="pageSearchField">
+    <div className="pageSearchHeader">
+      <form className="pageSearchField" onSubmit={onSubmit}>
         <Search />
         <input
           ref={inputRef}
@@ -69,10 +131,57 @@ function SearchHeader({ draft, onDraftChange, onSubmit, inputRef }) {
           onChange={(event) => onDraftChange(event.target.value)}
           placeholder=""
           aria-label="Search books"
+          aria-expanded={showPreview}
+          aria-autocomplete="list"
         />
-      </div>
-    </form>
+      </form>
+      {showPreview ? (
+        <SearchPreviewDropdown
+          results={previewResults}
+          loading={previewLoading}
+          onOpen={onOpen}
+          onSubmit={onSubmit}
+        />
+      ) : null}
+    </div>
   )
+}
+
+function SearchPreviewDropdown({ results, loading, onOpen, onSubmit }) {
+  return (
+    <div className="searchPreviewPanel" role="listbox" aria-label="Search suggestions">
+      {loading && results.length === 0 ? <div className="searchPreviewStatus">Searching books...</div> : null}
+      {results.map((book) => (
+        <button
+          key={book.id}
+          type="button"
+          className="searchPreviewItem"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => onOpen(book)}
+        >
+          <div className="searchPreviewCover">
+            <BookCover book={book} />
+          </div>
+          <div className="searchPreviewCopy">
+            <strong>{book.title}</strong>
+            {book.author ? <span>{book.author}</span> : null}
+            <p>{previewMeta(book)}</p>
+          </div>
+          <ChevronRight className="searchPreviewChevron" />
+        </button>
+      ))}
+      <button type="button" className="searchPreviewFooter" onClick={onSubmit}>
+        Press Enter to see all results
+      </button>
+    </div>
+  )
+}
+
+function previewMeta(book) {
+  const parts = []
+  if (book.genre) parts.push(book.genre)
+  if (book.pages) parts.push(`${formatCompactNumber(book.pages)} pages`)
+  return parts.join(' · ')
 }
 
 function SearchLanding({ title, body, emptyText }) {
