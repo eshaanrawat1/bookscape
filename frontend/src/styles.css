@@ -553,9 +553,8 @@ svg {
   position: relative;
   overflow: hidden;
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(34rem, 0.8fr);
   gap: 1.6rem;
-  align-items: center;
+  align-items: start;
 }
 
 .statsHeroGlow {
@@ -2237,9 +2236,6 @@ svg {
     grid-template-columns: repeat(3, minmax(10rem, 1fr));
   }
 
-  .statsHeroCard {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 980px) {
