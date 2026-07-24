@@ -78,7 +78,7 @@ def run_obsidian_sync(root: Path, *, dry_run: bool = False) -> SyncResult:
         raise FileNotFoundError(f"Obsidian vault not found at: {vault_path}")
 
     repo = DataRepository(root)
-    data_dir = root / "data"
+    data_dir = root / "backend" / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
     preview_path = data_dir / "obsidian_sync_preview.json"
 

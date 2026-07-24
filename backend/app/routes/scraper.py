@@ -27,9 +27,10 @@ def create_router(root: Path) -> APIRouter:
         book_id = uid_match.group(1)
         scraper_timeout = int(os.getenv("SCRAPER_TIMEOUT_SECONDS", "180"))
         try:
+            data_dir = root / "backend" / "data"
             res = subprocess.run(
-                [sys.executable, str(root / "data" / "scraper.py"), "--import-one", url],
-                cwd=root / "data", capture_output=True, text=True, timeout=scraper_timeout,
+                [sys.executable, str(data_dir / "scraper.py"), "--import-one", url],
+                cwd=data_dir, capture_output=True, text=True, timeout=scraper_timeout,
             )
             if res.returncode != 0:
                 raise HTTPException(status_code=500, detail=f"Scraper error: {res.stderr or res.stdout or 'unknown'}")

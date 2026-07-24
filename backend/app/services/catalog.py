@@ -15,7 +15,7 @@ class CatalogIndex:
 
 
 def _catalog_path(root: Path) -> Path:
-    return root / "data" / "books.json"
+    return root / "backend" / "data" / "books.json"
 
 
 @lru_cache(maxsize=8)

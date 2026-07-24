@@ -8,7 +8,7 @@ from .utils import read_json, write_json
 class DataRepository:
     def __init__(self, root: Path) -> None:
         self.root = root
-        self.data_dir = root / "data"
+        self.data_dir = root / "backend" / "data"
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.user_state_path = self.data_dir / "user_state.json"
         self.books_catalog_path = self.data_dir / "books.json"

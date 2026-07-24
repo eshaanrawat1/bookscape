@@ -15,7 +15,7 @@ use tauri::Manager;
 const BACKEND_HOST: &str = "127.0.0.1";
 const BACKEND_PORT: u16 = 9876;
 const HEALTHCHECK_URL: &str = "http://127.0.0.1:9876/health";
-const EXPECTED_BACKEND_API_VERSION: u64 = 2;
+const EXPECTED_BACKEND_API_VERSION: u64 = 3;
 
 fn project_root() -> &'static Path {
   Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
