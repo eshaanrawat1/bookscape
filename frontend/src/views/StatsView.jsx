@@ -43,10 +43,6 @@ function StatsView({ summary, loading, error, year, month, onYearChange, onMonth
           <section className="heroCard paperGrain statsHeroCard">
             <div className="heroGlow statsHeroGlow" style={{ '--hero-glow': buildHeroGlow(heroColor) }} />
             <div className="statsHeroCopy">
-              <span className="pill">
-                <BarChart3 />
-                {summary.period_label || 'All time'}
-              </span>
               <h2>Reading at a glance</h2>
               <p>Minimal stats pulled from your finished books and Obsidian snapshot.</p>
             </div>
