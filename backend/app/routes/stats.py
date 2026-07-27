@@ -12,37 +12,32 @@ from ..utils import parse_iso_date
 def create_router(root: Path, repo: DataRepository) -> APIRouter:
     router = APIRouter()
 
-    def _books_map() -> dict[str, dict]:
-        """Return user_state.books, always a plain dict."""
-        raw = repo.load_user_state().get("books", {})
-        return raw if isinstance(raw, dict) else {}
-
     def _stats_book_payload(book_id: str, row: dict) -> dict:
         catalog = load_book(root, book_id) or {}
-        genres = row.get("genres") or catalog.get("genres", [])
+        genres = catalog.get("genres", [])
         if not isinstance(genres, list):
             genres = [genres]
         clean_genres = [str(g).strip() for g in genres if str(g).strip()]
         total_pages = int(row.get("total_pages") or catalog.get("page_count") or 0)
         return {
             "id": book_id,
-            "title": str(row.get("title") or catalog.get("title") or "Untitled"),
-            "author": str(row.get("author") or catalog.get("author") or ""),
-            "cover": str(row.get("image_url") or catalog.get("image_url") or ""),
-            "color": str(row.get("color") or catalog.get("color") or ""),
+            "title": str(catalog.get("title") or "Untitled"),
+            "author": str(catalog.get("author") or ""),
+            "cover": str(catalog.get("image_url") or ""),
+            "color": str(catalog.get("color") or ""),
             "tint": "220 30% 45%",
-            "genre": clean_genres[0] if clean_genres else str(row.get("genre") or catalog.get("genre") or ""),
+            "genre": clean_genres[0] if clean_genres else "",
             "genres": clean_genres,
             "totalPages": total_pages,
             "currentPage": total_pages,
             "startDate": str(row.get("start_date") or "").strip(),
             "finishDate": str(row.get("finish_date") or "").strip(),
-            "rating": float(row.get("rating") or catalog.get("avg_rating") or 0),
+            "rating": float(catalog.get("avg_rating") or 0),
             "reviewCount": int(catalog.get("review_count") or 0),
             "ratingCount": int(catalog.get("rating_count") or 0),
             "progress": 100,
             "status": "done",
-            "blurb": str(row.get("description") or catalog.get("description") or ""),
+            "blurb": str(catalog.get("description") or ""),
             "_raw": {**row, **({"linked_catalog_book": catalog} if catalog else {})},
         }
 
@@ -51,19 +46,18 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
         year: int | None = Query(default=None, ge=1900, le=3000),
         month: int | None = Query(default=None, ge=1, le=12),
     ) -> dict:
-        books = _books_map()
+        books = repo.list_book_states()
 
         available_years = {
             fd.year
             for row in books.values()
-            if isinstance(row, dict) and (fd := parse_iso_date(row.get("finish_date")))
+            if (fd := parse_iso_date(row.get("finish_date")))
         }
 
         selected = {
             bid: row
             for bid, row in books.items()
-            if isinstance(row, dict)
-            and str(row.get("status") or "").strip().lower() == "done"
+            if str(row.get("status") or "").strip().lower() == "done"
             and (fd := parse_iso_date(row.get("finish_date")))
             and (year is None or fd.year == year)
             and (month is None or fd.month == month)

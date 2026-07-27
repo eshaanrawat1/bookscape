@@ -9,13 +9,14 @@ from ...utils import parse_iso_date_string
 
 
 def _normalize_name(value: object) -> str:
-    """Strip Obsidian wiki-link brackets and normalize unicode (preserve casing)."""
+    """Strip Obsidian wiki-link brackets and normalize unicode (preserve casing
+    and punctuation — titles/authors round-trip through Push, so periods,
+    apostrophes, and hyphens must survive a parse, not just accented letters)."""
     text = str(value or "").strip()
     text = re.sub(r"\[\[|\]\]", "", text).strip()
     # Normalize unicode but preserve original casing
     text = unicodedata.normalize("NFKD", text)
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
-    text = re.sub(r"[^\w\s]", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
 

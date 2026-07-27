@@ -23,6 +23,7 @@ import Sidebar from './components/Sidebar.jsx'
 import BookDialog from './components/BookDialog.jsx'
 import FinishedBookDialog from './components/FinishedBookDialog.jsx'
 import ScraperDialog from './components/ScraperDialog.jsx'
+import SettingsDialog from './components/SettingsDialog.jsx'
 import BookGrid from './components/BookGrid.jsx'
 
 // Views
@@ -67,6 +68,7 @@ export default function App() {
   const [syncing, setSyncing] = useState(false)
   const [syncError, setSyncError] = useState(null)
   const [showScraperDialog, setShowScraperDialog] = useState(false)
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -419,7 +421,7 @@ export default function App() {
   return (
     <div className="appRoot">
       <div className="iconPill">
-        <button className="iconPillButton" aria-label="File" disabled>
+        <button className="iconPillButton" aria-label="Obsidian Vault" onClick={() => setShowSettingsDialog(true)}>
           <File />
         </button>
         <button className="iconPillButton" aria-label="Sync" onClick={syncFromObsidian} disabled={syncing}>
@@ -567,6 +569,9 @@ export default function App() {
             setSelected({ book: normaliseBook(newBook), variant: 'standard' })
           }}
         />
+      )}
+      {showSettingsDialog && (
+        <SettingsDialog onClose={() => setShowSettingsDialog(false)} />
       )}
     </div>
   )

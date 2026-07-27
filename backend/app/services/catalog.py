@@ -1,66 +1,134 @@
 from __future__ import annotations
 
 import difflib
-from dataclasses import dataclass
-from functools import lru_cache
+import json
+import re
 from pathlib import Path
 
-from ..utils import normalize_text, read_json, split_author_field
+from ..db import LOCAL_UID_PREFIX, transaction
+from ..utils import normalize_text, split_author_field
+
+BOOK_COLUMNS = {
+    "title",
+    "author",
+    "image_url",
+    "avg_rating",
+    "rating_count",
+    "review_count",
+    "description",
+    "page_count",
+    "series",
+    "series_number",
+    "similar_book_ids",
+    "source_url",
+    "color",
+    "scraped_at",
+}
 
 
-@dataclass(frozen=True)
-class CatalogIndex:
-    books: list[dict]
-    by_uid: dict[str, dict]
+def make_local_uid(title: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", str(title or "").strip().lower()).strip("-")
+    return f"{LOCAL_UID_PREFIX}{slug or 'untitled'}"
 
 
-def _catalog_path(root: Path) -> Path:
-    return root / "backend" / "data" / "books.json"
+def _parse_json_list(value: object) -> list:
+    try:
+        parsed = json.loads(value) if value else []
+        return parsed if isinstance(parsed, list) else []
+    except Exception:
+        return []
 
 
-@lru_cache(maxsize=8)
-def _load_catalog_index(path_str: str, mtime: float) -> CatalogIndex:
-    payload = read_json(Path(path_str), {})
+def _genres_for_uid(conn, uid: str) -> list[str]:
+    rows = conn.execute(
+        "SELECT genres.name AS name FROM book_genres "
+        "JOIN genres ON genres.id = book_genres.genre_id "
+        "WHERE book_genres.uid = ? ORDER BY book_genres.position",
+        (uid,),
+    ).fetchall()
+    return [row["name"] for row in rows]
 
-    if isinstance(payload, dict):
-        rows = list(payload.values())
-    elif isinstance(payload, list):
-        rows = payload
+
+def _row_to_book(conn, row, genres_map: dict[str, list[str]] | None = None) -> dict:
+    book = dict(row)
+    book["similar_book_ids"] = _parse_json_list(book.get("similar_book_ids"))
+    book["genres"] = (
+        genres_map.get(book["uid"], []) if genres_map is not None else _genres_for_uid(conn, book["uid"])
+    )
+    return book
+
+
+def _load_all_books(conn) -> list[dict]:
+    book_rows = conn.execute("SELECT * FROM books").fetchall()
+    genre_rows = conn.execute(
+        "SELECT book_genres.uid AS uid, genres.name AS name FROM book_genres "
+        "JOIN genres ON genres.id = book_genres.genre_id "
+        "ORDER BY book_genres.uid, book_genres.position"
+    ).fetchall()
+    genres_map: dict[str, list[str]] = {}
+    for row in genre_rows:
+        genres_map.setdefault(row["uid"], []).append(row["name"])
+    return [_row_to_book(conn, row, genres_map) for row in book_rows]
+
+
+def _replace_genres(conn, uid: str, genre_names: list) -> None:
+    conn.execute("DELETE FROM book_genres WHERE uid = ?", (uid,))
+    clean = [str(g).strip() for g in (genre_names or []) if str(g).strip()]
+    for position, name in enumerate(clean):
+        conn.execute("INSERT INTO genres (name) VALUES (?) ON CONFLICT(name) DO NOTHING", (name,))
+        genre_row = conn.execute("SELECT id FROM genres WHERE name = ? COLLATE NOCASE", (name,)).fetchone()
+        conn.execute(
+            "INSERT INTO book_genres (uid, genre_id, position) VALUES (?, ?, ?)",
+            (uid, genre_row["id"], position),
+        )
+
+
+def upsert_book(root: Path, book: dict) -> None:
+    """Insert or partially update a catalog row. Only keys present in `book` are touched,
+    so a partial dict (e.g. from an Obsidian Pull) never nulls out scraper-only fields."""
+    uid = str(book.get("uid") or "").strip()
+    if not uid:
+        raise ValueError("book uid is required")
+
+    fields = {k: v for k, v in book.items() if k in BOOK_COLUMNS}
+    if "similar_book_ids" in fields:
+        fields["similar_book_ids"] = json.dumps(fields["similar_book_ids"] or [])
+
+    columns = list(fields.keys())
+    values = list(fields.values())
+    col_list = ", ".join(["uid", *columns])
+    placeholders = ", ".join(["?"] * (len(columns) + 1))
+    if columns:
+        update_clause = ", ".join(f"{c} = excluded.{c}" for c in columns)
+        update_clause += ", updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')"
     else:
-        rows = []
+        update_clause = "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')"
 
-    books = [row for row in rows if isinstance(row, dict)]
-    by_uid = {
-        str(row["uid"]).strip(): row
-        for row in books
-        if str(row.get("uid") or "").strip()
-    }
-
-    return CatalogIndex(books=books, by_uid=by_uid)
-
-
-def load_catalog_index(root: Path) -> CatalogIndex:
-    path = _catalog_path(root)
-    mtime = path.stat().st_mtime if path.exists() else 0.0
-    return _load_catalog_index(str(path), mtime)
+    with transaction(root) as conn:
+        conn.execute(
+            f"INSERT INTO books ({col_list}) VALUES ({placeholders}) "
+            f"ON CONFLICT(uid) DO UPDATE SET {update_clause}",
+            [uid, *values],
+        )
+        if "genres" in book:
+            _replace_genres(conn, uid, book.get("genres") or [])
 
 
 def has_data(root: Path) -> bool:
-    return bool(load_catalog_index(root).books)
+    with transaction(root) as conn:
+        row = conn.execute("SELECT 1 FROM books LIMIT 1").fetchone()
+    return row is not None
 
 
 def resolve_book(root: Path, book_id: str) -> dict | None:
-    """Resolve a book by uid from the catalog."""
     book_id = str(book_id or "").strip()
     if not book_id:
         return None
-
-    index = load_catalog_index(root)
-    direct = index.by_uid.get(book_id)
-    if direct:
-        return dict(direct)
-
-    return None
+    with transaction(root) as conn:
+        row = conn.execute("SELECT * FROM books WHERE uid = ?", (book_id,)).fetchone()
+        if not row:
+            return None
+        return _row_to_book(conn, row)
 
 
 def get_book_with_similar(root: Path, book_id: str) -> dict | None:
@@ -68,13 +136,14 @@ def get_book_with_similar(root: Path, book_id: str) -> dict | None:
     if not book:
         return None
 
-    index = load_catalog_index(root)
-    similar_ids = book.get("similar_book_ids") or []
-    similar_books = [
-        index.by_uid[str(sid)]
-        for sid in similar_ids
-        if str(sid) in index.by_uid
-    ]
+    similar_ids = [str(sid) for sid in (book.get("similar_book_ids") or []) if str(sid).strip()]
+    similar_books: list[dict] = []
+    if similar_ids:
+        with transaction(root) as conn:
+            placeholders = ", ".join(["?"] * len(similar_ids))
+            rows = conn.execute(f"SELECT * FROM books WHERE uid IN ({placeholders})", similar_ids).fetchall()
+            by_uid = {row["uid"]: _row_to_book(conn, row) for row in rows}
+        similar_books = [by_uid[sid] for sid in similar_ids if sid in by_uid]
 
     result = dict(book)
     result["similar_books"] = similar_books
@@ -86,10 +155,11 @@ def search_books(root: Path, query: str, limit: int = 10) -> list[dict]:
     if not q:
         return []
 
-    index = load_catalog_index(root)
-    scored = []
+    with transaction(root) as conn:
+        books = _load_all_books(conn)
 
-    for point in index.books:
+    scored = []
+    for point in books:
         title = str(point.get("title", "")).strip()
         title_lower = title.lower()
         if not title_lower:
@@ -131,8 +201,8 @@ def search_books(root: Path, query: str, limit: int = 10) -> list[dict]:
 
 
 def get_global_library(root: Path) -> list[dict]:
-    index = load_catalog_index(root)
-    all_books = index.books
+    with transaction(root) as conn:
+        all_books = _load_all_books(conn)
     if not all_books:
         return []
 
@@ -180,11 +250,12 @@ def get_books_by_author(root: Path, author: str) -> list[dict]:
     if not query:
         return []
 
-    index = load_catalog_index(root)
+    with transaction(root) as conn:
+        all_books = _load_all_books(conn)
+
     matched = []
     seen: set[str] = set()
-
-    for book in index.books:
+    for book in all_books:
         author_field = book.get("author", "")
         candidates = [(author_field)] + [
             normalize_text(part) for part in split_author_field(author_field)
@@ -204,22 +275,15 @@ def get_books_by_genre(root: Path, genre: str, limit: int = 100) -> list[dict]:
     if not query:
         return []
 
-    index = load_catalog_index(root)
-    matched = []
-    seen: set[str] = set()
+    with transaction(root) as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT books.* FROM books "
+            "JOIN book_genres ON book_genres.uid = books.uid "
+            "JOIN genres ON genres.id = book_genres.genre_id "
+            "WHERE genres.name = ? COLLATE NOCASE "
+            "ORDER BY books.rating_count DESC LIMIT ?",
+            (query, limit),
+        ).fetchall()
+        matched = [_row_to_book(conn, row) for row in rows]
 
-    for book in index.books:
-        book_genres = book.get("genres", [])
-        if not isinstance(book_genres, list):
-            book_genres = [book_genres]
-
-        if any(str(g or "").strip() == query for g in book_genres):
-            book_uid = str(book.get("uid") or "").strip()
-            if book_uid and book_uid not in seen:
-                seen.add(book_uid)
-                matched.append(book)
-                if len(matched) >= limit:
-                    break
-
-    matched.sort(key=lambda item: int(item.get("rating_count", 0) or 0), reverse=True)
     return matched

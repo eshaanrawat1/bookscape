@@ -9,6 +9,8 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from ..services.catalog import get_book_with_similar as load_book_with_similar
+from ..services.catalog import upsert_book
+from ..utils import read_json
 
 
 class ScrapeBookIn(BaseModel):
@@ -40,6 +42,13 @@ def create_router(root: Path) -> APIRouter:
             raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to run scraper: {e}") from e
+
+        # scraper.py (a standalone script, out of scope for the SQLite migration)
+        # writes the freshly-scraped row to books.json only — bridge it into SQLite.
+        catalog_payload = read_json(root / "backend" / "data" / "books.json", {})
+        raw_row = catalog_payload.get(book_id) if isinstance(catalog_payload, dict) else None
+        if isinstance(raw_row, dict):
+            upsert_book(root, raw_row)
 
         book = load_book_with_similar(root, book_id)
         if not book:

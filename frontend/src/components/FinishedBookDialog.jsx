@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, ChevronDown } from 'lucide-react'
+import { X, ChevronDown, Upload, Download } from 'lucide-react'
 import { apiFetch } from '../api.js'
 import { getCatalogBookId } from '../utils.js'
 import BookCover from './BookCover.jsx'
@@ -69,6 +69,41 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose, onOpenAut
   }, [bookId, baseRecord.current_page, baseRecord.total_pages, baseRecord.start_date, baseRecord.finish_date])
 
   const draft = record || baseRecord
+  const [obsidianBusy, setObsidianBusy] = useState(null) // 'push' | 'pull' | null
+  const [obsidianMessage, setObsidianMessage] = useState('')
+  const canSyncObsidian = Boolean(bookId) && (draft.status === 'reading' || draft.status === 'done')
+
+  const pushToVault = async () => {
+    if (!bookId || obsidianBusy) return
+    setObsidianBusy('push')
+    setObsidianMessage('')
+    try {
+      await apiFetch(`/sync/obsidian/push/${bookId}`, { method: 'POST' })
+      setObsidianMessage('Pushed to vault.')
+    } catch (err) {
+      setObsidianMessage(err.message || 'Could not push to vault.')
+    } finally {
+      setObsidianBusy(null)
+    }
+  }
+
+  const pullFromVault = async () => {
+    if (!bookId || obsidianBusy) return
+    setObsidianBusy('pull')
+    setObsidianMessage('')
+    try {
+      await apiFetch(`/sync/obsidian/pull/${bookId}`, { method: 'POST' })
+      const refreshed = await apiFetch(`/reading-progress/${bookId}`)
+      const nextRecord = { ...baseRecord, ...(refreshed?.entry || {}) }
+      setRecord(nextRecord)
+      lastSavedRef.current = JSON.stringify(nextRecord)
+      setObsidianMessage('Pulled from vault.')
+    } catch (err) {
+      setObsidianMessage(err.message || 'Could not pull from vault.')
+    } finally {
+      setObsidianBusy(null)
+    }
+  }
 
   const updateField = (field, value) => {
     setRecord((current) => ({
@@ -221,6 +256,32 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose, onOpenAut
                 )}
               </div>
             </div>
+
+            {canSyncObsidian && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="dialogIconButton"
+                  onClick={pushToVault}
+                  disabled={obsidianBusy !== null}
+                  aria-label="Push this book to the Obsidian vault"
+                  title="Push to vault"
+                >
+                  <Upload />
+                </button>
+                <button
+                  type="button"
+                  className="dialogIconButton"
+                  onClick={pullFromVault}
+                  disabled={obsidianBusy !== null}
+                  aria-label="Pull this book from the Obsidian vault"
+                  title="Pull from vault"
+                >
+                  <Download />
+                </button>
+                {obsidianMessage && <span className="dialogActionMessage">{obsidianMessage}</span>}
+              </div>
+            )}
 
             <div className="finishedPanel">
               <div className="finishedFieldRow">

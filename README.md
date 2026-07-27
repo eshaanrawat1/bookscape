@@ -7,8 +7,8 @@ backend, all running on your own machine — no accounts, no server.
 
 - `src-tauri/` — Rust/Tauri desktop shell; launches and supervises the backend
 - `frontend/` — React + Vite UI
-- `backend/app/` — FastAPI service (routes, services, JSON-file persistence)
-- `backend/data/` — runtime JSON only (`books.json` catalog, `user_state.json`)
+- `backend/app/` — FastAPI service (routes, services, SQLite persistence)
+- `backend/data/` — runtime data only (`bookscape.db`)
 - `backend/scripts/` — standalone scraper tooling (`scraper.py`, `gradient.py`)
 
 ## Quickstart
@@ -29,18 +29,34 @@ To run the pieces separately during development:
 
 ## Data
 
-- `backend/data/books.json` — scraped Goodreads catalog, keyed by `uid`
-- `backend/data/user_state.json` — your reading progress, lists, and notes
+- `backend/data/bookscape.db` — SQLite database: the scraped Goodreads catalog
+  (`books`, `genres`/`book_genres`), your personal reading state
+  (`user_book_state`: status, progress, notes, liked, want-to-read), and
+  collections (`collections`/`collection_books`).
 
-Both are plain JSON on disk. There is no auth and no sync; state is local-only.
+There is no auth and no cloud sync; everything is local-only. `liked`,
+`want_to_read`, and collection membership are Bookscape-only concepts and
+never leave the database.
 
-## Obsidian sync
+## Obsidian vault
 
-`POST /api/sync/obsidian` scans a vault folder of `.md` files with book
-frontmatter and merges them into `user_state.json`. Personal fields (notes,
-liked, want-to-read, lists) are preserved across syncs. Point it at your vault
-with the `OBSIDIAN_VAULT_PATH` environment variable, or the
-`obsidian_vault_path` key in `user_state.json`.
+Point Bookscape at any folder — via the file icon in the top bar (native
+folder picker) or `PUT /api/settings/vault-path` — and Push/Pull your
+reading/finished books as `.md` notes, at either the whole-vault level or a
+single book at a time:
+
+- `POST /api/sync/obsidian` / `POST /api/sync/obsidian/pull/{uid}` — import
+  notes from the vault. Only books with `status: reading` or `status: done`
+  are imported; a scan of 0 files is treated as an error (protects against an
+  unmounted drive), and importing never deletes existing Bookscape state.
+- `POST /api/sync/obsidian/push` / `POST /api/sync/obsidian/push/{uid}` —
+  export reading/finished books to the vault, full-regenerated each time.
+  Filenames are derived from the title and reused thereafter; a title
+  collision between two books is skipped (not fatal) and reported back for
+  manual resolution in Obsidian. Notes are SQL-authoritative — write them in
+  Bookscape and Push them out for reference.
+
+All of the above accept `?dry_run=true` to preview without writing.
 
 ## Scraper
 

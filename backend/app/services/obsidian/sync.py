@@ -1,137 +1,131 @@
 from __future__ import annotations
 
-import json
-import os
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from ...repository import DataRepository
-from ..reading import compute_reading_stats
+from ..catalog import resolve_book, upsert_book
+from .naming import safe_filename
 from .parser import parse_book
+from .vault import resolve_vault_path
 
-DEFAULT_OBSIDIAN_VAULT = Path("~/Obsidian/Books")
+
+class EmptyVaultScanError(Exception):
+    """Raised when a vault-level Pull scans zero .md files — this usually means
+    the vault folder is on an unmounted drive or not-yet-downloaded iCloud path,
+    not that the vault is genuinely empty. Never treat this as a normal result."""
 
 
 @dataclass
-class SyncResult:
-    scanned_files: int
-    parsed_books: int
-    created_books: int
-    updated_books: int
-    updated_progress_entries: int
+class PullResult:
     vault_path: str
-    preview_path: str
-    dry_run: bool
-    periods: dict
+    scanned_files: int
+    imported: int
+    skipped: list[dict] = field(default_factory=list)
+    dry_run: bool = False
 
 
-def _resolve_vault_path(root: Path | None = None) -> Path:
-    env_value = os.getenv("OBSIDIAN_VAULT_PATH", "").strip()
-    if env_value:
-        return Path(env_value).expanduser()
+def _apply_parsed_book(root: Path, book: dict, *, dry_run: bool) -> str:
+    """Upsert catalog + reading state for a parsed book dict.
+    Returns a rejection reason string, or '' if applied (or would be, for a dry run)."""
+    status = str(book.get("status") or "").strip().lower()
+    if status not in {"reading", "done"}:
+        return f"status '{status or 'unknown'}' is not reading/done"
 
-    if root is not None:
-        repo = DataRepository(root)
-        user_state = repo.load_user_state()
-        vault_path = str(user_state.get("obsidian_vault_path") or "").strip()
-        if vault_path:
-            return Path(vault_path).expanduser()
+    uid = str(book.get("uid") or "").strip()
+    if not uid:
+        return "missing uid"
 
-    return DEFAULT_OBSIDIAN_VAULT.expanduser()
+    if dry_run:
+        return ""
+
+    upsert_book(root, {
+        "uid": uid,
+        "title": book.get("title", ""),
+        "author": book.get("author", ""),
+        "image_url": book.get("image_url", ""),
+        "avg_rating": book.get("rating", 0),
+        "rating_count": book.get("rating_count", 0),
+        "review_count": book.get("review_count", 0),
+        "description": book.get("description", ""),
+        "genres": book.get("genres", []),
+    })
+    # Note: this is the only place liked/want_to_read are absent by design —
+    # they never appear in the Obsidian markdown format, so Pull never touches them.
+    DataRepository(root).upsert_book_state(
+        uid,
+        status=status,
+        current_page=book.get("current_page", 0),
+        total_pages=book.get("total_pages", 0),
+        start_date=book.get("start_date", ""),
+        finish_date=book.get("finish_date", ""),
+    )
+    return ""
 
 
-def run_obsidian_sync(root: Path, *, dry_run: bool = False) -> SyncResult:
-    vault_path = _resolve_vault_path(root)
+def pull_one(root: Path, *, uid: str | None = None, filename: str | None = None, dry_run: bool = False) -> dict:
+    """Pull a single book's note from the vault into Bookscape."""
+    vault_path = resolve_vault_path(root)
     if not vault_path.exists():
         raise FileNotFoundError(f"Obsidian vault not found at: {vault_path}")
 
-    repo = DataRepository(root)
-    data_dir = root / "backend" / "data"
-    data_dir.mkdir(parents=True, exist_ok=True)
-    preview_path = data_dir / "obsidian_sync_preview.json"
+    target_filename = filename
+    if not target_filename and uid:
+        state = DataRepository(root).get_book_state(uid)
+        target_filename = state.get("obsidian_filename") if state else None
+        if not target_filename:
+            book = resolve_book(root, uid)
+            if book and book.get("title"):
+                target_filename = safe_filename(book["title"])
 
-    user_state = repo.load_user_state()
-    books = user_state.setdefault("books", {})
-    if not isinstance(books, dict):
-        books = {}
-        user_state["books"] = books
+    if not target_filename:
+        raise FileNotFoundError("Could not resolve a vault file for this book")
 
-    scanned_files = 0
-    parsed_books = 0
-    created_books = 0
-    updated_books = 0
-    updated_progress_entries = 0
+    md_path = vault_path / target_filename
+    if not md_path.exists():
+        raise FileNotFoundError(f"No vault file found at: {md_path}")
 
-    for md in vault_path.rglob("*.md"):
-        scanned_files += 1
-        book = parse_book(md)
+    book = parse_book(md_path)
+    if not book or not book.get("uid"):
+        raise ValueError(f"Could not parse a valid book from {md_path.name}")
+
+    rejected = _apply_parsed_book(root, book, dry_run=dry_run)
+    if rejected:
+        raise ValueError(f"{md_path.name}: {rejected}")
+
+    return {"uid": book["uid"], "filename": md_path.name, "dry_run": dry_run}
+
+
+def run_obsidian_pull(root: Path, *, dry_run: bool = False) -> PullResult:
+    """Vault-level Pull: scan every .md file, importing any reading/done book found.
+    Never deletes Bookscape state based on a file being absent — that invariant is
+    intentional (protects against unmounted drives / partial vault availability) and
+    must not be "optimized away" by adding a delete-on-absence step here."""
+    vault_path = resolve_vault_path(root)
+    if not vault_path.exists():
+        raise FileNotFoundError(f"Obsidian vault not found at: {vault_path}")
+
+    md_files = list(vault_path.rglob("*.md"))
+    if not md_files:
+        raise EmptyVaultScanError(str(vault_path))
+
+    imported = 0
+    skipped: list[dict] = []
+    for md_path in md_files:
+        book = parse_book(md_path)
         if not book:
-            continue
+            continue  # no uid in frontmatter -> not a book note, not an error
 
-        parsed_books += 1
-        uid = book["uid"]  # uid is the canonical key — parser.py guarantees this exists
-
-        existing_book = books.get(uid) if isinstance(books.get(uid), dict) else {}
-
-        synced_row = {
-            **book,
-            # Personal fields — preserved across syncs, never overwritten
-            "notes":        existing_book.get("notes", ""),
-            "liked":        existing_book.get("liked", False),
-            "want_to_read": existing_book.get("want_to_read", False),
-            "lists":        existing_book.get("lists", []),
-        }
-
-        books[uid] = synced_row
-        updated_progress_entries += 1
-
-        if uid in existing_book:
-            updated_books += 1
+        rejected = _apply_parsed_book(root, book, dry_run=dry_run)
+        if rejected:
+            skipped.append({"filename": md_path.name, "reason": rejected})
         else:
-            created_books += 1
+            imported += 1
 
-    preview_payload = {
-        "dry_run": dry_run,
-        "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
-        "vault_path": str(vault_path),
-        "summary": {
-            "scanned_files": scanned_files,
-            "parsed_books": parsed_books,
-            "created_books": created_books,
-            "updated_books": updated_books,
-            "updated_progress_entries": updated_progress_entries,
-        },
-    }
-    with preview_path.open("w", encoding="utf-8") as f:
-        json.dump(preview_payload, f, indent=2)
-
-    if not dry_run:
-        user_state["obsidian_vault_path"] = str(vault_path)
-        user_state["books"] = books
-        repo.save_user_state(user_state)
-
-    # Compute stats from the full books map (not just synced books)
-    progress_entries = {
-        uid: {
-            "status":       r.get("status", "not_started"),
-            "total_pages":  int(r.get("total_pages") or 0),
-            "current_page": int(r.get("current_page") or 0),
-            "start_date":   r.get("start_date", ""),
-            "finish_date":  r.get("finish_date", ""),
-        }
-        for uid, r in books.items()
-        if isinstance(r, dict)
-    }
-
-    return SyncResult(
-        scanned_files=scanned_files,
-        parsed_books=parsed_books,
-        created_books=created_books,
-        updated_books=updated_books,
-        updated_progress_entries=updated_progress_entries,
+    return PullResult(
         vault_path=str(vault_path),
-        preview_path=str(preview_path),
+        scanned_files=len(md_files),
+        imported=imported,
+        skipped=skipped,
         dry_run=dry_run,
-        periods=compute_reading_stats(progress_entries),
     )
