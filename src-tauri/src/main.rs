@@ -90,14 +90,14 @@ fn kill_backend_listener() {
 
 fn resolve_python() -> PathBuf {
   let candidates = [
-    project_root().join(".venv/bin/python"),
-    project_root().join(".venv/bin/python3"),
-    project_root().join("venv/bin/python"),
-    project_root().join("venv/bin/python3"),
-    project_root().join(".venv/Scripts/python.exe"),
-    project_root().join(".venv/Scripts/python3.exe"),
-    project_root().join("venv/Scripts/python.exe"),
-    project_root().join("venv/Scripts/python3.exe"),
+    project_root().join("backend/.venv/bin/python"),
+    project_root().join("backend/.venv/bin/python3"),
+    project_root().join("backend/venv/bin/python"),
+    project_root().join("backend/venv/bin/python3"),
+    project_root().join("backend/.venv/Scripts/python.exe"),
+    project_root().join("backend/.venv/Scripts/python3.exe"),
+    project_root().join("backend/venv/Scripts/python.exe"),
+    project_root().join("backend/venv/Scripts/python3.exe"),
   ];
 
   for candidate in candidates.iter() {

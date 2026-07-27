@@ -14,8 +14,9 @@ backend, all running on your own machine — no accounts, no server.
 ## Quickstart
 
 1. Create the virtualenv and install backend deps:
-   - `python3 -m venv .venv && source .venv/bin/activate`
-   - `pip install -r requirements.txt`
+   - `python3 -m venv backend/.venv && source backend/.venv/bin/activate`
+   - `pip install -r backend/requirements.txt`
+   - `playwright install chromium`
 2. Install frontend deps:
    - `npm --prefix frontend install`
 3. Run the desktop app (starts Vite and the backend for you):
