@@ -8,8 +8,8 @@ backend, all running on your own machine — no accounts, no server.
 - `src-tauri/` — Rust/Tauri desktop shell; launches and supervises the backend
 - `frontend/` — React + Vite UI
 - `backend/app/` — FastAPI service (routes, services, JSON-file persistence)
-- `backend/data/` — runtime data (`books.json` catalog, `user_state.json`) plus
-  the standalone scraper tooling (`scraper.py`, `gradient.py`)
+- `backend/data/` — runtime JSON only (`books.json` catalog, `user_state.json`)
+- `backend/scripts/` — standalone scraper tooling (`scraper.py`, `gradient.py`)
 
 ## Quickstart
 
@@ -43,13 +43,15 @@ with the `OBSIDIAN_VAULT_PATH` environment variable, or the
 
 ## Scraper
 
-`backend/data/scraper.py` drives real Chromium via Playwright (Goodreads sits
-behind an AWS WAF JS challenge that plain HTTP clients cannot pass).
+`backend/scripts/scraper.py` drives real Chromium via Playwright (Goodreads
+sits behind an AWS WAF JS challenge that plain HTTP clients cannot pass). Both
+scripts resolve their data paths relative to `backend/data/`, so they can be
+run from any directory.
 
-- `python scraper.py --import-one <url>` — scrape one book (what the app's
-  "Add Book" dialog shells out to)
-- `python scraper.py --seed <url>` — recursive crawl from a seed
-- `python scraper.py --stats` — frontier queue stats
+- `python backend/scripts/scraper.py --import-one <url>` — scrape one book
+  (what the app's "Add Book" dialog shells out to)
+- `python backend/scripts/scraper.py --seed <url>` — recursive crawl from a seed
+- `python backend/scripts/scraper.py --stats` — frontier queue stats
 
-Requires `playwright install chromium` once. `gradient.py` runs a separate
-rate-limited pass to extract dominant cover colors into `books.json`.
+Requires `playwright install chromium` once. `backend/scripts/gradient.py` runs
+a separate rate-limited pass to extract dominant cover colors into `books.json`.
