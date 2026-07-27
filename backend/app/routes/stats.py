@@ -6,7 +6,6 @@ from pathlib import Path
 
 from ..repository import DataRepository
 from ..services.catalog import resolve_book as load_book
-from ..services.reading import compute_reading_stats
 from ..utils import parse_iso_date
 
 
@@ -46,21 +45,6 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
             "blurb": str(row.get("description") or catalog.get("description") or ""),
             "_raw": {**row, **({"linked_catalog_book": catalog} if catalog else {})},
         }
-
-    @router.get("/reading-stats")
-    def get_reading_stats() -> dict:
-        entries = {
-            bid: {
-                "status": row.get("status", "not_started"),
-                "total_pages": int(row.get("total_pages") or 0),
-                "current_page": int(row.get("current_page") or 0),
-                "start_date": row.get("start_date", ""),
-                "finish_date": row.get("finish_date", ""),
-            }
-            for bid, row in _books_map().items()
-            if isinstance(row, dict)
-        }
-        return {"periods": compute_reading_stats(entries)}
 
     @router.get("/stats")
     def get_stats(

@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from datetime import date, datetime
 from pathlib import Path
 import yaml
 
-from ...utils import normalize_text, parse_iso_date_string
+from ...utils import parse_iso_date_string
 
 
 def _normalize_name(value: object) -> str:
@@ -18,11 +17,6 @@ def _normalize_name(value: object) -> str:
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
     text = re.sub(r"[^\w\s]", " ", text)
     return re.sub(r"\s+", " ", text).strip()
-
-
-def _normalize_genre(value: object) -> str:
-    """Normalize genre name (preserve casing)."""
-    return _normalize_name(value)
 
 
 def _parse_frontmatter(md_text: str) -> dict:
@@ -61,7 +55,7 @@ def parse_book(path: Path) -> dict | None:
 
     genres_raw = fm.get("genres") or ""
     genres = (
-        [_normalize_genre(g) for g in genres_raw if _normalize_genre(g)]
+        [_normalize_name(g) for g in genres_raw if _normalize_name(g)]
         if isinstance(genres_raw, list)
         else [g.strip() for g in str(genres_raw).split(",") if g.strip()]
     )

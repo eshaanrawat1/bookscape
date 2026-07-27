@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from ..utils import normalize_author, read_json, split_author_field
+from ..utils import normalize_text, read_json, split_author_field
 
 
 @dataclass(frozen=True)
@@ -176,7 +176,7 @@ def get_global_library(root: Path) -> list[dict]:
 
 
 def get_books_by_author(root: Path, author: str) -> list[dict]:
-    query = normalize_author(author)
+    query = normalize_text(author)
     if not query:
         return []
 
@@ -187,7 +187,7 @@ def get_books_by_author(root: Path, author: str) -> list[dict]:
     for book in index.books:
         author_field = book.get("author", "")
         candidates = [(author_field)] + [
-            normalize_author(part) for part in split_author_field(author_field)
+            normalize_text(part) for part in split_author_field(author_field)
         ]
         if any(c and (c == query or c in query or query in c) for c in candidates):
             book_uid = str(book.get("uid") or "").strip()

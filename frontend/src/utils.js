@@ -19,7 +19,6 @@ async function loadBootstrapData() {
   return {
     books: asArray(myBooksRes?.books),
     lists: asArray(listsRes?.lists),
-    wantToReadBookIds: asArray(wantToReadRes?.book_ids),
     wantToReadBooks: asArray(wantToReadRes?.books),
     globalLibrary: asArray(globalRes?.genres),
   }
@@ -145,7 +144,6 @@ function genreNameFromView(view) {
 }
 
 export {
-  asArray,
   sleep,
   loadBootstrapData,
   collectionIdFromName,

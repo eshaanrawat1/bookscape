@@ -41,37 +41,6 @@ def _resolve_vault_path(root: Path | None = None) -> Path:
     return DEFAULT_OBSIDIAN_VAULT.expanduser()
 
 
-def load_obsidian_progress_entries(root: Path) -> tuple[dict[str, dict], dict]:
-    """
-    Returns progress entries from user_state.books.
-    Vault scan is only used during sync — not here.
-    """
-    if root is None:
-        raise ValueError("root is required")
-
-    repo = DataRepository(root)
-    user_state = repo.load_user_state()
-    books = user_state.get("books", {})
-    if not isinstance(books, dict):
-        books = {}
-
-    entries: dict[str, dict] = {}
-    for uid, book_record in books.items():
-        if not isinstance(book_record, dict):
-            continue
-        entries[str(uid)] = {
-            "status": book_record.get("status", "not_started"),
-            "total_pages": int(book_record.get("total_pages") or 0),
-            "current_page": int(book_record.get("current_page") or 0),
-            "start_date": book_record.get("start_date", ""),
-            "finish_date": book_record.get("finish_date", ""),
-            "notes": book_record.get("notes", ""),
-        }
-
-    vault_path = user_state.get("obsidian_vault_path", "")
-    return entries, {"vault_path": str(vault_path), "scanned_files": 0, "parsed_books": len(entries)}
-
-
 def run_obsidian_sync(root: Path, *, dry_run: bool = False) -> SyncResult:
     vault_path = _resolve_vault_path(root)
     if not vault_path.exists():

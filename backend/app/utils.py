@@ -40,11 +40,6 @@ def normalize_text(value: object) -> str:
     return " ".join(text.lower().split())
 
 
-def normalize_author(value: object) -> str:
-    """Normalize author name for comparison/search."""
-    return normalize_text(value)
-
-
 def split_author_field(value: object) -> list[str]:
     """Split author field by common separators (&, and, with, x, ;, /)."""
     raw = str(value or "").strip()

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Menu, RefreshCcw, Plus, Trash2, File } from 'lucide-react'
 
 // API & Utilities
-import { apiFetch, postJsonWithFallback, BOOTSTRAP_RETRIES, BOOTSTRAP_RETRY_DELAY_MS } from './api.js'
+import { apiFetch, BOOTSTRAP_RETRIES, BOOTSTRAP_RETRY_DELAY_MS } from './api.js'
 import {
   sleep,
   loadBootstrapData,
@@ -61,7 +61,6 @@ export default function App() {
   // Live data from the API
   const [books, setBooks] = useState([])
   const [collections, setCollections] = useState([])
-  const [wantToReadBookIds, setWantToReadBookIds] = useState([])
   const [wantToReadBooks, setWantToReadBooks] = useState([])
   const [globalLibrary, setGlobalLibrary] = useState([])
   const [loading, setLoading] = useState(true)
@@ -82,7 +81,6 @@ export default function App() {
 
             setBooks(data.books.map(normaliseBook))
             setCollections(mapReadingLists(data.lists))
-            setWantToReadBookIds(data.wantToReadBookIds)
             setWantToReadBooks(data.wantToReadBooks.map(normaliseBook))
             setGlobalLibrary(data.globalLibrary)
             setError(null)
@@ -257,7 +255,6 @@ export default function App() {
 
     setBooks(data.books.map(normaliseBook))
     setCollections(mapReadingLists(data.lists))
-    setWantToReadBookIds(data.wantToReadBookIds)
     setWantToReadBooks(data.wantToReadBooks.map(normaliseBook))
     setGlobalLibrary(data.globalLibrary)
   }
@@ -401,7 +398,6 @@ export default function App() {
         body: isSaved ? undefined : JSON.stringify({ book_id: bookId }),
       }
     )
-    setWantToReadBookIds(data.book_ids || [])
     setWantToReadBooks((data.books || []).map(normaliseBook))
     await reloadAppData()
   }
@@ -411,7 +407,7 @@ export default function App() {
     setSyncing(true)
     setSyncError(null)
     try {
-      await postJsonWithFallback('/sync/obsidian')
+      await apiFetch('/sync/obsidian', { method: 'POST' })
       await reloadAppData()
     } catch (err) {
       setSyncError(err.message || 'Could not sync from Obsidian.')
@@ -500,13 +496,10 @@ export default function App() {
                 onOpen={openBookDialog}
                 onOpenAuthor={openAuthorPage}
                 onOpenReadingNow={openFinishedBookDialog}
-                onOpenSidebar={() => setMobileNav(true)}
-                onSelectView={setView}
                 onGoBackFromAuthor={goBackFromAuthor}
                 onSearch={runSearch}
                 onRemoveFromCollection={removeBookFromCollection}
                 collections={collections}
-                books={books}
                 booksByIds={booksByIds}
                 currentlyReading={currentlyReading}
                 wantToRead={wantToRead}
@@ -585,8 +578,6 @@ function ViewContent({
   onOpen,
   onOpenAuthor,
   onOpenReadingNow,
-  onOpenSidebar,
-  onSelectView,
   onGoBackFromAuthor,
   onSearch,
   onRemoveFromCollection,
@@ -669,8 +660,6 @@ function ViewContent({
           onSearch={onSearch}
           onOpen={onOpen}
           onOpenAuthor={onOpenAuthor}
-          onOpenSidebar={onOpenSidebar}
-          onGoLibrary={() => onSelectView('library')}
         />
       )
     case 'stats':

@@ -94,4 +94,4 @@ function buildDialogGlow(color, fallback = 'oklch(0.62 0.14 250)') {
   return fallback
 }
 
-export { rgbToHsl, hslToRgb, buildHeroGlow, buildDialogGlow }
+export { buildHeroGlow, buildDialogGlow }

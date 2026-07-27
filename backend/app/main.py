@@ -20,7 +20,7 @@ from .routes.scraper import create_router as create_scraper_router
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_API_VERSION = 3
 
-app = FastAPI(title="Atlas API", version="0.1.0")
+app = FastAPI(title="Bookscape API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

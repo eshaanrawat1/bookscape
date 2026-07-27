@@ -295,51 +295,12 @@ svg {
   line-height: 1.35;
 }
 
-.sidebarBottomSection {
-  margin-top: auto;
-  padding-top: 1.5rem;
-}
 
-.sidebarDivider {
-  width: 100%;
-  height: 1px;
-  background: var(--border);
-  margin-bottom: 1.25rem;
-}
 
-.sidebarBottomIcons {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  justify-content: flex-end;
-}
 
-.sidebarIconButton {
-  display: grid;
-  width: 2.25rem;
-  height: 2.25rem;
-  place-items: center;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--sidebar-foreground);
-  cursor: pointer;
-  transition: background 160ms ease, color 160ms ease;
-}
 
-.sidebarIconButton:hover:not(:disabled) {
-  background: color-mix(in oklch, var(--sidebar-accent) 70%, transparent);
-}
 
-.sidebarIconButton:disabled {
-  cursor: default;
-  opacity: 0.55;
-}
 
-.sidebarIconButton svg {
-  width: 1.25rem;
-  height: 1.25rem;
-}
 
 .iconPill {
   position: fixed;
@@ -433,31 +394,8 @@ svg {
   gap: 0.75rem;
 }
 
-.syncButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.65rem;
-  border: 1px solid color-mix(in oklch, var(--border) 78%, transparent);
-  border-radius: 999px;
-  background: color-mix(in oklch, var(--card) 88%, white);
-  color: var(--foreground);
-  padding: 0.8rem 1.15rem;
-  font-size: 1.08rem;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 10px 22px -18px rgba(74, 45, 18, 0.35);
-  transition: background 160ms ease, transform 160ms ease, border-color 160ms ease, opacity 160ms ease;
-}
 
-.syncButton:hover:not(:disabled) {
-  background: color-mix(in oklch, var(--secondary) 84%, white);
-  transform: translateY(-1px);
-}
 
-.syncButton:disabled {
-  cursor: default;
-  opacity: 0.6;
-}
 
 .syncIcon {
   width: 1.3rem;
@@ -516,28 +454,8 @@ svg {
   height: 2.8rem;
 }
 
-.deleteCollectionButton {
-  display: grid;
-  width: 3.35rem;
-  height: 3.35rem;
-  place-items: center;
-  border: 1px solid color-mix(in oklch, oklch(0.62 0.2 25) 40%, var(--border));
-  border-radius: 999px;
-  background: transparent;
-  color: oklch(0.58 0.21 25);
-  cursor: pointer;
-  transition: background 160ms ease, transform 160ms ease, border-color 160ms ease;
-}
 
-.deleteCollectionButton:hover {
-  background: color-mix(in oklch, oklch(0.62 0.2 25) 12%, transparent);
-  border-color: oklch(0.58 0.21 25);
-}
 
-.deleteCollectionButton svg {
-  width: 1.45rem;
-  height: 1.45rem;
-}
 
 .mainContent {
   max-width: 76rem;
@@ -753,9 +671,6 @@ svg {
   font-size: 1.05rem;
 }
 
-.statsGenres {
-  margin-top: -0.2rem;
-}
 
 .statsFeatured {
   display: grid;
@@ -1059,12 +974,6 @@ svg {
   gap: 1.1rem;
 }
 
-.heroHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
 
 .carouselControls {
   position: absolute;
@@ -1099,24 +1008,7 @@ svg {
   height: 1.4rem;
 }
 
-.pill {
-  display: inline-flex;
-  width: fit-content;
-  align-items: center;
-  gap: 0.6rem;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-foreground);
-  padding: 0.55rem 1.45rem;
-  font-size: 1.12rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
 
-.pill svg {
-  width: 1.2rem;
-  height: 1.2rem;
-}
 
 .heroCopy h2,
 .shelf h2,
@@ -1186,13 +1078,6 @@ svg {
   background: var(--primary);
 }
 
-.actionRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 0.55rem;
-}
 
 .primaryButton,
 .secondaryButton {
@@ -1474,20 +1359,6 @@ svg {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), transparent 42%);
 }
 
-.audioBadge {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  z-index: 4;
-  display: grid;
-  width: 2.9rem;
-  height: 2.9rem;
-  place-items: center;
-  border-radius: 999px;
-  background: color-mix(in oklch, var(--card) 90%, transparent);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
-  backdrop-filter: blur(8px);
-}
 
 .coverProgress {
   position: absolute;
