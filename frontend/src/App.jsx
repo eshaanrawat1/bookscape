@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Menu, RefreshCcw, Plus, Trash2, File } from 'lucide-react'
+import { Menu, RefreshCcw, Plus, Trash2, File, ArrowLeft } from 'lucide-react'
 
 // API & Utilities
 import { apiFetch, BOOTSTRAP_RETRIES, BOOTSTRAP_RETRY_DELAY_MS } from './api.js'
@@ -476,6 +476,12 @@ export default function App() {
                 <Menu />
               </button>
               <div>
+                {view.startsWith('genre:') && (
+                  <button type="button" className="kickerLink" onClick={goBackFromGenre}>
+                    <ArrowLeft size={14} />
+                    Library
+                  </button>
+                )}
                 <h1>{meta?.title || meta?.name}</h1>
                 <p>{meta?.subtitle || meta?.description}</p>
               </div>
@@ -522,7 +528,6 @@ export default function App() {
                 genreLoading={genreLoading}
                 genreError={genreError}
                 onOpenGenre={openGenrePage}
-                onGoBackFromGenre={goBackFromGenre}
                 statsSummary={statsSummary}
                 statsLoading={statsLoading}
                 statsError={statsError}
@@ -607,7 +612,6 @@ function ViewContent({
   genreLoading,
   genreError,
   onOpenGenre,
-  onGoBackFromGenre,
   statsSummary,
   statsLoading,
   statsError,
@@ -708,7 +712,6 @@ function ViewContent({
             error={genreError}
             onOpen={onOpen}
             onOpenAuthor={onOpenAuthor}
-            onBack={onGoBackFromGenre}
           />
         )
       }

@@ -396,6 +396,32 @@ svg {
   gap: 0.75rem;
 }
 
+.kickerLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: opacity 160ms ease;
+}
+
+.kickerLink svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.kickerLink:hover {
+  opacity: 0.75;
+}
+
 
 
 

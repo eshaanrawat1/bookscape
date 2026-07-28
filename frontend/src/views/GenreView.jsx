@@ -1,16 +1,8 @@
-import { ArrowLeft } from 'lucide-react'
 import BookGrid from '../components/BookGrid.jsx'
 
-function GenreView({ genre, books, loading, error, onOpen, onOpenAuthor, onBack }) {
+function GenreView({ genre, books, loading, error, onOpen, onOpenAuthor }) {
   return (
     <div className="stack">
-      <div className="shelfHeader">
-        <button type="button" className="secondaryButton" onClick={onBack}>
-          <ArrowLeft size={18} />
-          Back to Library
-        </button>
-      </div>
-
       {loading ? (
         <div className="emptyState">
           <p>Loading genre books…</p>
