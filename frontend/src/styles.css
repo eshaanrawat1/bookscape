@@ -616,7 +616,7 @@ svg {
 .dialogScrim {
   display: flex;
   justify-content: center;
-  align-items: flex-start;
+  align-items: center;
   padding: 4rem 1rem;
   overflow-y: auto;
 }
