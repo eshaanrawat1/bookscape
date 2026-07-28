@@ -49,10 +49,9 @@ function AuthorView({ author }: AuthorViewProps) {
                 </div>
               )}
             </div>
-            {heroBook && <p className="authorHeroCaption">Featured</p>}
           </div>
 
-          <div className="finishedCopy">
+          <div className="authorIdentity">
             <div className="finishedHeader">
               <div>
                 <h2>{author || 'Author'}</h2>
@@ -77,9 +76,11 @@ function AuthorView({ author }: AuthorViewProps) {
                 </span>
               )}
             </div>
+          </div>
 
+          <div className="finishedCopy">
             <p className="authorSummary">
-              Books we have by this author, including co-written titles. This page gathers every matching title from the catalog and gives you a clean shelf just like the finished-books view.
+              This page includes all books we have by this author, including co-written titles.
             </p>
 
             {featuredBlurb && heroBook && (
