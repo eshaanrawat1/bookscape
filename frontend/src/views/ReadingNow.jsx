@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Clock3, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toNumberOrZero } from '../utils.js'
 import { buildHeroGlow } from '../color.js'
@@ -9,10 +9,24 @@ import Shelf from '../components/Shelf.jsx'
 function ReadingNowHero({ books, onOpen }) {
   const [currentIndex, setCurrentIndex] = useState(0)
 
+  // In case the list shrinks
+  const safeIndex = books && currentIndex >= books.length ? 0 : currentIndex
+
+  useEffect(() => {
+    if (!books || books.length < 2) return
+    const neighborCovers = [
+      books[(safeIndex + 1) % books.length]?.cover,
+      books[(safeIndex - 1 + books.length) % books.length]?.cover,
+    ]
+    neighborCovers.forEach((src) => {
+      if (!src) return
+      const preload = new Image()
+      preload.src = src
+    })
+  }, [books, safeIndex])
+
   if (!books || books.length === 0) return null
 
-  // In case the list shrinks
-  const safeIndex = currentIndex >= books.length ? 0 : currentIndex
   const book = books[safeIndex]
 
   const nextBook = () => setCurrentIndex((i) => (i + 1) % books.length)

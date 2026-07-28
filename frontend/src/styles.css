@@ -1379,6 +1379,11 @@ svg {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  opacity: 0;
+}
+
+.coverImage img.coverLoaded {
+  opacity: 1;
 }
 
 .spineShadow,
