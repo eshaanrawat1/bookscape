@@ -482,6 +482,12 @@ export default function App() {
                     Library
                   </button>
                 )}
+                {view.startsWith('author:') && (
+                  <button type="button" className="kickerLink" onClick={goBackFromAuthor}>
+                    <ArrowLeft size={14} />
+                    Library
+                  </button>
+                )}
                 <h1>{meta?.title || meta?.name}</h1>
                 <p>{meta?.subtitle || meta?.description}</p>
               </div>
@@ -504,7 +510,6 @@ export default function App() {
                 onOpen={openBookDialog}
                 onOpenAuthor={openAuthorPage}
                 onOpenReadingNow={openFinishedBookDialog}
-                onGoBackFromAuthor={goBackFromAuthor}
                 onSearch={runSearch}
                 onRemoveFromCollection={removeBookFromCollection}
                 collections={collections}
@@ -588,7 +593,6 @@ function ViewContent({
   onOpen,
   onOpenAuthor,
   onOpenReadingNow,
-  onGoBackFromAuthor,
   onSearch,
   onRemoveFromCollection,
   collections,
@@ -699,7 +703,6 @@ function ViewContent({
             error={authorError}
             onOpen={onOpen}
             onOpenAuthor={onOpenAuthor}
-            onBack={onGoBackFromAuthor}
           />
         )
       }

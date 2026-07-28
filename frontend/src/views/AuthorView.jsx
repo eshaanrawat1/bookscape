@@ -1,7 +1,7 @@
 import BookCover from '../components/BookCover.jsx'
 import BookGrid from '../components/BookGrid.jsx'
 
-function AuthorView({ author, books, loading, error, onOpen, onOpenAuthor, onBack }) {
+function AuthorView({ author, books, loading, error, onOpen, onOpenAuthor }) {
   const heroBook = books[0] || null
 
   return (
@@ -35,12 +35,6 @@ function AuthorView({ author, books, loading, error, onOpen, onOpenAuthor, onBac
             <p className="authorSummary">
               This page gathers every matching title from the catalog and gives you a clean shelf just like the finished-books view.
             </p>
-
-            <div className="authorActions">
-              <button type="button" className="secondaryButton" onClick={onBack}>
-                Back to Library
-              </button>
-            </div>
           </div>
         </div>
       </section>

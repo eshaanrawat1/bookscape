@@ -2099,13 +2099,6 @@ svg {
   line-height: 1.65;
 }
 
-.authorActions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1rem;
-}
-
 .authorBooksSection {
   display: flex;
   flex-direction: column;
