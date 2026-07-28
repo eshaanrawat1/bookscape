@@ -5,11 +5,9 @@
   --background: oklch(0.96 0.012 80);
   --foreground: oklch(0.26 0.024 50);
   --card: oklch(0.98 0.01 84);
-  --card-foreground: oklch(0.26 0.024 50);
   --primary: oklch(0.55 0.13 55);
   --primary-foreground: oklch(0.98 0.012 84);
   --secondary: oklch(0.92 0.018 78);
-  --secondary-foreground: oklch(0.32 0.03 52);
   --muted: oklch(0.93 0.015 80);
   --muted-foreground: oklch(0.5 0.025 60);
   --accent: oklch(0.88 0.04 70);
@@ -21,9 +19,15 @@
   --sidebar-accent: oklch(0.88 0.03 70);
   --sidebar-border: oklch(0.86 0.022 72);
   --ember-soft: oklch(0.72 0.12 62);
-  --shadow-warm: 0 14px 30px -12px rgba(60, 40, 20, 0.55);
-  --shadow-panel: 0 18px 40px -20px rgba(60, 40, 20, 0.5);
-  --radius: 0.875rem;
+  --danger: oklch(0.58 0.22 25);
+  --danger-strong: oklch(0.62 0.24 25);
+  --status-reading: oklch(0.72 0.16 72);
+  --status-not-started: oklch(0.69 0.05 85);
+  --status-finished: #7dbf85;
+  --shadow-tint: 60, 40, 20;
+  --shadow-tint-finished: 74, 45, 18;
+  --shadow-warm: 0 14px 30px -12px rgba(var(--shadow-tint), 0.55);
+  --shadow-panel: 0 18px 40px -20px rgba(var(--shadow-tint), 0.5);
 }
 
 * {
@@ -207,6 +211,8 @@ svg {
 
 .collectionButton {
   width: 100%;
+  min-height: 3.9rem;
+  font-weight: 400;
 }
 
 .navButton svg {
@@ -223,12 +229,6 @@ svg {
   background: var(--sidebar-accent);
   color: var(--sidebar-foreground);
   box-shadow: 0 0 10px 1px color-mix(in oklch, var(--ember-soft) 22%, transparent);
-}
-
-.collectionButton {
-  min-height: 3.9rem;
-  font-size: 1.30rem;
-  font-weight: 400;
 }
 
 .collectionButton.active {
@@ -296,13 +296,6 @@ svg {
   font-size: 1.1rem;
   line-height: 1.35;
 }
-
-
-
-
-
-
-
 
 .iconPill {
   position: fixed;
@@ -422,9 +415,6 @@ svg {
   opacity: 0.75;
 }
 
-
-
-
 .syncIcon {
   width: 1.3rem;
   height: 1.3rem;
@@ -481,9 +471,6 @@ svg {
   width: 2.8rem;
   height: 2.8rem;
 }
-
-
-
 
 .mainContent {
   max-width: 76rem;
@@ -560,7 +547,7 @@ svg {
   border-radius: 1.2rem;
   background: color-mix(in oklch, var(--card) 94%, white);
   padding: 1rem;
-  box-shadow: 0 10px 20px -18px rgba(60, 40, 20, 0.28);
+  box-shadow: 0 10px 20px -18px rgba(var(--shadow-tint), 0.28);
 }
 
 .statsFilterTrigger {
@@ -620,7 +607,7 @@ svg {
   border-radius: 1rem;
   background: color-mix(in oklch, var(--card) 96%, white);
   padding: 0.65rem;
-  box-shadow: 0 22px 40px -22px rgba(60, 40, 20, 0.45);
+  box-shadow: 0 22px 40px -22px rgba(var(--shadow-tint), 0.45);
   transition: opacity 160ms ease, transform 160ms ease, visibility 0s linear 160ms;
   z-index: 30;
 }
@@ -698,7 +685,6 @@ svg {
   color: var(--muted-foreground);
   font-size: 1.05rem;
 }
-
 
 .statsFeatured {
   display: grid;
@@ -836,7 +822,7 @@ svg {
   border: 1px solid var(--border);
   border-radius: 1.6rem;
   background: color-mix(in oklch, var(--card) 94%, white);
-  box-shadow: 0 18px 36px -24px rgba(60, 40, 20, 0.24);
+  box-shadow: 0 18px 36px -24px rgba(var(--shadow-tint), 0.24);
 }
 
 .searchPreviewStatus {
@@ -1032,7 +1018,6 @@ svg {
   gap: 1.1rem;
 }
 
-
 .carouselControls {
   position: absolute;
   top: 1.5rem;
@@ -1065,8 +1050,6 @@ svg {
   width: 1.4rem;
   height: 1.4rem;
 }
-
-
 
 .heroCopy h2,
 .shelf h2,
@@ -1136,7 +1119,6 @@ svg {
   background: var(--primary);
 }
 
-
 .primaryButton,
 .secondaryButton {
   display: inline-flex;
@@ -1169,20 +1151,6 @@ svg {
 .secondaryButton:hover {
   opacity: 0.9;
   transform: translateY(-1px);
-}
-
-.starRating {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--muted-foreground);
-  font-size: 1rem;
-}
-
-.starRating svg {
-  width: 1.1rem;
-  height: 1.1rem;
-  color: var(--primary);
 }
 
 .shelf {
@@ -1292,15 +1260,15 @@ svg {
   border-radius: 999px;
   background: color-mix(in oklch, var(--card) 92%, white);
   color: var(--muted-foreground);
-  box-shadow: 0 8px 18px rgba(60, 40, 20, 0.18);
+  box-shadow: 0 8px 18px rgba(var(--shadow-tint), 0.18);
   cursor: pointer;
   transition: background 160ms ease, color 160ms ease, transform 160ms ease, border-color 160ms ease;
 }
 
 .collectionRemoveButton:hover {
-  background: color-mix(in oklch, oklch(0.64 0.2 25) 12%, white);
-  color: oklch(0.58 0.22 25);
-  border-color: oklch(0.58 0.22 25 / 0.5);
+  background: color-mix(in oklch, var(--danger) 12%, white);
+  color: var(--danger);
+  border-color: color-mix(in oklch, var(--danger) 50%, transparent);
   transform: translateY(-1px);
 }
 
@@ -1440,7 +1408,6 @@ svg {
   z-index: 3;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), transparent 42%);
 }
-
 
 .coverProgress {
   position: absolute;
@@ -1601,7 +1568,7 @@ svg {
 }
 
 .scraperError {
-  color: oklch(0.58 0.22 25);
+  color: var(--danger);
   margin: 0;
   font-size: 0.98rem;
   font-weight: 500;
@@ -1782,17 +1749,17 @@ svg {
 }
 
 .dialogSaveButton.saved {
-  border-color: color-mix(in oklch, oklch(0.64 0.22 25) 34%, var(--border));
-  color: oklch(0.62 0.24 25);
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, oklch(0.64 0.22 25) 14%, transparent);
+  border-color: color-mix(in oklch, var(--danger-strong) 34%, var(--border));
+  color: var(--danger-strong);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--danger-strong) 14%, transparent);
 }
 
 .dialogSaveButton.saved svg {
-  color: oklch(0.62 0.24 25);
+  color: var(--danger-strong);
 }
 
 .dialogSaveButton.saved:hover:not(:disabled) {
-  background: color-mix(in oklch, oklch(0.64 0.22 25) 10%, white);
+  background: color-mix(in oklch, var(--danger-strong) 10%, white);
 }
 
 .collectionPicker {
@@ -1856,7 +1823,7 @@ svg {
   padding: 2.25rem;
   background:
     linear-gradient(180deg, color-mix(in oklch, var(--card) 92%, white) 0%, color-mix(in oklch, var(--card) 84%, var(--background)) 100%);
-  box-shadow: 0 28px 90px rgba(74, 45, 18, 0.28);
+  box-shadow: 0 28px 90px rgba(var(--shadow-tint-finished), 0.28);
 }
 
 .finishedDialogTop {
@@ -2002,18 +1969,18 @@ svg {
   width: 0.72rem;
   height: 0.72rem;
   border-radius: 999px;
-  background: #7dbf85;
-  box-shadow: 0 0 0 4px color-mix(in oklch, #7dbf85 18%, transparent);
+  background: var(--status-finished);
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--status-finished) 18%, transparent);
 }
 
 .finishedStatusDot.reading {
-  background: oklch(0.72 0.16 72);
-  box-shadow: 0 0 0 4px color-mix(in oklch, oklch(0.72 0.16 72) 18%, transparent);
+  background: var(--status-reading);
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--status-reading) 18%, transparent);
 }
 
 .finishedStatusDot.notStarted {
-  background: oklch(0.69 0.05 85);
-  box-shadow: 0 0 0 4px color-mix(in oklch, oklch(0.69 0.05 85) 18%, transparent);
+  background: var(--status-not-started);
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--status-not-started) 18%, transparent);
 }
 
 .finishedPanel {
@@ -2145,7 +2112,7 @@ svg {
   background:
     linear-gradient(180deg, color-mix(in oklch, var(--card) 92%, white) 0%, color-mix(in oklch, var(--card) 84%, var(--background)) 100%);
   padding: 2.25rem;
-  box-shadow: 0 28px 90px rgba(74, 45, 18, 0.14);
+  box-shadow: 0 28px 90px rgba(var(--shadow-tint-finished), 0.14);
 }
 
 .authorDialogTop {
@@ -2319,16 +2286,6 @@ svg {
   color: var(--muted-foreground);
   font-size: 1.3rem;
   line-height: 1.5;
-}
-
-.dialogStats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.7rem;
-  color: var(--muted-foreground);
-  font-size: 0.88rem;
-  font-weight: 400;
-  letter-spacing: 0.005em;
 }
 
 .mobileDrawer {
