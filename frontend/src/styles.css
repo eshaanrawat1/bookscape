@@ -222,6 +222,7 @@ svg {
 .navButton.active {
   background: var(--sidebar-accent);
   color: var(--sidebar-foreground);
+  box-shadow: 0 0 10px 1px color-mix(in oklch, var(--ember-soft) 22%, transparent);
 }
 
 .collectionButton {
@@ -233,6 +234,7 @@ svg {
 .collectionButton.active {
   background: var(--sidebar-accent);
   color: var(--sidebar-foreground);
+  box-shadow: 0 0 10px 1px color-mix(in oklch, var(--ember-soft) 22%, transparent);
 }
 
 .collectionDot {
@@ -1161,6 +1163,18 @@ svg {
   font-weight: 600;
   letter-spacing: 0.005em;
   cursor: pointer;
+}
+
+.shelfHeader .secondaryButton {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 1.08rem;
+}
+
+.shelfHeader .secondaryButton svg {
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
 .shelfScroll {
