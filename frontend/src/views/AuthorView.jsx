@@ -1,7 +1,9 @@
 import BookCover from '../components/BookCover.jsx'
 import BookGrid from '../components/BookGrid.jsx'
+import useAuthorBooks from '../hooks/useAuthorBooks.js'
 
-function AuthorView({ author, books, loading, error, onOpen, onOpenAuthor }) {
+function AuthorView({ author }) {
+  const { books, loading, error } = useAuthorBooks(author)
   const heroBook = books[0] || null
 
   return (
@@ -56,7 +58,7 @@ function AuthorView({ author, books, loading, error, onOpen, onOpenAuthor }) {
               <p>Every title in the catalog matched to this author.</p>
             </div>
           </div>
-          <BookGrid books={books} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
+          <BookGrid books={books} />
         </section>
       ) : (
         <div className="emptyState">

@@ -1,6 +1,6 @@
 import BookCard from './BookCard.jsx'
 
-function Shelf({ title, subtitle, books, onOpen, onOpenAuthor, onSeeAll }) {
+function Shelf({ title, subtitle, books, onSeeAll }) {
   if (!books.length) return null
 
   return (
@@ -16,7 +16,7 @@ function Shelf({ title, subtitle, books, onOpen, onOpenAuthor, onSeeAll }) {
       </div>
       <div className="shelfScroll">
         {books.map((book) => (
-          <BookCard key={book.id} book={book} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
+          <BookCard key={book.id} book={book} />
         ))}
       </div>
     </section>

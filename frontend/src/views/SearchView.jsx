@@ -3,20 +3,22 @@ import { ChevronRight, Search, X } from 'lucide-react'
 import BookCover from '../components/BookCover.jsx'
 import BookGrid from '../components/BookGrid.jsx'
 import { formatCompactNumber } from '../utils.js'
+import useSearch from '../hooks/useSearch.js'
+import { useNavigation } from '../context/NavigationContext.jsx'
 
-function SearchView({
-  draft,
-  query = '',
-  results,
-  loading,
-  error,
-  previewResults = [],
-  previewLoading = false,
-  onDraftChange,
-  onSearch,
-  onOpen,
-  onOpenAuthor,
-}) {
+function SearchView() {
+  const {
+    draft,
+    query,
+    results,
+    loading,
+    error,
+    previewResults,
+    previewLoading,
+    setDraft,
+    runSearch,
+  } = useSearch()
+  const { onOpen, onOpenAuthor } = useNavigation()
   const inputRef = useRef(null)
   const draftQuery = draft.trim()
   const submittedQuery = query.trim()
@@ -25,13 +27,13 @@ function SearchView({
 
   const submitSearch = async (event) => {
     event.preventDefault()
-    await onSearch(draft)
+    await runSearch(draft)
   }
 
   if (loading) {
     return (
       <div className="stack">
-        <SearchHeader draft={draft} onDraftChange={onDraftChange} onSubmit={submitSearch} inputRef={inputRef} />
+        <SearchHeader draft={draft} onDraftChange={setDraft} onSubmit={submitSearch} inputRef={inputRef} />
       </div>
     )
   }
@@ -45,7 +47,7 @@ function SearchView({
           previewResults={previewResults}
           previewLoading={previewLoading}
           showPreview={showPreview}
-          onDraftChange={onDraftChange}
+          onDraftChange={setDraft}
           onSubmit={submitSearch}
           onOpen={onOpen}
           inputRef={inputRef}
@@ -64,13 +66,13 @@ function SearchView({
           previewResults={previewResults}
           previewLoading={previewLoading}
           showPreview={showPreview}
-          onDraftChange={onDraftChange}
+          onDraftChange={setDraft}
           onSubmit={submitSearch}
           onOpen={onOpen}
           inputRef={inputRef}
         />
         {results.length > 0 ? (
-          <BookGrid books={results} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
+          <BookGrid books={results} />
         ) : (
           <SearchLanding title="No results found" body="Try a different title, author, or a broader term." />
         )}
@@ -86,7 +88,7 @@ function SearchView({
         previewResults={previewResults}
         previewLoading={previewLoading}
         showPreview={showPreview}
-        onDraftChange={onDraftChange}
+        onDraftChange={setDraft}
         onSubmit={submitSearch}
         onOpen={onOpen}
         inputRef={inputRef}

@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { Flame, Plus } from 'lucide-react'
 import { collectionIdFromName } from '../utils.js'
 import { mainNav, shelfNav } from '../constants.js'
+import { useLibraryData } from '../context/LibraryDataContext.jsx'
 
-function Sidebar({ active, collections, onSelect, onCreateCollection, onRenameCollection }) {
+function Sidebar({ active, onSelect }) {
+  const { collections, createCollection: onCreateCollection, renameCollection: onRenameCollection } = useLibraryData()
   const [editingId, setEditingId] = useState(null)
   const [draftName, setDraftName] = useState('')
   const [collectionError, setCollectionError] = useState('')

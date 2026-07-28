@@ -5,6 +5,8 @@ import { buildHeroGlow } from '../color.js'
 import BookCover from '../components/BookCover.jsx'
 import Progress from '../components/Progress.jsx'
 import Shelf from '../components/Shelf.jsx'
+import { useLibraryData } from '../context/LibraryDataContext.jsx'
+import { useNavigation } from '../context/NavigationContext.jsx'
 
 function ReadingNowHero({ books, onOpen }) {
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -78,19 +80,13 @@ function ReadingNowHero({ books, onOpen }) {
   )
 }
 
-function ReadingNow({
-  currentlyReading,
-  wantToRead,
-  collections,
-  booksByIds,
-  onOpen,
-  onOpenAuthor,
-  onOpenReadingNow,
-}) {
+function ReadingNow() {
+  const { currentlyReading, wantToRead, collections, booksByIds } = useLibraryData()
+  const { onOpenReadingNow } = useNavigation()
   return (
     <div className="stack">
       {currentlyReading.length > 0 && <ReadingNowHero books={currentlyReading} onOpen={onOpenReadingNow} />}
-      <Shelf title="Up next" subtitle="Saved for the right moment." books={wantToRead.slice(0, 6)} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
+      <Shelf title="Up next" subtitle="Saved for the right moment." books={wantToRead.slice(0, 6)} />
       {collections
         .filter((collection) => (collection.books?.length || collection.bookIds?.length || 0) > 0)
         .map((collection) => (
@@ -99,8 +95,6 @@ function ReadingNow({
             title={collection.name}
             subtitle="Collection"
             books={collection.books?.length ? collection.books : booksByIds(collection.bookIds)}
-            onOpen={onOpen}
-            onOpenAuthor={onOpenAuthor}
           />
         ))}
     </div>

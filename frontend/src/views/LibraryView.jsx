@@ -1,6 +1,10 @@
 import Shelf from '../components/Shelf.jsx'
+import { useLibraryData } from '../context/LibraryDataContext.jsx'
+import { useNavigation } from '../context/NavigationContext.jsx'
 
-function LibraryView({ globalLibrary, onOpen, onOpenAuthor, onOpenGenre }) {
+function LibraryView() {
+  const { globalLibrary } = useLibraryData()
+  const { onOpenGenre } = useNavigation()
   if (!globalLibrary || globalLibrary.length === 0) {
     return (
       <div className="emptyState">
@@ -15,8 +19,6 @@ function LibraryView({ globalLibrary, onOpen, onOpenAuthor, onOpenGenre }) {
           key={genreSection.genre}
           title={genreSection.genre}
           books={genreSection.books}
-          onOpen={onOpen}
-          onOpenAuthor={onOpenAuthor}
           onSeeAll={onOpenGenre}
         />
       ))}

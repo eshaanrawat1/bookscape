@@ -1,6 +1,8 @@
 import BookGrid from '../components/BookGrid.jsx'
+import { useLibraryData } from '../context/LibraryDataContext.jsx'
 
-function CollectionView({ activeCollection, booksByIds, onOpen, onOpenAuthor, onRemoveFromCollection }) {
+function CollectionView({ activeCollection }) {
+  const { booksByIds, removeBookFromCollection } = useLibraryData()
   if (!activeCollection) return null
 
   const books = activeCollection.books?.length ? activeCollection.books : booksByIds(activeCollection.bookIds)
@@ -15,11 +17,9 @@ function CollectionView({ activeCollection, booksByIds, onOpen, onOpenAuthor, on
       </div>
       <BookGrid
         books={books}
-        onOpen={onOpen}
-        onOpenAuthor={onOpenAuthor}
         showRemoveButton
         removeLabel={activeCollection.name}
-        onRemove={(bookId) => onRemoveFromCollection(activeCollection.name, bookId)}
+        onRemove={(bookId) => removeBookFromCollection(activeCollection.name, bookId)}
       />
     </div>
   )

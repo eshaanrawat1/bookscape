@@ -1,6 +1,6 @@
 import BookCard from './BookCard.jsx'
 
-function BookGrid({ books, onOpen, onOpenAuthor, showRemoveButton = false, removeLabel = '', onRemove }) {
+function BookGrid({ books, showRemoveButton = false, removeLabel = '', onRemove }) {
   if (!books.length) {
     return (
       <div className="emptyState">
@@ -16,8 +16,6 @@ function BookGrid({ books, onOpen, onOpenAuthor, showRemoveButton = false, remov
         <BookCard
           key={book.id}
           book={book}
-          onOpen={onOpen}
-          onOpenAuthor={onOpenAuthor}
           showRemoveButton={showRemoveButton}
           removeLabel={removeLabel}
           onRemove={onRemove}

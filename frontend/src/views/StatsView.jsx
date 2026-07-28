@@ -4,8 +4,10 @@ import BookCard from '../components/BookCard.jsx'
 import { monthOptions } from '../constants.js'
 import { buildHeroGlow } from '../color.js'
 import { formatCompactNumber } from '../utils.js'
+import useStats from '../hooks/useStats.js'
 
-function StatsView({ summary, loading, error, year, month, onYearChange, onMonthChange, onOpen, onOpenAuthor }) {
+function StatsView() {
+  const { summary, loading, error, year, month, setYear, setMonth } = useStats()
   const years = summary?.available_years || []
   const hasBooks = (summary?.books_read || 0) > 0
   const heroColor = summary?.most_time_spent?.color || summary?.densest_book?.color || 'oklch(0.62 0.14 55)'
@@ -18,14 +20,14 @@ function StatsView({ summary, loading, error, year, month, onYearChange, onMonth
           value={year}
           emptyLabel="All years"
           options={years.map((value) => ({ value: String(value), label: String(value) }))}
-          onChange={onYearChange}
+          onChange={setYear}
         />
         <AccordionFilter
           label="Month"
           value={month}
           emptyLabel="All months"
           options={monthOptions}
-          onChange={onMonthChange}
+          onChange={setMonth}
         />
       </div>
 
@@ -73,7 +75,7 @@ function StatsView({ summary, loading, error, year, month, onYearChange, onMonth
                   <h2>Densest book</h2>
                   <p>{formatCompactNumber(summary.densest_book.totalPages)} pages</p>
                 </div>
-                <BookCard book={summary.densest_book} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
+                <BookCard book={summary.densest_book} />
               </div>
             )}
             {summary.most_time_spent && (
@@ -82,7 +84,7 @@ function StatsView({ summary, loading, error, year, month, onYearChange, onMonth
                   <h2>Most time spent</h2>
                   <p>{summary.most_time_spent_days ? `${summary.most_time_spent_days} days` : 'No date range'}</p>
                 </div>
-                <BookCard book={summary.most_time_spent} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
+                <BookCard book={summary.most_time_spent} />
               </div>
             )}
           </section>

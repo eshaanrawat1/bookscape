@@ -1,21 +1,17 @@
 import { useState, useEffect } from 'react'
 import { X, Star, MessageSquareText, FileText, Plus, Heart } from 'lucide-react'
 import { apiFetch } from '../api.js'
-import { normaliseBook, getCatalogBookId, formatCompactNumber } from '../utils.js'
+import { normaliseBook, getCatalogBookId, formatCompactNumber, resolveSavedWantToReadBook } from '../utils.js'
 import { buildDialogGlow } from '../color.js'
 import BookCover from './BookCover.jsx'
 import FinishedBookDialog from './FinishedBookDialog.jsx'
+import { useLibraryData } from '../context/LibraryDataContext.jsx'
+import { useNavigation } from '../context/NavigationContext.jsx'
 
-function BookDialog({
-  book,
-  collections,
-  savedWantToReadBook,
-  onAddToCollection,
-  onClose,
-  onOpen,
-  onOpenAuthor,
-  onToggleWantToRead,
-}) {
+function BookDialog({ book, onClose }) {
+  const { collections, wantToReadBooks, addBookToCollection, toggleBookWantToRead } = useLibraryData()
+  const { onOpen, onOpenAuthor } = useNavigation()
+  const savedWantToReadBook = resolveSavedWantToReadBook(book, wantToReadBooks)
   const [fullBook, setFullBook] = useState(null)
   const [collectionMenuOpen, setCollectionMenuOpen] = useState(false)
   const [actionMessage, setActionMessage] = useState('')
@@ -60,7 +56,7 @@ function BookDialog({
     setActionMessage('')
     try {
       const nextSaved = !isSavedToWantToRead
-      await onToggleWantToRead(isSavedToWantToRead ? savedWantToReadKey : bookId, isSavedToWantToRead)
+      await toggleBookWantToRead(isSavedToWantToRead ? savedWantToReadKey : bookId, isSavedToWantToRead)
       setActionMessage(nextSaved ? 'Saved to Want to read.' : 'Removed from Want to read.')
     } catch (err) {
       setActionMessage(err.message || 'Could not save this book.')
@@ -74,7 +70,7 @@ function BookDialog({
     setSavingCollection(collectionName)
     setActionMessage('')
     try {
-      await onAddToCollection(collectionName, bookId)
+      await addBookToCollection(collectionName, bookId)
       setCollectionMenuOpen(false)
       setActionMessage(`Added to ${collectionName}.`)
     } catch (err) {

@@ -1,6 +1,8 @@
 import BookGrid from '../components/BookGrid.jsx'
+import useGenreBooks from '../hooks/useGenreBooks.js'
 
-function GenreView({ genre, books, loading, error, onOpen, onOpenAuthor }) {
+function GenreView({ genre }) {
+  const { books, loading, error } = useGenreBooks(genre)
   return (
     <div className="stack">
       {loading ? (
@@ -13,7 +15,7 @@ function GenreView({ genre, books, loading, error, onOpen, onOpenAuthor }) {
           <p>{error}</p>
         </div>
       ) : books.length > 0 ? (
-        <BookGrid books={books} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
+        <BookGrid books={books} />
       ) : (
         <div className="emptyState">
           <h2>No books found</h2>

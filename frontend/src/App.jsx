@@ -10,13 +10,16 @@ import {
   mapReadingLists,
   nextCollectionName,
   normaliseBook,
-  resolveSavedWantToReadBook,
   authorViewId,
   authorNameFromView,
   genreViewId,
   genreNameFromView,
 } from './utils.js'
 import { viewMeta } from './constants.js'
+
+// Context
+import { LibraryDataContext, useLibraryData } from './context/LibraryDataContext.jsx'
+import { NavigationContext } from './context/NavigationContext.jsx'
 
 // Components
 import Sidebar from './components/Sidebar.jsx'
@@ -40,24 +43,6 @@ export default function App() {
   const [previousView, setPreviousView] = useState('reading-now')
   const [mobileNav, setMobileNav] = useState(false)
   const [selected, setSelected] = useState(null)
-  const [searchDraft, setSearchDraft] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState([])
-  const [searchLoading, setSearchLoading] = useState(false)
-  const [searchError, setSearchError] = useState(null)
-  const [searchPreviewResults, setSearchPreviewResults] = useState([])
-  const [searchPreviewLoading, setSearchPreviewLoading] = useState(false)
-  const [statsSummary, setStatsSummary] = useState(null)
-  const [statsLoading, setStatsLoading] = useState(false)
-  const [statsError, setStatsError] = useState(null)
-  const [statsYear, setStatsYear] = useState('')
-  const [statsMonth, setStatsMonth] = useState('')
-  const [authorBooks, setAuthorBooks] = useState([])
-  const [authorLoading, setAuthorLoading] = useState(false)
-  const [authorError, setAuthorError] = useState(null)
-  const [genreBooks, setGenreBooks] = useState([])
-  const [genreLoading, setGenreLoading] = useState(false)
-  const [genreError, setGenreError] = useState(null)
 
   // Live data from the API
   const [books, setBooks] = useState([])
@@ -105,152 +90,6 @@ export default function App() {
     load()
     return () => { cancelled = true }
   }, [])
-
-  useEffect(() => {
-    if (view !== 'stats') return
-    let cancelled = false
-
-    async function loadStats() {
-      setStatsLoading(true)
-      try {
-        const params = new URLSearchParams()
-        if (statsYear) params.set('year', statsYear)
-        if (statsMonth) params.set('month', statsMonth)
-        const suffix = params.toString() ? `?${params.toString()}` : ''
-        const data = await apiFetch(`/stats${suffix}`)
-        if (cancelled) return
-        setStatsSummary(data)
-        setStatsError(null)
-      } catch (err) {
-        if (!cancelled) setStatsError(err.message || 'Could not load stats.')
-      } finally {
-        if (!cancelled) setStatsLoading(false)
-      }
-    }
-
-    loadStats()
-    return () => { cancelled = true }
-  }, [view, statsYear, statsMonth])
-
-  useEffect(() => {
-    if (view !== 'search') {
-      setSearchPreviewResults([])
-      setSearchPreviewLoading(false)
-      return undefined
-    }
-
-    const nextQuery = searchDraft.trim()
-    const submittedQuery = searchQuery.trim()
-    if (!nextQuery || nextQuery === submittedQuery) {
-      setSearchPreviewResults([])
-      setSearchPreviewLoading(false)
-      return undefined
-    }
-
-    setSearchPreviewResults([])
-    setSearchPreviewLoading(true)
-
-    let cancelled = false
-    const timer = window.setTimeout(async () => {
-      try {
-        const data = await apiFetch(`/search?q=${encodeURIComponent(nextQuery)}&limit=5`)
-        if (cancelled) return
-        setSearchPreviewResults((data.results || []).map(normaliseBook))
-      } catch (err) {
-        if (cancelled) return
-        setSearchPreviewResults([])
-      } finally {
-        if (!cancelled) setSearchPreviewLoading(false)
-      }
-    }, 180)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
-  }, [view, searchDraft, searchQuery])
-
-  useEffect(() => {
-    if (!view.startsWith('author:')) {
-      setAuthorBooks([])
-      setAuthorError(null)
-      setAuthorLoading(false)
-      return undefined
-    }
-
-    const authorName = authorNameFromView(view)
-    if (!authorName) {
-      setAuthorBooks([])
-      setAuthorError('Could not load author books.')
-      setAuthorLoading(false)
-      return undefined
-    }
-
-    let cancelled = false
-    setAuthorLoading(true)
-    setAuthorError(null)
-
-    async function loadAuthorBooks() {
-      try {
-        const data = await apiFetch(`/author-books?author=${encodeURIComponent(authorName)}`)
-        if (cancelled) return
-        setAuthorBooks((data.books || []).map(normaliseBook))
-      } catch (err) {
-        if (!cancelled) {
-          setAuthorBooks([])
-          setAuthorError(err.message || 'Could not load author books.')
-        }
-      } finally {
-        if (!cancelled) setAuthorLoading(false)
-      }
-    }
-
-    loadAuthorBooks()
-    return () => {
-      cancelled = true
-    }
-  }, [view])
-
-  useEffect(() => {
-    if (!view.startsWith('genre:')) {
-      setGenreBooks([])
-      setGenreError(null)
-      setGenreLoading(false)
-      return undefined
-    }
-
-    const genreName = genreNameFromView(view)
-    if (!genreName) {
-      setGenreBooks([])
-      setGenreError('Could not load genre books.')
-      setGenreLoading(false)
-      return undefined
-    }
-
-    let cancelled = false
-    setGenreLoading(true)
-    setGenreError(null)
-
-    async function loadGenreBooks() {
-      try {
-        const data = await apiFetch(`/genre-books?genre=${encodeURIComponent(genreName)}&limit=100`)
-        if (cancelled) return
-        setGenreBooks((data.books || []).map(normaliseBook))
-      } catch (err) {
-        if (!cancelled) {
-          setGenreBooks([])
-          setGenreError(err.message || 'Could not load genre books.')
-        }
-      } finally {
-        if (!cancelled) setGenreLoading(false)
-      }
-    }
-
-    loadGenreBooks()
-    return () => {
-      cancelled = true
-    }
-  }, [view])
 
   async function reloadAppData() {
     const data = await loadBootstrapData()
@@ -307,31 +146,6 @@ export default function App() {
   const goBackFromGenre = () => {
     setView(previousView && !previousView.startsWith('genre:') ? previousView : 'library')
     setMobileNav(false)
-  }
-
-  async function runSearch(rawQuery = searchDraft) {
-    const nextQuery = String(rawQuery || '').trim()
-    setSearchDraft(nextQuery)
-    setSearchQuery(nextQuery)
-    setView('search')
-
-    if (!nextQuery) {
-      setSearchResults([])
-      setSearchError(null)
-      return
-    }
-
-    setSearchLoading(true)
-    setSearchError(null)
-    try {
-      const data = await apiFetch(`/search?q=${encodeURIComponent(nextQuery)}&limit=24`)
-      setSearchResults((data.results || []).map(normaliseBook))
-    } catch (err) {
-      setSearchError(err.message || 'Could not search books.')
-      setSearchResults([])
-    } finally {
-      setSearchLoading(false)
-    }
   }
 
   async function createCollection() {
@@ -418,305 +232,181 @@ export default function App() {
     }
   }
 
+  const libraryData = {
+    books,
+    collections,
+    wantToReadBooks,
+    globalLibrary,
+    currentlyReading,
+    wantToRead,
+    finished,
+    booksByIds,
+    addBookToCollection,
+    removeBookFromCollection,
+    toggleBookWantToRead,
+    createCollection,
+    renameCollection,
+  }
+
+  const navigation = {
+    onOpen: openBookDialog,
+    onOpenAuthor: openAuthorPage,
+    onOpenGenre: openGenrePage,
+    onOpenReadingNow: openFinishedBookDialog,
+  }
+
   return (
-    <div className="appRoot">
-      <div className="iconPill">
-        <button className="iconPillButton" aria-label="Obsidian Vault" onClick={() => setShowSettingsDialog(true)}>
-          <File />
-        </button>
-        <button className="iconPillButton" aria-label="Sync" onClick={syncFromObsidian} disabled={syncing}>
-          <RefreshCcw className={syncing ? 'syncIcon spinning' : 'syncIcon'} />
-        </button>
-        <button className="iconPillButton" aria-label="Add Book" onClick={() => setShowScraperDialog(true)}>
-          <Plus />
-        </button>
-        {activeCollection && (
-          <button
-            className="iconPillButton"
-            aria-label={`Delete ${activeCollection.name}`}
-            onClick={() => deleteCollection(activeCollection)}
-          >
-            <Trash2 />
-          </button>
-        )}
-      </div>
-      <div className="hearthShell">
-        <Sidebar
-          active={view}
-          collections={collections}
-          onCreateCollection={createCollection}
-          onRenameCollection={renameCollection}
-          onSelect={(nextView) => {
-            setView(nextView)
-            setMobileNav(false)
-          }}
-        />
-
-        {mobileNav && (
-          <div className="mobileScrim" onClick={() => setMobileNav(false)}>
-            <div className="mobileDrawer" onClick={(event) => event.stopPropagation()}>
-              <Sidebar
-                active={view}
-                collections={collections}
-                onCreateCollection={createCollection}
-                onRenameCollection={renameCollection}
-                onSelect={(nextView) => {
-                  setView(nextView)
-                  setMobileNav(false)
-                }}
-              />
-            </div>
-          </div>
-        )}
-
-        <main className="contentPane">
-          <header className="topBar">
-            <div className="titleGroup">
-              <button className="mobileMenuButton" onClick={() => setMobileNav(true)} aria-label="Open menu">
-                <Menu />
+    <LibraryDataContext.Provider value={libraryData}>
+      <NavigationContext.Provider value={navigation}>
+        <div className="appRoot">
+          <div className="iconPill">
+            <button className="iconPillButton" aria-label="Obsidian Vault" onClick={() => setShowSettingsDialog(true)}>
+              <File />
+            </button>
+            <button className="iconPillButton" aria-label="Sync" onClick={syncFromObsidian} disabled={syncing}>
+              <RefreshCcw className={syncing ? 'syncIcon spinning' : 'syncIcon'} />
+            </button>
+            <button className="iconPillButton" aria-label="Add Book" onClick={() => setShowScraperDialog(true)}>
+              <Plus />
+            </button>
+            {activeCollection && (
+              <button
+                className="iconPillButton"
+                aria-label={`Delete ${activeCollection.name}`}
+                onClick={() => deleteCollection(activeCollection)}
+              >
+                <Trash2 />
               </button>
-              <div>
-                {view.startsWith('genre:') && (
-                  <button type="button" className="kickerLink" onClick={goBackFromGenre}>
-                    <ArrowLeft size={14} />
-                    Library
-                  </button>
-                )}
-                {view.startsWith('author:') && (
-                  <button type="button" className="kickerLink" onClick={goBackFromAuthor}>
-                    <ArrowLeft size={14} />
-                    Library
-                  </button>
-                )}
-                <h1>{meta?.title || meta?.name}</h1>
-                <p>{meta?.subtitle || meta?.description}</p>
-              </div>
-            </div>
-            <div className="topBarActions" />
-            {syncError && (
-              <p className="topBarNotice syncErrorNotice">{syncError}</p>
-            )}
-          </header>
-
-          <div className="mainContent">
-            {loading ? (
-              <div className="emptyState"><p>Loading your books…</p></div>
-            ) : error ? (
-              <div className="emptyState"><h2>Could not load books</h2><p>{error}</p></div>
-            ) : (
-              <ViewContent
-                view={view}
-                activeCollection={activeCollection}
-                onOpen={openBookDialog}
-                onOpenAuthor={openAuthorPage}
-                onOpenReadingNow={openFinishedBookDialog}
-                onSearch={runSearch}
-                onRemoveFromCollection={removeBookFromCollection}
-                collections={collections}
-                booksByIds={booksByIds}
-                currentlyReading={currentlyReading}
-                wantToRead={wantToRead}
-                finished={finished}
-                searchDraft={searchDraft}
-                searchQuery={searchQuery}
-                searchResults={searchResults}
-                searchLoading={searchLoading}
-                searchError={searchError}
-                searchPreviewResults={searchPreviewResults}
-                searchPreviewLoading={searchPreviewLoading}
-                setSearchDraft={setSearchDraft}
-                globalLibrary={globalLibrary}
-                authorBooks={authorBooks}
-                authorLoading={authorLoading}
-                authorError={authorError}
-                genreBooks={genreBooks}
-                genreLoading={genreLoading}
-                genreError={genreError}
-                onOpenGenre={openGenrePage}
-                statsSummary={statsSummary}
-                statsLoading={statsLoading}
-                statsError={statsError}
-                statsYear={statsYear}
-                statsMonth={statsMonth}
-                setStatsYear={setStatsYear}
-                setStatsMonth={setStatsMonth}
-                onOpenStatsBook={openBookDialog}
-              />
             )}
           </div>
-        </main>
-      </div>
+          <div className="hearthShell">
+            <Sidebar
+              active={view}
+              onSelect={(nextView) => {
+                setView(nextView)
+                setMobileNav(false)
+              }}
+            />
 
-      {selected && (
-        selected.variant === 'finished' ? (
-          <FinishedBookDialog
-            key={selected.book.id || selected.book.uid}
-            book={selected.book}
-            preferLiveStatus={selected.preferLiveStatus}
-            onClose={() => setSelected(null)}
-            onOpenAuthor={openAuthorPage}
-          />
-        ) : (
-          <BookDialog
-            key={selected.book.id || selected.book.uid}
-            book={selected.book}
-            collections={collections}
-            savedWantToReadBook={resolveSavedWantToReadBook(selected.book, wantToReadBooks)}
-            onAddToCollection={addBookToCollection}
-            onClose={() => setSelected(null)}
-            onOpen={openBookDialog}
-            onOpenAuthor={openAuthorPage}
-            onToggleWantToRead={toggleBookWantToRead}
-          />
-        )
-      )}
-      {showScraperDialog && (
-        <ScraperDialog
-          onClose={() => setShowScraperDialog(false)}
-          onSuccess={async (newBook) => {
-            setShowScraperDialog(false)
-            await reloadAppData()
-            setSelected({ book: normaliseBook(newBook), variant: 'standard' })
-          }}
-        />
-      )}
-      {showSettingsDialog && (
-        <SettingsDialog onClose={() => setShowSettingsDialog(false)} onDataChanged={reloadAppData} />
-      )}
-    </div>
+            {mobileNav && (
+              <div className="mobileScrim" onClick={() => setMobileNav(false)}>
+                <div className="mobileDrawer" onClick={(event) => event.stopPropagation()}>
+                  <Sidebar
+                    active={view}
+                    onSelect={(nextView) => {
+                      setView(nextView)
+                      setMobileNav(false)
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <main className="contentPane">
+              <header className="topBar">
+                <div className="titleGroup">
+                  <button className="mobileMenuButton" onClick={() => setMobileNav(true)} aria-label="Open menu">
+                    <Menu />
+                  </button>
+                  <div>
+                    {view.startsWith('genre:') && (
+                      <button type="button" className="kickerLink" onClick={goBackFromGenre}>
+                        <ArrowLeft size={14} />
+                        Library
+                      </button>
+                    )}
+                    {view.startsWith('author:') && (
+                      <button type="button" className="kickerLink" onClick={goBackFromAuthor}>
+                        <ArrowLeft size={14} />
+                        Library
+                      </button>
+                    )}
+                    <h1>{meta?.title || meta?.name}</h1>
+                    <p>{meta?.subtitle || meta?.description}</p>
+                  </div>
+                </div>
+                <div className="topBarActions" />
+                {syncError && (
+                  <p className="topBarNotice syncErrorNotice">{syncError}</p>
+                )}
+              </header>
+
+              <div className="mainContent">
+                {loading ? (
+                  <div className="emptyState"><p>Loading your books…</p></div>
+                ) : error ? (
+                  <div className="emptyState"><h2>Could not load books</h2><p>{error}</p></div>
+                ) : (
+                  <ViewContent view={view} />
+                )}
+              </div>
+            </main>
+          </div>
+
+          {selected && (
+            selected.variant === 'finished' ? (
+              <FinishedBookDialog
+                key={selected.book.id || selected.book.uid}
+                book={selected.book}
+                preferLiveStatus={selected.preferLiveStatus}
+                onClose={() => setSelected(null)}
+              />
+            ) : (
+              <BookDialog
+                key={selected.book.id || selected.book.uid}
+                book={selected.book}
+                onClose={() => setSelected(null)}
+              />
+            )
+          )}
+          {showScraperDialog && (
+            <ScraperDialog
+              onClose={() => setShowScraperDialog(false)}
+              onSuccess={async (newBook) => {
+                setShowScraperDialog(false)
+                await reloadAppData()
+                setSelected({ book: normaliseBook(newBook), variant: 'standard' })
+              }}
+            />
+          )}
+          {showSettingsDialog && (
+            <SettingsDialog onClose={() => setShowSettingsDialog(false)} onDataChanged={reloadAppData} />
+          )}
+        </div>
+      </NavigationContext.Provider>
+    </LibraryDataContext.Provider>
   )
 }
 
-function ViewContent({
-  view,
-  activeCollection,
-  onOpen,
-  onOpenAuthor,
-  onOpenReadingNow,
-  onSearch,
-  onRemoveFromCollection,
-  collections,
-  booksByIds,
-  currentlyReading,
-  wantToRead,
-  finished,
-  searchDraft,
-  searchQuery,
-  searchResults,
-  searchLoading,
-  searchError,
-  searchPreviewResults,
-  searchPreviewLoading,
-  setSearchDraft,
-  globalLibrary,
-  authorBooks,
-  authorLoading,
-  authorError,
-  genreBooks,
-  genreLoading,
-  genreError,
-  onOpenGenre,
-  statsSummary,
-  statsLoading,
-  statsError,
-  statsYear,
-  statsMonth,
-  setStatsYear,
-  setStatsMonth,
-  onOpenStatsBook,
-}) {
+function ViewContent({ view }) {
+  const { collections, wantToRead, finished } = useLibraryData()
+  const activeCollection = view.startsWith('collection:')
+    ? collections.find((c) => `collection:${c.id}` === view)
+    : null
+
   if (activeCollection) {
-    return (
-      <CollectionView
-        activeCollection={activeCollection}
-        booksByIds={booksByIds}
-        onOpen={onOpen}
-        onOpenAuthor={onOpenAuthor}
-        onRemoveFromCollection={onRemoveFromCollection}
-      />
-    )
+    return <CollectionView activeCollection={activeCollection} />
   }
 
   switch (view) {
     case 'reading-now':
-      return (
-        <ReadingNow
-          currentlyReading={currentlyReading}
-          wantToRead={wantToRead}
-          collections={collections}
-          booksByIds={booksByIds}
-          onOpen={onOpen}
-          onOpenAuthor={onOpenAuthor}
-          onOpenReadingNow={onOpenReadingNow}
-        />
-      )
+      return <ReadingNow />
     case 'library':
-      return (
-        <LibraryView
-          globalLibrary={globalLibrary}
-          onOpen={onOpen}
-          onOpenAuthor={onOpenAuthor}
-          onOpenGenre={onOpenGenre}
-        />
-      )
+      return <LibraryView />
     case 'search':
-      return (
-        <SearchView
-          draft={searchDraft}
-          query={searchQuery}
-          results={searchResults}
-          loading={searchLoading}
-          error={searchError}
-          previewResults={searchPreviewResults}
-          previewLoading={searchPreviewLoading}
-          onDraftChange={setSearchDraft}
-          onSearch={onSearch}
-          onOpen={onOpen}
-          onOpenAuthor={onOpenAuthor}
-        />
-      )
+      return <SearchView />
     case 'stats':
-      return (
-        <StatsView
-          summary={statsSummary}
-          loading={statsLoading}
-          error={statsError}
-          year={statsYear}
-          month={statsMonth}
-          onYearChange={setStatsYear}
-          onMonthChange={setStatsMonth}
-          onOpen={onOpenStatsBook}
-          onOpenAuthor={onOpenAuthor}
-        />
-      )
+      return <StatsView />
     case 'want-to-read':
-      return <BookGrid books={wantToRead} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
+      return <BookGrid books={wantToRead} />
     case 'finished':
-      return <BookGrid books={finished} onOpen={onOpen} onOpenAuthor={onOpenAuthor} />
+      return <BookGrid books={finished} />
     default:
       if (view.startsWith('author:')) {
-        return (
-          <AuthorView
-            author={authorNameFromView(view)}
-            books={authorBooks}
-            loading={authorLoading}
-            error={authorError}
-            onOpen={onOpen}
-            onOpenAuthor={onOpenAuthor}
-          />
-        )
+        return <AuthorView author={authorNameFromView(view)} />
       }
       if (view.startsWith('genre:')) {
-        return (
-          <GenreView
-            genre={genreNameFromView(view)}
-            books={genreBooks}
-            loading={genreLoading}
-            error={genreError}
-            onOpen={onOpen}
-            onOpenAuthor={onOpenAuthor}
-          />
-        )
+        return <GenreView genre={genreNameFromView(view)} />
       }
       return null
   }

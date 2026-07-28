@@ -1,8 +1,10 @@
 import { X } from 'lucide-react'
 import BookCover from './BookCover.jsx'
 import Progress from './Progress.jsx'
+import { useNavigation } from '../context/NavigationContext.jsx'
 
-function BookCard({ book, onOpen, onOpenAuthor, showRemoveButton = false, removeLabel = '', onRemove }) {
+function BookCard({ book, showRemoveButton = false, removeLabel = '', onRemove }) {
+  const { onOpen, onOpenAuthor } = useNavigation()
   const card = (
     <div className="bookCard">
       <button type="button" className="bookCardButton" onClick={() => onOpen(book)}>

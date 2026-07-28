@@ -3,8 +3,10 @@ import { X, ChevronDown, Upload, Download } from 'lucide-react'
 import { apiFetch } from '../api.js'
 import { getCatalogBookId } from '../utils.js'
 import BookCover from './BookCover.jsx'
+import { useNavigation } from '../context/NavigationContext.jsx'
 
-function FinishedBookDialog({ book, preferLiveStatus = false, onClose, onOpenAuthor }) {
+function FinishedBookDialog({ book, preferLiveStatus = false, onClose }) {
+  const { onOpenAuthor } = useNavigation()
   const [record, setRecord] = useState(null)
   const [hydrated, setHydrated] = useState(false)
   const [statusMenuOpen, setStatusMenuOpen] = useState(false)
