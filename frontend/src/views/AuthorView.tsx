@@ -1,4 +1,7 @@
-import { BookOpen, Tag, Star, ChevronRight, BookText } from 'lucide-react'
+import { useEffect, useState, type CSSProperties } from 'react'
+import { ChevronLeft, ChevronRight, Star, MessageSquareText, FileText } from 'lucide-react'
+import { buildHeroGlow } from '../color.js'
+import { formatCompactNumber } from '../utils.js'
 import BookCover from '../components/BookCover.jsx'
 import useAuthorBooks from '../hooks/useAuthorBooks.js'
 import { useNavigation } from '../context/NavigationContext.jsx'
@@ -8,101 +11,97 @@ interface AuthorViewProps {
   author: string
 }
 
-const BLURB_LIMIT = 260
+interface AuthorHeroProps {
+  books: Book[]
+  onOpen: (book: Book) => void
+}
 
-function truncateBlurb(text: string, limit = BLURB_LIMIT): { text: string; isTruncated: boolean } {
-  const trimmed = text.trim()
-  if (trimmed.length <= limit) return { text: trimmed, isTruncated: false }
-  const clipped = trimmed.slice(0, limit)
-  const lastSpace = clipped.lastIndexOf(' ')
-  const safe = (lastSpace > 40 ? clipped.slice(0, lastSpace) : clipped).trim()
-  return { text: `${safe}…`, isTruncated: true }
+function AuthorHero({ books, onOpen }: AuthorHeroProps) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [direction, setDirection] = useState<'next' | 'prev'>('next')
+
+  const safeIndex = currentIndex >= books.length ? 0 : currentIndex
+
+  useEffect(() => {
+    if (books.length < 2) return
+    const neighborCovers = [
+      books[(safeIndex + 1) % books.length]?.cover,
+      books[(safeIndex - 1 + books.length) % books.length]?.cover,
+    ]
+    neighborCovers.forEach((src) => {
+      if (!src) return
+      const preload = new Image()
+      preload.src = src
+    })
+  }, [books, safeIndex])
+
+  const book = books[safeIndex]
+  if (!book) return null
+
+  const nextBook = () => {
+    setDirection('next')
+    setCurrentIndex((i) => (i + 1) % books.length)
+  }
+  const prevBook = () => {
+    setDirection('prev')
+    setCurrentIndex((i) => (i - 1 + books.length) % books.length)
+  }
+
+  const heroGlowColor = buildHeroGlow(book.color || `hsl(${book.tint})`)
+
+  return (
+    <section className="heroCard paperGrain">
+      <div className="heroGlow" style={{ '--hero-glow': heroGlowColor } as CSSProperties} />
+      {books.length > 1 && (
+        <div className="carouselControls">
+          <button className="carouselButton" onClick={prevBook} aria-label="Previous book">
+            <ChevronLeft />
+          </button>
+          <button className="carouselButton" onClick={nextBook} aria-label="Next book">
+            <ChevronRight />
+          </button>
+        </div>
+      )}
+      <div className={`heroInner heroSlide-${direction}`} key={book.id}>
+        <button className="heroCover" onClick={() => onOpen(book)}>
+          <BookCover book={book} glow />
+        </button>
+        <div className="heroCopy">
+          <h2>{book.title}</h2>
+          {book.genre ? <p className="bookMeta">{book.genre}</p> : null}
+          <p className="heroBlurb">{book.blurb}</p>
+          <div className="dialogStatsRow">
+            {book.rating > 0 && (
+              <span className="dialogStatItem">
+                <Star />
+                <span>{book.rating.toFixed(1)}{book.ratingCount > 0 ? ` (${formatCompactNumber(book.ratingCount)})` : ''}</span>
+              </span>
+            )}
+            {book.reviewCount > 0 && (
+              <span className="dialogStatItem">
+                <MessageSquareText />
+                <span>{formatCompactNumber(book.reviewCount)}</span>
+              </span>
+            )}
+            {book.pages > 0 && (
+              <span className="dialogStatItem">
+                <FileText />
+                <span>{formatCompactNumber(book.pages)} pages</span>
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
 }
 
 function AuthorView({ author }: AuthorViewProps) {
   const { books, loading, error } = useAuthorBooks(author)
   const { onOpen } = useNavigation()
-  const heroBook = books[0] || null
-
-  const genreCount = new Set(
-    books.flatMap((book) => (book.genres.length ? book.genres : book.genre ? [book.genre] : []))
-  ).size
-
-  const ratedBooks = books.filter((book) => book.rating > 0 && book.ratingCount > 0)
-  const avgRating = ratedBooks.length
-    ? ratedBooks.reduce((sum, book) => sum + book.rating, 0) / ratedBooks.length
-    : null
-
-  const featuredBlurb = heroBook?.blurb ? truncateBlurb(heroBook.blurb) : null
 
   return (
     <div className="stack authorPage">
-      <section className="authorHeroPanel">
-        <div className="finishedDialogTop authorDialogTop">
-          <div className="finishedCoverColumn">
-            <div className="finishedCoverWrap authorHeroFrame">
-              {heroBook ? (
-                <BookCover book={heroBook} glow />
-              ) : (
-                <div className="authorCoverFallback">
-                  <span>{author ? author.charAt(0).toUpperCase() : '?'}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="authorIdentity">
-            <div className="finishedHeader">
-              <div>
-                <h2>{author || 'Author'}</h2>
-              </div>
-            </div>
-
-            <div className="authorStats">
-              <span className="authorStat">
-                <BookOpen />
-                <span>{books.length} {books.length === 1 ? 'book' : 'books'}</span>
-              </span>
-              {genreCount > 0 && (
-                <span className="authorStat">
-                  <Tag />
-                  <span>{genreCount} {genreCount === 1 ? 'genre' : 'genres'}</span>
-                </span>
-              )}
-              {avgRating !== null && (
-                <span className="authorStat">
-                  <Star />
-                  <span>{avgRating.toFixed(1)} average</span>
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="finishedCopy">
-            <p className="authorSummary">
-              This page includes all books we have by this author, including co-written titles.
-            </p>
-
-            {featuredBlurb && heroBook && (
-              <div className="authorFeatured">
-                <p className="authorFeaturedLabel">
-                  <BookText />
-                  <span>About {heroBook.title}</span>
-                </p>
-                <p className="authorFeaturedBlurb">
-                  {featuredBlurb.text}
-                  {featuredBlurb.isTruncated && (
-                    <button type="button" className="authorFeaturedReadMore" onClick={() => onOpen(heroBook)}>
-                      Read more
-                    </button>
-                  )}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
       {loading ? (
         <div className="emptyState">
           <p>Loading author books…</p>
@@ -113,17 +112,20 @@ function AuthorView({ author }: AuthorViewProps) {
           <p>{error}</p>
         </div>
       ) : books.length > 0 ? (
-        <section className="authorBooksSection">
-          <div className="shelfHeader">
-            <h2>All books</h2>
-            <p className="authorBooksCaption">Every title matched to this author</p>
-          </div>
-          <ul className="authorBookList">
-            {books.map((book) => (
-              <AuthorBookRow key={book.id} book={book} onOpen={onOpen} />
-            ))}
-          </ul>
-        </section>
+        <>
+          <AuthorHero key={author} books={books} onOpen={onOpen} />
+          <section className="authorBooksSection">
+            <div className="shelfHeader">
+              <h2>All books</h2>
+              <p className="authorBooksCaption">Every title matched to this author</p>
+            </div>
+            <ul className="authorBookList">
+              {books.map((book) => (
+                <AuthorBookRow key={book.id} book={book} onOpen={onOpen} />
+              ))}
+            </ul>
+          </section>
+        </>
       ) : (
         <div className="emptyState">
           <h2>No books found</h2>
