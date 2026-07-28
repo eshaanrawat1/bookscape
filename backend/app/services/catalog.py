@@ -165,20 +165,29 @@ def search_books(root: Path, query: str, limit: int = 10) -> list[dict]:
         if not title_lower:
             continue
 
+        author_lower = str(point.get("author", "")).strip().lower()
         genres = point.get("genres", [])
         genres_text = " ".join(str(g) for g in genres) if isinstance(genres, list) else str(genres or "")
-        text_lower = f"{title_lower} {point.get('author', '')} {point.get('genre', '')} {genres_text} {point.get('description', '')}".lower()
+        text_lower = f"{title_lower} {author_lower} {point.get('genre', '')} {genres_text} {point.get('description', '')}".lower()
 
         if title_lower.startswith(q):
             lex_score = 5
         elif q in title_lower:
+            lex_score = 4
+        elif author_lower and (author_lower == q or author_lower.startswith(q)):
+            lex_score = 5
+        elif author_lower and q in author_lower:
             lex_score = 4
         elif q in text_lower:
             lex_score = 2
         else:
             lex_score = 0
 
-        sim = difflib.SequenceMatcher(None, q, title_lower[: max(len(q), 24)]).ratio()
+        title_sim = difflib.SequenceMatcher(None, q, title_lower[: max(len(q), 24)]).ratio()
+        author_sim = (
+            difflib.SequenceMatcher(None, q, author_lower[: max(len(q), 24)]).ratio() if author_lower else 0
+        )
+        sim = max(title_sim, author_sim)
         fuzzy_score = 2 if sim >= 0.78 else 1 if sim >= 0.66 else 0
         total_score = lex_score + fuzzy_score
 
