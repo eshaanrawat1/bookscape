@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type FormEvent, type RefObject } from 'react'
 import { ChevronRight, Search, X } from 'lucide-react'
 import BookCover from '../components/BookCover.jsx'
 import BookGrid from '../components/BookGrid.jsx'
 import { formatCompactNumber } from '../utils.js'
 import useSearch from '../hooks/useSearch.js'
 import { useNavigation } from '../context/NavigationContext.jsx'
+import type { Book } from '../types.js'
 
 function SearchView() {
   const {
@@ -18,14 +19,14 @@ function SearchView() {
     setDraft,
     runSearch,
   } = useSearch()
-  const { onOpen, onOpenAuthor } = useNavigation()
-  const inputRef = useRef(null)
+  const { onOpen } = useNavigation()
+  const inputRef = useRef<HTMLInputElement>(null)
   const draftQuery = draft.trim()
   const submittedQuery = query.trim()
   const hasSubmittedResults = Boolean(draftQuery && draftQuery === submittedQuery)
   const showPreview = Boolean(draftQuery && draftQuery !== submittedQuery && (previewLoading || previewResults.length > 0))
 
-  const submitSearch = async (event) => {
+  const submitSearch = async (event: FormEvent) => {
     event.preventDefault()
     await runSearch(draft)
   }
@@ -106,9 +107,20 @@ function SearchView() {
   )
 }
 
+interface SearchHeaderProps {
+  draft: string
+  query?: string
+  previewResults?: Book[]
+  previewLoading?: boolean
+  showPreview?: boolean
+  onDraftChange: (value: string) => void
+  onSubmit: (event: FormEvent) => void
+  onOpen?: (book: Book) => void
+  inputRef: RefObject<HTMLInputElement>
+}
+
 function SearchHeader({
   draft,
-  query = '',
   previewResults = [],
   previewLoading = false,
   showPreview = false,
@@ -116,7 +128,7 @@ function SearchHeader({
   onSubmit,
   onOpen,
   inputRef,
-}) {
+}: SearchHeaderProps) {
   useEffect(() => {
     inputRef?.current?.focus()
     inputRef?.current?.select?.()
@@ -164,7 +176,14 @@ function SearchHeader({
   )
 }
 
-function SearchPreviewDropdown({ results, loading, onOpen, onSubmit }) {
+interface SearchPreviewDropdownProps {
+  results: Book[]
+  loading: boolean
+  onOpen?: (book: Book) => void
+  onSubmit: (event: FormEvent) => void
+}
+
+function SearchPreviewDropdown({ results, loading, onOpen, onSubmit }: SearchPreviewDropdownProps) {
   return (
     <div className="searchPreviewPanel" role="listbox" aria-label="Search suggestions">
       {loading && results.length === 0 ? <div className="searchPreviewStatus">Searching books...</div> : null}
@@ -174,7 +193,7 @@ function SearchPreviewDropdown({ results, loading, onOpen, onSubmit }) {
           type="button"
           className="searchPreviewItem"
           onMouseDown={(event) => event.preventDefault()}
-          onClick={() => onOpen(book)}
+          onClick={() => onOpen?.(book)}
         >
           <div className="searchPreviewCover">
             <BookCover book={book} />
@@ -194,14 +213,20 @@ function SearchPreviewDropdown({ results, loading, onOpen, onSubmit }) {
   )
 }
 
-function previewMeta(book) {
-  const parts = []
+function previewMeta(book: Book): string {
+  const parts: string[] = []
   if (book.genre) parts.push(book.genre)
   if (book.pages) parts.push(`${formatCompactNumber(book.pages)} pages`)
   return parts.join(' · ')
 }
 
-function SearchLanding({ title, body, emptyText }) {
+interface SearchLandingProps {
+  title: string
+  body: string
+  emptyText?: string
+}
+
+function SearchLanding({ title, body, emptyText }: SearchLandingProps) {
   return (
     <div className="searchLanding">
       <div className="searchHeader">

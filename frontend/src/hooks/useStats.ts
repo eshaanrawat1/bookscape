@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../api.js'
+import type { StatsSummary } from '../types.js'
 
 function useStats() {
-  const [summary, setSummary] = useState(null)
+  const [summary, setSummary] = useState<StatsSummary | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [year, setYear] = useState('')
   const [month, setMonth] = useState('')
 
@@ -18,12 +19,12 @@ function useStats() {
         if (year) params.set('year', year)
         if (month) params.set('month', month)
         const suffix = params.toString() ? `?${params.toString()}` : ''
-        const data = await apiFetch(`/stats${suffix}`)
+        const data = await apiFetch<StatsSummary>(`/stats${suffix}`)
         if (cancelled) return
         setSummary(data)
         setError(null)
       } catch (err) {
-        if (!cancelled) setError(err.message || 'Could not load stats.')
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load stats.')
       } finally {
         if (!cancelled) setLoading(false)
       }

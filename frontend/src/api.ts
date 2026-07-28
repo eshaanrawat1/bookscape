@@ -2,7 +2,7 @@ const BASE = 'http://127.0.0.1:9876/api'
 const BOOTSTRAP_RETRIES = 2
 const BOOTSTRAP_RETRY_DELAY_MS = 500
 
-async function apiFetch(path, options) {
+async function apiFetch<T = unknown>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, options)
   if (!res.ok) {
     let detail = ''

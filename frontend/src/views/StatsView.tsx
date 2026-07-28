@@ -1,4 +1,4 @@
-import { BarChart3 } from 'lucide-react'
+import { type CSSProperties } from 'react'
 import AccordionFilter from '../components/AccordionFilter.jsx'
 import BookCard from '../components/BookCard.jsx'
 import { monthOptions } from '../constants.js'
@@ -40,10 +40,10 @@ function StatsView() {
           <h2>Could not load stats</h2>
           <p>{error}</p>
         </div>
-      ) : hasBooks ? (
+      ) : summary && hasBooks ? (
         <>
           <section className="heroCard paperGrain statsHeroCard">
-            <div className="heroGlow statsHeroGlow" style={{ '--hero-glow': buildHeroGlow(heroColor) }} />
+            <div className="heroGlow statsHeroGlow" style={{ '--hero-glow': buildHeroGlow(heroColor) } as CSSProperties} />
             <div className="statsHeroCopy">
               <h2>Reading at a glance</h2>
               <p>Minimal stats pulled from your finished books and Obsidian snapshot.</p>

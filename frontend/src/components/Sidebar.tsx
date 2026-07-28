@@ -1,23 +1,29 @@
 import { useState } from 'react'
-import { Flame, Plus } from 'lucide-react'
+import { Flame, Plus, type LucideIcon } from 'lucide-react'
 import { collectionIdFromName } from '../utils.js'
 import { mainNav, shelfNav } from '../constants.js'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
+import type { Collection } from '../types.js'
 
-function Sidebar({ active, onSelect }) {
+interface SidebarProps {
+  active: string
+  onSelect: (viewId: string) => void
+}
+
+function Sidebar({ active, onSelect }: SidebarProps) {
   const { collections, createCollection: onCreateCollection, renameCollection: onRenameCollection } = useLibraryData()
-  const [editingId, setEditingId] = useState(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [draftName, setDraftName] = useState('')
   const [collectionError, setCollectionError] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const startRename = (collection) => {
+  const startRename = (collection: Collection) => {
     setEditingId(collection.id)
     setDraftName(collection.name)
     setCollectionError('')
   }
 
-  const finishRename = async (collection) => {
+  const finishRename = async (collection: Collection) => {
     const clean = draftName.trim().replace(/\s+/g, ' ')
     if (clean === collection.name) {
       setEditingId(null)
@@ -39,7 +45,7 @@ function Sidebar({ active, onSelect }) {
       setEditingId(null)
       setCollectionError('')
     } catch (err) {
-      setCollectionError(err.message || 'Could not rename collection.')
+      setCollectionError(err instanceof Error ? err.message : 'Could not rename collection.')
     } finally {
       setSaving(false)
     }
@@ -53,7 +59,7 @@ function Sidebar({ active, onSelect }) {
       setEditingId(collectionIdFromName(createdName))
       setDraftName(createdName)
     } catch (err) {
-      setCollectionError(err.message || 'Could not create collection.')
+      setCollectionError(err instanceof Error ? err.message : 'Could not create collection.')
     } finally {
       setSaving(false)
     }
@@ -167,7 +173,19 @@ function Sidebar({ active, onSelect }) {
   )
 }
 
-function NavButton({ item, active, onSelect }) {
+interface NavItem {
+  id: string
+  label: string
+  icon: LucideIcon
+}
+
+interface NavButtonProps {
+  item: NavItem
+  active: boolean
+  onSelect: (id: string) => void
+}
+
+function NavButton({ item, active, onSelect }: NavButtonProps) {
   const Icon = item.icon
   return (
     <button className={active ? 'navButton active' : 'navButton'} onClick={() => onSelect(item.id)}>

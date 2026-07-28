@@ -1,7 +1,12 @@
 import BookGrid from '../components/BookGrid.jsx'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
+import type { Collection } from '../types.js'
 
-function CollectionView({ activeCollection }) {
+interface CollectionViewProps {
+  activeCollection: Collection | null
+}
+
+function CollectionView({ activeCollection }: CollectionViewProps) {
   const { booksByIds, removeBookFromCollection } = useLibraryData()
   if (!activeCollection) return null
 

@@ -1,7 +1,11 @@
 import BookGrid from '../components/BookGrid.jsx'
 import useGenreBooks from '../hooks/useGenreBooks.js'
 
-function GenreView({ genre }) {
+interface GenreViewProps {
+  genre: string
+}
+
+function GenreView({ genre }: GenreViewProps) {
   const { books, loading, error } = useGenreBooks(genre)
   return (
     <div className="stack">

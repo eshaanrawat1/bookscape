@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../api.js'
 import { normaliseBook } from '../utils.js'
+import type { Book, RawBookPayload } from '../types.js'
 
-function useAuthorBooks(authorName) {
-  const [books, setBooks] = useState([])
+function useAuthorBooks(authorName: string) {
+  const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!authorName) {
@@ -21,13 +22,13 @@ function useAuthorBooks(authorName) {
 
     async function loadAuthorBooks() {
       try {
-        const data = await apiFetch(`/author-books?author=${encodeURIComponent(authorName)}`)
+        const data = await apiFetch<{ books?: RawBookPayload[] }>(`/author-books?author=${encodeURIComponent(authorName)}`)
         if (cancelled) return
         setBooks((data.books || []).map(normaliseBook))
       } catch (err) {
         if (!cancelled) {
           setBooks([])
-          setError(err.message || 'Could not load author books.')
+          setError(err instanceof Error ? err.message : 'Could not load author books.')
         }
       } finally {
         if (!cancelled) setLoading(false)

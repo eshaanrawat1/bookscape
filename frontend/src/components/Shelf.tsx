@@ -1,6 +1,14 @@
 import BookCard from './BookCard.jsx'
+import type { Book } from '../types.js'
 
-function Shelf({ title, subtitle, books, onSeeAll }) {
+interface ShelfProps {
+  title: string
+  subtitle?: string
+  books: Book[]
+  onSeeAll?: (title: string) => void
+}
+
+function Shelf({ title, subtitle, books, onSeeAll }: ShelfProps) {
   if (!books.length) return null
 
   return (

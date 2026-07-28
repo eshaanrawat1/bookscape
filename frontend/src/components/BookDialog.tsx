@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type CSSProperties } from 'react'
 import { X, Star, MessageSquareText, FileText, Plus, Heart } from 'lucide-react'
 import { apiFetch } from '../api.js'
 import { normaliseBook, getCatalogBookId, formatCompactNumber, resolveSavedWantToReadBook } from '../utils.js'
@@ -7,12 +7,18 @@ import BookCover from './BookCover.jsx'
 import FinishedBookDialog from './FinishedBookDialog.jsx'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
+import type { Book, RawBookPayload } from '../types.js'
 
-function BookDialog({ book, onClose }) {
+interface BookDialogProps {
+  book: Book
+  onClose: () => void
+}
+
+function BookDialog({ book, onClose }: BookDialogProps) {
   const { collections, wantToReadBooks, addBookToCollection, toggleBookWantToRead } = useLibraryData()
   const { onOpen, onOpenAuthor } = useNavigation()
   const savedWantToReadBook = resolveSavedWantToReadBook(book, wantToReadBooks)
-  const [fullBook, setFullBook] = useState(null)
+  const [fullBook, setFullBook] = useState<Book | null>(null)
   const [collectionMenuOpen, setCollectionMenuOpen] = useState(false)
   const [actionMessage, setActionMessage] = useState('')
   const [savingCollection, setSavingCollection] = useState('')
@@ -23,7 +29,7 @@ function BookDialog({ book, onClose }) {
     let cancelled = false
     setFullBook(null)
     if (!bookId) return () => { cancelled = true }
-    apiFetch(`/book/${bookId}`)
+    apiFetch<RawBookPayload>(`/book/${bookId}`)
       .then((data) => {
         if (!cancelled && data) setFullBook({ ...normaliseBook(data), similar_books: data.similar_books || [] })
       })
@@ -45,7 +51,6 @@ function BookDialog({ book, onClose }) {
       <FinishedBookDialog
         book={displayBook}
         onClose={onClose}
-        onOpenAuthor={onOpenAuthor}
       />
     )
   }
@@ -59,13 +64,13 @@ function BookDialog({ book, onClose }) {
       await toggleBookWantToRead(isSavedToWantToRead ? savedWantToReadKey : bookId, isSavedToWantToRead)
       setActionMessage(nextSaved ? 'Saved to Want to read.' : 'Removed from Want to read.')
     } catch (err) {
-      setActionMessage(err.message || 'Could not save this book.')
+      setActionMessage(err instanceof Error ? err.message : 'Could not save this book.')
     } finally {
       setSavingToRead(false)
     }
   }
 
-  const handleAddToCollection = async (collectionName) => {
+  const handleAddToCollection = async (collectionName: string) => {
     if (!bookId || !collectionName || savingCollection === collectionName) return
     setSavingCollection(collectionName)
     setActionMessage('')
@@ -74,7 +79,7 @@ function BookDialog({ book, onClose }) {
       setCollectionMenuOpen(false)
       setActionMessage(`Added to ${collectionName}.`)
     } catch (err) {
-      setActionMessage(err.message || 'Could not add this book.')
+      setActionMessage(err instanceof Error ? err.message : 'Could not add this book.')
     } finally {
       setSavingCollection('')
     }
@@ -84,7 +89,7 @@ function BookDialog({ book, onClose }) {
     <div className="dialogScrim" onClick={onClose}>
       <article
         className="bookDialog paperGrain"
-        style={{ '--dialog-glow': buildDialogGlow(displayBook.color || `hsl(${displayBook.tint})`) }}
+        style={{ '--dialog-glow': buildDialogGlow(displayBook.color || `hsl(${displayBook.tint})`) } as CSSProperties}
         onClick={(event) => event.stopPropagation()}
       >
         <button className="dialogClose" onClick={onClose} aria-label="Close details">
@@ -138,7 +143,7 @@ function BookDialog({ book, onClose }) {
               </div>
             )}
 
-            <p className="dialogBlurb">{displayBook.blurb || displayBook.description || 'A great read from your library.'}</p>
+            <p className="dialogBlurb">{displayBook.blurb || 'A great read from your library.'}</p>
 
             <div className="dialogActionPanel">
               <div className="dialogActionRow">

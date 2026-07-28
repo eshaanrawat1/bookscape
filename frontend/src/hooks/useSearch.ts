@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../api.js'
 import { normaliseBook } from '../utils.js'
+import type { Book, RawBookPayload } from '../types.js'
 
 function useSearch() {
   const [draft, setDraft] = useState('')
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState([])
+  const [results, setResults] = useState<Book[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [previewResults, setPreviewResults] = useState([])
+  const [error, setError] = useState<string | null>(null)
+  const [previewResults, setPreviewResults] = useState<Book[]>([])
   const [previewLoading, setPreviewLoading] = useState(false)
 
   useEffect(() => {
@@ -26,10 +27,10 @@ function useSearch() {
     let cancelled = false
     const timer = window.setTimeout(async () => {
       try {
-        const data = await apiFetch(`/search?q=${encodeURIComponent(nextQuery)}&limit=5`)
+        const data = await apiFetch<{ results?: RawBookPayload[] }>(`/search?q=${encodeURIComponent(nextQuery)}&limit=5`)
         if (cancelled) return
         setPreviewResults((data.results || []).map(normaliseBook))
-      } catch (err) {
+      } catch {
         if (cancelled) return
         setPreviewResults([])
       } finally {
@@ -57,10 +58,10 @@ function useSearch() {
     setLoading(true)
     setError(null)
     try {
-      const data = await apiFetch(`/search?q=${encodeURIComponent(nextQuery)}&limit=24`)
+      const data = await apiFetch<{ results?: RawBookPayload[] }>(`/search?q=${encodeURIComponent(nextQuery)}&limit=24`)
       setResults((data.results || []).map(normaliseBook))
     } catch (err) {
-      setError(err.message || 'Could not search books.')
+      setError(err instanceof Error ? err.message : 'Could not search books.')
       setResults([])
     } finally {
       setLoading(false)

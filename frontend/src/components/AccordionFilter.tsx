@@ -1,20 +1,33 @@
 import { useState, useEffect, useRef } from 'react'
 import { ChevronRight } from 'lucide-react'
 
-function AccordionFilter({ label, value, emptyLabel, options, onChange }) {
+interface AccordionOption {
+  value: string
+  label: string
+}
+
+interface AccordionFilterProps {
+  label: string
+  value: string
+  emptyLabel: string
+  options: AccordionOption[]
+  onChange: (value: string) => void
+}
+
+function AccordionFilter({ label, value, emptyLabel, options, onChange }: AccordionFilterProps) {
   const [open, setOpen] = useState(false)
-  const rootRef = useRef(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   const selected = options.find((option) => String(option.value) === String(value)) || null
   const displayLabel = selected?.label || emptyLabel
 
   useEffect(() => {
     if (!open) return undefined
-    const handlePointerDown = (event) => {
-      if (rootRef.current && !rootRef.current.contains(event.target)) {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
         setOpen(false)
       }
     }
-    const handleKeyDown = (event) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setOpen(false)
       }

@@ -1,4 +1,4 @@
-function rgbToHsl(r, g, b) {
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   const rn = r / 255
   const gn = g / 255
   const bn = b / 255
@@ -29,7 +29,7 @@ function rgbToHsl(r, g, b) {
   return [h, s, l]
 }
 
-function hslToRgb(h, s, l) {
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   const c = (1 - Math.abs(2 * l - 1)) * s
   const hp = h / 60
   const x = c * (1 - Math.abs((hp % 2) - 1))
@@ -50,7 +50,7 @@ function hslToRgb(h, s, l) {
   ]
 }
 
-function buildHeroGlow(color, fallback = 'oklch(0.62 0.14 250)') {
+function buildHeroGlow(color?: string | null, fallback = 'oklch(0.62 0.14 250)'): string {
   const raw = String(color || '').trim()
   const rgbMatch = raw.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*[\d.]+\s*)?\)$/i)
   if (rgbMatch) {
@@ -73,7 +73,7 @@ function buildHeroGlow(color, fallback = 'oklch(0.62 0.14 250)') {
   return fallback
 }
 
-function buildDialogGlow(color, fallback = 'oklch(0.62 0.14 250)') {
+function buildDialogGlow(color?: string | null, fallback = 'oklch(0.62 0.14 250)'): string {
   const raw = String(color || '').trim()
   const rgbMatch = raw.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*[\d.]+\s*)?\)$/i)
   if (rgbMatch) {

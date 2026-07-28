@@ -2,7 +2,11 @@ import BookCover from '../components/BookCover.jsx'
 import BookGrid from '../components/BookGrid.jsx'
 import useAuthorBooks from '../hooks/useAuthorBooks.js'
 
-function AuthorView({ author }) {
+interface AuthorViewProps {
+  author: string
+}
+
+function AuthorView({ author }: AuthorViewProps) {
   const { books, loading, error } = useAuthorBooks(author)
   const heroBook = books[0] || null
 

@@ -2,8 +2,16 @@ import { X } from 'lucide-react'
 import BookCover from './BookCover.jsx'
 import Progress from './Progress.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
+import type { Book } from '../types.js'
 
-function BookCard({ book, showRemoveButton = false, removeLabel = '', onRemove }) {
+interface BookCardProps {
+  book: Book
+  showRemoveButton?: boolean
+  removeLabel?: string
+  onRemove?: (bookId: string) => void
+}
+
+function BookCard({ book, showRemoveButton = false, removeLabel = '', onRemove }: BookCardProps) {
   const { onOpen, onOpenAuthor } = useNavigation()
   const card = (
     <div className="bookCard">

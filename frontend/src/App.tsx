@@ -37,29 +37,34 @@ import StatsView from './views/StatsView.jsx'
 import AuthorView from './views/AuthorView.jsx'
 import GenreView from './views/GenreView.jsx'
 import CollectionView from './views/CollectionView.jsx'
+import type { Book, Collection, GenreSection, RawBookPayload, RawList } from './types.js'
+
+type Selected =
+  | { book: Book; variant: 'standard' }
+  | { book: Book; variant: 'finished'; preferLiveStatus: boolean }
 
 export default function App() {
   const [view, setView] = useState('reading-now')
   const [previousView, setPreviousView] = useState('reading-now')
   const [mobileNav, setMobileNav] = useState(false)
-  const [selected, setSelected] = useState(null)
+  const [selected, setSelected] = useState<Selected | null>(null)
 
   // Live data from the API
-  const [books, setBooks] = useState([])
-  const [collections, setCollections] = useState([])
-  const [wantToReadBooks, setWantToReadBooks] = useState([])
-  const [globalLibrary, setGlobalLibrary] = useState([])
+  const [books, setBooks] = useState<Book[]>([])
+  const [collections, setCollections] = useState<Collection[]>([])
+  const [wantToReadBooks, setWantToReadBooks] = useState<Book[]>([])
+  const [globalLibrary, setGlobalLibrary] = useState<GenreSection[]>([])
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
-  const [syncError, setSyncError] = useState(null)
+  const [syncError, setSyncError] = useState<string | null>(null)
   const [showScraperDialog, setShowScraperDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     async function load() {
-      let lastError = null
+      let lastError: unknown = null
       try {
         for (let attempt = 0; attempt <= BOOTSTRAP_RETRIES; attempt += 1) {
           try {
@@ -81,7 +86,7 @@ export default function App() {
         }
 
         if (!cancelled) {
-          setError(lastError?.message || 'Could not load books.')
+          setError(lastError instanceof Error ? lastError.message : 'Could not load books.')
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -102,7 +107,8 @@ export default function App() {
 
   // Derived views from live books
   const bookById = new Map(books.map((b) => [b.id, b]))
-  const booksByIds = (ids) => ids.map((id) => bookById.get(id)).filter(Boolean)
+  const booksByIds = (ids: string[]): Book[] =>
+    ids.map((id) => bookById.get(id)).filter((b): b is Book => Boolean(b))
   const currentlyReading = books.filter((b) => b.status === 'reading')
   const wantToRead = wantToReadBooks
   const finished = books.filter((b) => b.status === 'done')
@@ -112,7 +118,7 @@ export default function App() {
     : null
   const activeAuthorName = authorNameFromView(view)
   const activeGenreName = genreNameFromView(view)
-  const meta = activeCollection
+  const meta: { title?: string; subtitle?: string; name?: string; description?: string } | undefined = activeCollection
     ? activeCollection
     : view.startsWith('author:')
       ? { title: activeAuthorName || 'Author', subtitle: 'Every book we have by this author.' }
@@ -120,10 +126,10 @@ export default function App() {
         ? { title: activeGenreName || 'Genre', subtitle: 'Top books in this genre.' }
         : viewMeta[view]
 
-  const openBookDialog = (book) => setSelected({ book, variant: 'standard' })
-  const openFinishedBookDialog = (book) => setSelected({ book, variant: 'finished', preferLiveStatus: true })
-  
-  const openAuthorPage = (author) => {
+  const openBookDialog = (book: Book) => setSelected({ book, variant: 'standard' })
+  const openFinishedBookDialog = (book: Book) => setSelected({ book, variant: 'finished', preferLiveStatus: true })
+
+  const openAuthorPage = (author: string) => {
     const cleanAuthor = String(author || '').trim()
     if (!cleanAuthor) return
     setPreviousView((current) => (view.startsWith('author:') ? current : view))
@@ -135,7 +141,7 @@ export default function App() {
     setView(previousView && !previousView.startsWith('author:') ? previousView : 'library')
     setMobileNav(false)
   }
-  const openGenrePage = (genre) => {
+  const openGenrePage = (genre: string) => {
     const cleanGenre = String(genre || '').trim()
     if (!cleanGenre) return
     setPreviousView((current) => (view.startsWith('genre:') ? current : view))
@@ -148,9 +154,9 @@ export default function App() {
     setMobileNav(false)
   }
 
-  async function createCollection() {
+  async function createCollection(): Promise<string> {
     const name = nextCollectionName(collections)
-    const data = await apiFetch('/reading-lists', {
+    const data = await apiFetch<{ lists?: RawList[] }>('/reading-lists', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
@@ -161,8 +167,8 @@ export default function App() {
     return name
   }
 
-  async function renameCollection(collection, name) {
-    const data = await apiFetch(`/reading-lists/${collectionIdFromName(collection.name)}`, {
+  async function renameCollection(collection: Collection, name: string): Promise<string> {
+    const data = await apiFetch<{ lists?: RawList[] }>(`/reading-lists/${collectionIdFromName(collection.name)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
@@ -175,8 +181,8 @@ export default function App() {
     return name
   }
 
-  async function deleteCollection(collection) {
-    const data = await apiFetch(`/reading-lists/${collectionIdFromName(collection.name)}`, {
+  async function deleteCollection(collection: Collection): Promise<void> {
+    const data = await apiFetch<{ lists?: RawList[] }>(`/reading-lists/${collectionIdFromName(collection.name)}`, {
       method: 'DELETE',
     })
     const nextCollections = mapReadingLists(data.lists || [])
@@ -186,8 +192,8 @@ export default function App() {
     }
   }
 
-  async function addBookToCollection(collectionName, bookId) {
-    const data = await apiFetch(`/reading-lists/${collectionIdFromName(collectionName)}/books`, {
+  async function addBookToCollection(collectionName: string, bookId: string): Promise<void> {
+    const data = await apiFetch<{ lists?: RawList[] }>(`/reading-lists/${collectionIdFromName(collectionName)}/books`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ book_id: bookId }),
@@ -195,8 +201,8 @@ export default function App() {
     setCollections(mapReadingLists(data.lists || []))
   }
 
-  async function removeBookFromCollection(collectionName, bookId) {
-    const data = await apiFetch(
+  async function removeBookFromCollection(collectionName: string, bookId: string): Promise<void> {
+    const data = await apiFetch<{ lists?: RawList[] }>(
       `/reading-lists/${collectionIdFromName(collectionName)}/books/${bookId}`,
       {
         method: 'DELETE',
@@ -205,8 +211,8 @@ export default function App() {
     setCollections(mapReadingLists(data.lists || []))
   }
 
-  async function toggleBookWantToRead(bookId, isSaved) {
-    const data = await apiFetch(
+  async function toggleBookWantToRead(bookId: string, isSaved: boolean): Promise<void> {
+    const data = await apiFetch<{ books?: RawBookPayload[] }>(
       isSaved ? `/want-to-read-books/${bookId}` : '/want-to-read-books',
       {
         method: isSaved ? 'DELETE' : 'POST',
@@ -226,7 +232,7 @@ export default function App() {
       await apiFetch('/sync/obsidian', { method: 'POST' })
       await reloadAppData()
     } catch (err) {
-      setSyncError(err.message || 'Could not sync from Obsidian.')
+      setSyncError(err instanceof Error ? err.message : 'Could not sync from Obsidian.')
     } finally {
       setSyncing(false)
     }
@@ -346,14 +352,14 @@ export default function App() {
           {selected && (
             selected.variant === 'finished' ? (
               <FinishedBookDialog
-                key={selected.book.id || selected.book.uid}
+                key={selected.book.id}
                 book={selected.book}
                 preferLiveStatus={selected.preferLiveStatus}
                 onClose={() => setSelected(null)}
               />
             ) : (
               <BookDialog
-                key={selected.book.id || selected.book.uid}
+                key={selected.book.id}
                 book={selected.book}
                 onClose={() => setSelected(null)}
               />
@@ -378,7 +384,7 @@ export default function App() {
   )
 }
 
-function ViewContent({ view }) {
+function ViewContent({ view }: { view: string }) {
   const { collections, wantToRead, finished } = useLibraryData()
   const activeCollection = view.startsWith('collection:')
     ? collections.find((c) => `collection:${c.id}` === view)

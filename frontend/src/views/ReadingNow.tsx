@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Clock3, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect, useState, type CSSProperties } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { toNumberOrZero } from '../utils.js'
 import { buildHeroGlow } from '../color.js'
 import BookCover from '../components/BookCover.jsx'
@@ -7,10 +7,16 @@ import Progress from '../components/Progress.jsx'
 import Shelf from '../components/Shelf.jsx'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
+import type { Book } from '../types.js'
 
-function ReadingNowHero({ books, onOpen }) {
+interface ReadingNowHeroProps {
+  books: Book[]
+  onOpen: (book: Book) => void
+}
+
+function ReadingNowHero({ books, onOpen }: ReadingNowHeroProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [direction, setDirection] = useState('next')
+  const [direction, setDirection] = useState<'next' | 'prev'>('next')
 
   // In case the list shrinks
   const safeIndex = books && currentIndex >= books.length ? 0 : currentIndex
@@ -46,7 +52,7 @@ function ReadingNowHero({ books, onOpen }) {
 
   return (
     <section className="heroCard paperGrain">
-      <div className="heroGlow" style={{ '--hero-glow': heroGlowColor }} />
+      <div className="heroGlow" style={{ '--hero-glow': heroGlowColor } as CSSProperties} />
       {books.length > 1 && (
         <div className="carouselControls">
           <button className="carouselButton" onClick={prevBook} aria-label="Previous book">

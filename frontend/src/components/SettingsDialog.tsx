@@ -1,23 +1,31 @@
 import { useEffect, useState } from 'react'
 import { X, FolderOpen, RefreshCcw } from 'lucide-react'
 import { apiFetch } from '../api.js'
+import type { SyncPullResult, SyncPushResult } from '../types.js'
 
-function SettingsDialog({ onClose, onDataChanged }) {
+interface SettingsDialogProps {
+  onClose: () => void
+  onDataChanged?: () => Promise<void>
+}
+
+type SettingsResult = ({ kind: 'pull' } & SyncPullResult) | ({ kind: 'push' } & SyncPushResult)
+
+function SettingsDialog({ onClose, onDataChanged }: SettingsDialogProps) {
   const [vaultPath, setVaultPath] = useState('')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [busy, setBusy] = useState(null) // 'pull' | 'push' | null
-  const [result, setResult] = useState(null)
+  const [busy, setBusy] = useState<'pull' | 'push' | null>(null)
+  const [result, setResult] = useState<SettingsResult | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    apiFetch('/settings/vault-path')
+    apiFetch<{ vault_path?: string }>('/settings/vault-path')
       .then((data) => {
         if (!cancelled) setVaultPath(data.vault_path || '')
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message || 'Could not load the vault path.')
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load the vault path.')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -25,18 +33,18 @@ function SettingsDialog({ onClose, onDataChanged }) {
     return () => { cancelled = true }
   }, [])
 
-  async function saveVaultPath(path) {
+  async function saveVaultPath(path: string) {
     setSaving(true)
     setError(null)
     try {
-      const data = await apiFetch('/settings/vault-path', {
+      const data = await apiFetch<{ vault_path?: string }>('/settings/vault-path', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path }),
       })
       setVaultPath(data.vault_path || '')
     } catch (err) {
-      setError(err.message || 'Could not save the vault path.')
+      setError(err instanceof Error ? err.message : 'Could not save the vault path.')
     } finally {
       setSaving(false)
     }
@@ -49,7 +57,7 @@ function SettingsDialog({ onClose, onDataChanged }) {
       if (typeof dir === 'string' && dir) {
         await saveVaultPath(dir)
       }
-    } catch (err) {
+    } catch {
       setError('Could not open the folder picker. Are you running the desktop app?')
     }
   }
@@ -59,11 +67,11 @@ function SettingsDialog({ onClose, onDataChanged }) {
     setError(null)
     setResult(null)
     try {
-      const data = await apiFetch('/sync/obsidian', { method: 'POST' })
+      const data = await apiFetch<SyncPullResult>('/sync/obsidian', { method: 'POST' })
       setResult({ kind: 'pull', ...data })
       await onDataChanged?.()
     } catch (err) {
-      setError(err.message || 'Pull from Obsidian failed.')
+      setError(err instanceof Error ? err.message : 'Pull from Obsidian failed.')
     } finally {
       setBusy(null)
     }
@@ -74,11 +82,11 @@ function SettingsDialog({ onClose, onDataChanged }) {
     setError(null)
     setResult(null)
     try {
-      const data = await apiFetch('/sync/obsidian/push', { method: 'POST' })
+      const data = await apiFetch<SyncPushResult>('/sync/obsidian/push', { method: 'POST' })
       setResult({ kind: 'push', ...data })
       await onDataChanged?.()
     } catch (err) {
-      setError(err.message || 'Push to Obsidian failed.')
+      setError(err instanceof Error ? err.message : 'Push to Obsidian failed.')
     } finally {
       setBusy(null)
     }
@@ -138,7 +146,7 @@ function SettingsDialog({ onClose, onDataChanged }) {
                   {result.skipped_collisions?.length ? `, ${result.skipped_collisions.length} collision(s) skipped` : ''}.
                 </span>
               )}
-              {(result.skipped_collisions || []).map((c) => (
+              {(result.kind === 'push' ? result.skipped_collisions : []).map((c) => (
                 <span key={c.filename} className="scraperError">
                   "{c.filename}" claimed by {c.uids.join(', ')} — rename in Obsidian and Push again.
                 </span>

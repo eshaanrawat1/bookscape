@@ -4,24 +4,44 @@ import { apiFetch } from '../api.js'
 import { getCatalogBookId } from '../utils.js'
 import BookCover from './BookCover.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
+import type { Book } from '../types.js'
 
-function FinishedBookDialog({ book, preferLiveStatus = false, onClose }) {
+interface ReadingProgressRecord {
+  status: string
+  current_page: number | string
+  total_pages: number | string
+  start_date: string
+  finish_date: string
+  notes: string
+}
+
+interface ReadingProgressResponse {
+  book_id?: string
+  entry?: Partial<ReadingProgressRecord>
+}
+
+interface FinishedBookDialogProps {
+  book: Book
+  preferLiveStatus?: boolean
+  onClose: () => void
+}
+
+function FinishedBookDialog({ book, preferLiveStatus = false, onClose }: FinishedBookDialogProps) {
   const { onOpenAuthor } = useNavigation()
-  const [record, setRecord] = useState(null)
+  const [record, setRecord] = useState<ReadingProgressRecord | null>(null)
   const [hydrated, setHydrated] = useState(false)
   const [statusMenuOpen, setStatusMenuOpen] = useState(false)
-  const saveTimerRef = useRef(null)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSavedRef = useRef('')
-  const statusMenuRef = useRef(null)
+  const statusMenuRef = useRef<HTMLDivElement>(null)
   const bookId = [
     book?._raw?.id,
     book?.id,
-    book?.uid,
     getCatalogBookId(book),
   ]
     .map((value) => String(value || '').trim())
     .filter(Boolean)[0] || ''
-  const baseRecord = {
+  const baseRecord: ReadingProgressRecord = {
     status: book.status || 'not_started',
     current_page: book.currentPage ?? book.pages ?? 0,
     total_pages: book.totalPages ?? book.pages ?? 0,
@@ -40,11 +60,11 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose }) {
       return () => { cancelled = true }
     }
 
-    apiFetch(`/reading-progress/${bookId}`)
+    apiFetch<ReadingProgressResponse>(`/reading-progress/${bookId}`)
       .then((data) => {
         if (cancelled) return
         const next = data?.entry || {}
-        const nextRecord = {
+        const nextRecord: ReadingProgressRecord = {
           ...baseRecord,
           ...next,
         }
@@ -71,7 +91,7 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose }) {
   }, [bookId, baseRecord.current_page, baseRecord.total_pages, baseRecord.start_date, baseRecord.finish_date])
 
   const draft = record || baseRecord
-  const [obsidianBusy, setObsidianBusy] = useState(null) // 'push' | 'pull' | null
+  const [obsidianBusy, setObsidianBusy] = useState<'push' | 'pull' | null>(null)
   const [obsidianMessage, setObsidianMessage] = useState('')
   const canSyncObsidian = Boolean(bookId) && (draft.status === 'reading' || draft.status === 'done')
 
@@ -83,7 +103,7 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose }) {
       await apiFetch(`/sync/obsidian/push/${bookId}`, { method: 'POST' })
       setObsidianMessage('Pushed to vault.')
     } catch (err) {
-      setObsidianMessage(err.message || 'Could not push to vault.')
+      setObsidianMessage(err instanceof Error ? err.message : 'Could not push to vault.')
     } finally {
       setObsidianBusy(null)
     }
@@ -95,45 +115,45 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose }) {
     setObsidianMessage('')
     try {
       await apiFetch(`/sync/obsidian/pull/${bookId}`, { method: 'POST' })
-      const refreshed = await apiFetch(`/reading-progress/${bookId}`)
-      const nextRecord = { ...baseRecord, ...(refreshed?.entry || {}) }
+      const refreshed = await apiFetch<ReadingProgressResponse>(`/reading-progress/${bookId}`)
+      const nextRecord: ReadingProgressRecord = { ...baseRecord, ...(refreshed?.entry || {}) }
       setRecord(nextRecord)
       lastSavedRef.current = JSON.stringify(nextRecord)
       setObsidianMessage('Pulled from vault.')
     } catch (err) {
-      setObsidianMessage(err.message || 'Could not pull from vault.')
+      setObsidianMessage(err instanceof Error ? err.message : 'Could not pull from vault.')
     } finally {
       setObsidianBusy(null)
     }
   }
 
-  const updateField = (field, value) => {
+  const updateField = (field: keyof ReadingProgressRecord, value: string) => {
     setRecord((current) => ({
       ...(current || baseRecord),
       [field]: value,
     }))
   }
 
-  const persistRecord = async (nextRecord) => {
+  const persistRecord = async (nextRecord: ReadingProgressRecord) => {
     if (!bookId) return
     try {
       const payload = {
         status: String(nextRecord.status || 'done').trim().toLowerCase() || 'done',
-        current_page: Math.max(0, parseInt(nextRecord.current_page, 10) || 0),
-        total_pages: Math.max(0, parseInt(nextRecord.total_pages, 10) || 0),
+        current_page: Math.max(0, parseInt(String(nextRecord.current_page), 10) || 0),
+        total_pages: Math.max(0, parseInt(String(nextRecord.total_pages), 10) || 0),
         start_date: String(nextRecord.start_date || '').trim(),
         finish_date: String(nextRecord.finish_date || '').trim(),
         notes: String(nextRecord.notes || '').trim(),
       }
-      const data = await apiFetch(`/reading-progress/${bookId}`, {
+      const data = await apiFetch<ReadingProgressResponse>(`/reading-progress/${bookId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      const nextSaved = { ...baseRecord, ...(data.entry || payload) }
+      const nextSaved: ReadingProgressRecord = { ...baseRecord, ...(data.entry || payload) }
       setRecord(nextSaved)
       lastSavedRef.current = JSON.stringify(nextSaved)
-    } catch (err) {
+    } catch {
       // Keep the draft visible; autosave will retry on the next edit.
     }
   }
@@ -168,9 +188,9 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose }) {
   }, [])
 
   useEffect(() => {
-    function handlePointerDown(event) {
+    function handlePointerDown(event: PointerEvent) {
       if (!statusMenuRef.current) return
-      if (!statusMenuRef.current.contains(event.target)) {
+      if (!statusMenuRef.current.contains(event.target as Node)) {
         setStatusMenuOpen(false)
       }
     }
@@ -178,16 +198,16 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose }) {
     return () => document.removeEventListener('pointerdown', handlePointerDown)
   }, [])
 
-  const statusLabelMap = {
+  const statusLabelMap: Record<string, string> = {
     done: 'Finished',
     reading: 'Reading',
     not_started: 'Want to read',
   }
-  const statusDotClass = {
+  const statusDotClass = ({
     done: 'finishedStatusDot done',
     reading: 'finishedStatusDot reading',
     not_started: 'finishedStatusDot notStarted',
-  }[draft.status] || 'finishedStatusDot'
+  } as Record<string, string>)[draft.status] || 'finishedStatusDot'
 
   return (
     <div className="dialogScrim finishedScrim" onClick={onClose}>
@@ -332,7 +352,7 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose }) {
               <label className="finishedNotes">
                 <span>Notes</span>
                 <textarea
-                  rows="7"
+                  rows={7}
                   value={draft.notes}
                   onChange={(event) => updateField('notes', event.target.value)}
                   placeholder="Add a few thoughts, a memorable passage, or why this one mattered."

@@ -1,14 +1,25 @@
 import { useState } from 'react'
 import { X, RefreshCcw } from 'lucide-react'
 import { apiFetch } from '../api.js'
+import type { RawBookPayload } from '../types.js'
 
-function ScraperDialog({ onClose, onSuccess }) {
+interface ScraperDialogProps {
+  onClose: () => void
+  onSuccess: (book: RawBookPayload) => void
+}
+
+interface ScrapeBookResponse {
+  ok: boolean
+  book?: RawBookPayload
+}
+
+function ScraperDialog({ onClose, onSuccess }: ScraperDialogProps) {
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState('')
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const trimmedUrl = url.trim()
     if (!trimmedUrl) {
@@ -39,7 +50,7 @@ function ScraperDialog({ onClose, onSuccess }) {
     )
 
     try {
-      const res = await apiFetch('/scrape-book', {
+      const res = await apiFetch<ScrapeBookResponse>('/scrape-book', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: trimmedUrl }),
@@ -52,7 +63,7 @@ function ScraperDialog({ onClose, onSuccess }) {
       }
     } catch (err) {
       timers.forEach(clearTimeout)
-      setError(err.message || 'An error occurred while importing the book.')
+      setError(err instanceof Error ? err.message : 'An error occurred while importing the book.')
     } finally {
       setLoading(false)
       setStatusMessage('')

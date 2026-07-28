@@ -1,6 +1,22 @@
-import { Library, Search, BarChart3, BookOpen, Bookmark, CheckCircle2 } from 'lucide-react'
+import { Library, Search, BarChart3, BookOpen, Bookmark, CheckCircle2, type LucideIcon } from 'lucide-react'
 
-const viewMeta = {
+interface ViewMetaEntry {
+  title: string
+  subtitle: string
+}
+
+interface NavItem {
+  id: string
+  label: string
+  icon: LucideIcon
+}
+
+interface SelectOption {
+  value: string
+  label: string
+}
+
+const viewMeta: Record<string, ViewMetaEntry> = {
   'reading-now': { title: 'Reading Now', subtitle: 'Pick up where you left off.' },
   library: { title: 'Library', subtitle: 'Everything on your shelves.' },
   search: { title: 'Search', subtitle: 'Find a book by title or author.' },
@@ -9,19 +25,19 @@ const viewMeta = {
   finished: { title: 'Finished', subtitle: "Books you've loved and closed." },
 }
 
-const mainNav = [
+const mainNav: NavItem[] = [
   { id: 'library', label: 'Library', icon: Library },
   { id: 'search', label: 'Search', icon: Search },
   { id: 'stats', label: 'Statistics', icon: BarChart3 },
 ]
 
-const shelfNav = [
+const shelfNav: NavItem[] = [
   { id: 'reading-now', label: 'Reading Now', icon: BookOpen },
   { id: 'want-to-read', label: 'Want to Read', icon: Bookmark },
   { id: 'finished', label: 'Finished', icon: CheckCircle2 },
 ]
 
-const monthOptions = [
+const monthOptions: SelectOption[] = [
   { value: '1', label: 'January' },
   { value: '2', label: 'February' },
   { value: '3', label: 'March' },

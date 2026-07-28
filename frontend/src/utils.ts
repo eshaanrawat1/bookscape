@@ -1,19 +1,27 @@
 import { apiFetch } from './api.js'
+import type { Book, Collection, GenreSection, RawBookPayload, RawList } from './types.js'
 
-function asArray(value) {
+function asArray<T>(value: T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : []
 }
 
-function sleep(ms) {
+function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function loadBootstrapData() {
+interface BootstrapData {
+  books: RawBookPayload[]
+  lists: RawList[]
+  wantToReadBooks: RawBookPayload[]
+  globalLibrary: GenreSection[]
+}
+
+async function loadBootstrapData(): Promise<BootstrapData> {
   const [myBooksRes, listsRes, wantToReadRes, globalRes] = await Promise.all([
-    apiFetch('/my-books'),
-    apiFetch('/reading-lists'),
-    apiFetch('/want-to-read-books'),
-    apiFetch('/global-library'),
+    apiFetch<{ books?: RawBookPayload[] }>('/my-books'),
+    apiFetch<{ lists?: RawList[] }>('/reading-lists'),
+    apiFetch<{ books?: RawBookPayload[] }>('/want-to-read-books'),
+    apiFetch<{ genres?: GenreSection[] }>('/global-library'),
   ])
 
   return {
@@ -24,11 +32,11 @@ async function loadBootstrapData() {
   }
 }
 
-function collectionIdFromName(name) {
+function collectionIdFromName(name: string): string {
   return encodeURIComponent(name)
 }
 
-function mapReadingLists(rawLists) {
+function mapReadingLists(rawLists: RawList[]): Collection[] {
   return rawLists.map((list) => ({
     id: collectionIdFromName(list.name),
     name: list.name,
@@ -38,17 +46,17 @@ function mapReadingLists(rawLists) {
   }))
 }
 
-function nextCollectionName(collections) {
+function nextCollectionName(collections: Collection[]): string {
   const existing = new Set(collections.map((collection) => collection.name.trim().toLowerCase()))
   let index = 1
   while (existing.has(`collection ${index}`)) index += 1
   return `Collection ${index}`
 }
 
-function formatCompactNumber(value) {
+function formatCompactNumber(value: number | string): string {
   const num = Number(value)
   if (!Number.isFinite(num) || num <= 0) return '0'
-  const compact = (divisor, suffix) => {
+  const compact = (divisor: number, suffix: string) => {
     const truncated = Math.floor((Math.abs(num) / divisor) * 10) / 10
     const text = truncated % 1 === 0 ? String(truncated.toFixed(0)) : String(truncated.toFixed(1))
     return `${num < 0 ? '-' : ''}${text}${suffix}`
@@ -59,12 +67,12 @@ function formatCompactNumber(value) {
   return `${Math.round(num)}`
 }
 
-function toNumberOrZero(value) {
+function toNumberOrZero(value: unknown): number {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : 0
 }
 
-function normaliseBook(raw) {
+function normaliseBook(raw: RawBookPayload): Book {
   const totalPages = toNumberOrZero(raw.reading_total_pages ?? raw.total_pages)
   const currentPage = toNumberOrZero(raw.reading_current_page ?? raw.current_page)
   const progress =
@@ -73,10 +81,10 @@ function normaliseBook(raw) {
   const status = raw.reading_status || raw.status || 'not_started'
   const genres = Array.isArray(raw.genres) ? raw.genres.filter(Boolean) : []
   const primaryGenre = raw.genre || genres[0] || ''
-  const rating = parseFloat(raw.avg_rating ?? raw.book_rating) || 0
+  const rating = parseFloat(String(raw.avg_rating ?? raw.book_rating ?? '')) || 0
   const pages = raw.page_count || raw.total_pages || raw.reading_total_pages || totalPages
-  const reviewCount = parseInt(raw.review_count ?? raw.book_review_count ?? 0, 10) || 0
-  const ratingCount = parseInt(raw.rating_count ?? raw.book_rating_count ?? 0, 10) || 0
+  const reviewCount = parseInt(String(raw.review_count ?? raw.book_review_count ?? 0), 10) || 0
+  const ratingCount = parseInt(String(raw.rating_count ?? raw.book_rating_count ?? 0), 10) || 0
 
   return {
     id: raw.id || raw.uid || '',
@@ -104,22 +112,23 @@ function normaliseBook(raw) {
   }
 }
 
-function getCatalogBookId(book) {
-  const raw = book?._raw || book || {}
+function getCatalogBookId(book?: Book | RawBookPayload | null): string {
+  if (!book) return ''
+  const raw: RawBookPayload = '_raw' in book ? (book as Book)._raw : (book as RawBookPayload)
   return String(raw.uid || raw.id || '').trim() || ''
 }
 
-function resolveSavedWantToReadBook(book, savedBooks) {
+function resolveSavedWantToReadBook(book: Book, savedBooks: Book[] | null | undefined): Book | null {
   const targetId = getCatalogBookId(book)
   if (!targetId) return null
   return (savedBooks || []).find((savedBook) => getCatalogBookId(savedBook) === targetId) || null
 }
 
-function authorViewId(author) {
+function authorViewId(author: string): string {
   return `author:${encodeURIComponent(String(author || '').trim())}`
 }
 
-function authorNameFromView(view) {
+function authorNameFromView(view: string): string {
   if (!String(view || '').startsWith('author:')) return ''
   const raw = String(view).slice('author:'.length)
   try {
@@ -129,11 +138,11 @@ function authorNameFromView(view) {
   }
 }
 
-function genreViewId(genre) {
+function genreViewId(genre: string): string {
   return `genre:${encodeURIComponent(String(genre || '').trim())}`
 }
 
-function genreNameFromView(view) {
+function genreNameFromView(view: string): string {
   if (!String(view || '').startsWith('genre:')) return ''
   const raw = String(view).slice('genre:'.length)
   try {

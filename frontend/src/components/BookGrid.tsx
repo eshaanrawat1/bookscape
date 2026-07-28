@@ -1,6 +1,14 @@
 import BookCard from './BookCard.jsx'
+import type { Book } from '../types.js'
 
-function BookGrid({ books, showRemoveButton = false, removeLabel = '', onRemove }) {
+interface BookGridProps {
+  books: Book[]
+  showRemoveButton?: boolean
+  removeLabel?: string
+  onRemove?: (bookId: string) => void
+}
+
+function BookGrid({ books, showRemoveButton = false, removeLabel = '', onRemove }: BookGridProps) {
   if (!books.length) {
     return (
       <div className="emptyState">
