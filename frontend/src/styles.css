@@ -225,12 +225,7 @@ svg {
   background: color-mix(in oklch, var(--sidebar-accent) 70%, transparent);
 }
 
-.navButton.active {
-  background: var(--sidebar-accent);
-  color: var(--sidebar-foreground);
-  box-shadow: 0 0 10px 1px color-mix(in oklch, var(--ember-soft) 22%, transparent);
-}
-
+.navButton.active,
 .collectionButton.active {
   background: var(--sidebar-accent);
   color: var(--sidebar-foreground);
@@ -285,7 +280,8 @@ svg {
   outline: 0;
 }
 
-.collectionNameInput:focus {
+.collectionNameInput:focus,
+.scraperInput:focus {
   border-color: var(--ring);
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 16%, transparent);
 }
@@ -329,7 +325,8 @@ svg {
   background: var(--sidebar-accent);
 }
 
-.iconPillButton:disabled {
+.iconPillButton:disabled,
+.plusButton:disabled {
   cursor: default;
   opacity: 0.55;
 }
@@ -348,11 +345,6 @@ svg {
   background: transparent;
   color: var(--muted-foreground);
   cursor: pointer;
-}
-
-.plusButton:disabled {
-  cursor: default;
-  opacity: 0.55;
 }
 
 .contentPane {
@@ -527,7 +519,8 @@ svg {
   gap: 1rem;
 }
 
-.statsFilter {
+.statsFilter,
+.searchHeader {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
@@ -571,7 +564,8 @@ svg {
   font-weight: 600;
 }
 
-.statsFilterTrigger:focus-visible {
+.statsFilterTrigger:focus-visible,
+.searchClearButton:focus-visible {
   outline: 0;
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 18%, transparent);
 }
@@ -700,7 +694,8 @@ svg {
   padding: 1.2rem;
 }
 
-.statsFeatureHeader {
+.statsFeatureHeader,
+.shelfHeader {
   display: flex;
   align-items: end;
   justify-content: space-between;
@@ -803,11 +798,6 @@ svg {
 .searchClearButton:hover {
   color: var(--primary);
   transform: translateY(-1px);
-}
-
-.searchClearButton:focus-visible {
-  outline: 0;
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 18%, transparent);
 }
 
 .searchClearButton svg {
@@ -915,12 +905,6 @@ svg {
 .searchPreviewFooter:hover {
   background: color-mix(in oklch, var(--accent) 60%, white);
   color: var(--foreground);
-}
-
-.searchHeader {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
 }
 
 .searchHeader h2 {
@@ -1041,7 +1025,8 @@ svg {
   transition: background 160ms ease, transform 160ms ease;
 }
 
-.carouselButton:hover {
+.carouselButton:hover,
+.dialogIconButton:hover:not(:disabled) {
   background: var(--secondary);
   transform: translateY(-1px);
 }
@@ -1153,17 +1138,11 @@ svg {
   transform: translateY(-1px);
 }
 
-.shelf {
+.shelf,
+.dialogCopy {
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
-}
-
-.shelfHeader {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 1rem;
 }
 
 .shelfHeader h2 {
@@ -1549,11 +1528,6 @@ svg {
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
-.scraperInput:focus {
-  border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 16%, transparent);
-}
-
 .scraperStatus {
   display: flex;
   align-items: center;
@@ -1605,12 +1579,6 @@ svg {
   width: 2.8rem;
   height: 2.8rem;
   background: color-mix(in oklch, var(--card) 82%, transparent);
-}
-
-.dialogCopy {
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
 }
 
 .dialogAuthor,
@@ -1722,11 +1690,6 @@ svg {
   color: var(--foreground);
   cursor: pointer;
   transition: background 160ms ease, transform 160ms ease, border-color 160ms ease, color 160ms ease;
-}
-
-.dialogIconButton:hover:not(:disabled) {
-  background: var(--secondary);
-  transform: translateY(-1px);
 }
 
 .dialogIconButton:disabled {
