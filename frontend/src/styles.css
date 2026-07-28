@@ -480,13 +480,19 @@ svg {
   display: none;
   width: 2.8rem;
   height: 2.8rem;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease;
 }
 
 /* ========================================================================== */
 /* Shared Primitives                                                        */
 /* ========================================================================== */
 
-.mobileMenuButton,
 .dialogClose {
   display: grid;
   width: 4.75rem;
