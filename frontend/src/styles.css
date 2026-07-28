@@ -717,8 +717,10 @@ svg {
 .heroGlow {
   position: absolute;
   inset: 0;
-  background: radial-gradient(32rem 26rem at 100% 0%, var(--hero-glow, oklch(0.62 0.14 250)) 0%, transparent 68%);
-  opacity: 0.55;
+  background: var(--hero-glow, oklch(0.62 0.14 250));
+  opacity: 0.4;
+  -webkit-mask-image: radial-gradient(60% 75% at 100% 0%, black 0%, transparent 75%);
+  mask-image: radial-gradient(60% 75% at 100% 0%, black 0%, transparent 75%);
   pointer-events: none;
 }
 
