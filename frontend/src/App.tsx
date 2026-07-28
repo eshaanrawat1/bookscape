@@ -334,13 +334,13 @@ export default function App() {
                     {view.startsWith('genre:') && (
                       <button type="button" className="kickerLink" onClick={goBackFromGenre}>
                         <ArrowLeft size={14} />
-                        Library
+                        Back
                       </button>
                     )}
                     {view.startsWith('author:') && (
                       <button type="button" className="kickerLink" onClick={goBackFromAuthor}>
                         <ArrowLeft size={14} />
-                        Library
+                        Back
                       </button>
                     )}
                     <h1>{meta?.title || meta?.name}</h1>
