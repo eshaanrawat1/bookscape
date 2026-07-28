@@ -121,9 +121,9 @@ export default function App() {
   const meta: { title?: string; subtitle?: string; name?: string; description?: string } | undefined = activeCollection
     ? activeCollection
     : view.startsWith('author:')
-      ? { title: activeAuthorName || 'Author', subtitle: 'Every book we have by this author.' }
+      ? { title: activeAuthorName || 'Author' }
       : view.startsWith('genre:')
-        ? { title: activeGenreName || 'Genre', subtitle: 'Top books in this genre.' }
+        ? { title: activeGenreName || 'Genre' }
         : viewMeta[view]
 
   const openBookDialog = (book: Book) => setSelected({ book, variant: 'standard' })

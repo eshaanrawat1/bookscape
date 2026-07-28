@@ -862,8 +862,11 @@ svg {
 }
 
 .shelfHeader h2 {
+  font-family: var(--font-serif);
+  font-weight: 500;
   font-size: 2rem;
   letter-spacing: -0.015em;
+  color: var(--foreground);
 }
 
 .shelfHeader p {
@@ -2279,10 +2282,184 @@ svg {
   line-height: 1.65;
 }
 
+.authorStats {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-top: 1.35rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+}
+
+.authorStat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: color-mix(in oklch, var(--foreground) 86%, var(--muted-foreground));
+  font-size: 1.08rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.authorStat svg {
+  width: 1.3rem;
+  height: 1.3rem;
+  color: var(--primary);
+}
+
+.authorNotable {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  max-width: 30rem;
+}
+
+.authorNotableLabel {
+  margin: 0 0 0.5rem;
+  color: var(--muted-foreground);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.authorNotableList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.authorNotableList li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.authorNotableList li + li {
+  border-top: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
+}
+
+.authorNotableTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  color: var(--foreground);
+}
+
+.authorNotableRating {
+  flex: 0 0 auto;
+  color: var(--muted-foreground);
+  font-size: 0.94rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .authorBooksSection {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.authorBookList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+
+.authorBookList li {
+  list-style: none;
+}
+
+.authorBookRow {
+  display: grid;
+  grid-template-columns: 3.6rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 1.1rem;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid color-mix(in oklch, var(--border) 82%, transparent);
+  background: transparent;
+  padding: 1rem 0.2rem;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background 150ms ease, transform 150ms ease;
+}
+
+.authorBookRow:hover {
+  background: color-mix(in oklch, var(--secondary) 55%, white);
+  transform: translateX(0.18rem);
+}
+
+.authorBookRowCover {
+  width: 3.6rem;
+}
+
+.authorBookRowCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.authorBookRowCopy strong {
+  overflow: hidden;
+  font-family: var(--font-serif);
+  font-size: 1.18rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--foreground);
+}
+
+.authorBookRowCopy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+  font-size: 0.96rem;
+}
+
+.authorBookRowRating {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 2.6rem;
+  color: var(--primary);
+  font-size: 1.02rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.authorBookRowRating svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.authorBookRowChevron {
+  width: 1.3rem;
+  height: 1.3rem;
+  color: color-mix(in oklch, var(--muted-foreground) 82%, transparent);
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  .authorBookRowCover {
+    width: 2.9rem;
+  }
 }
 
 /* ========================================================================== */
