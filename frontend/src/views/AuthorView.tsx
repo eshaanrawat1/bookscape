@@ -68,7 +68,7 @@ function AuthorHero({ books, onOpen }: AuthorHeroProps) {
         </button>
         <div className="heroCopy">
           <h2>{book.title}</h2>
-          {book.genre ? <p className="bookMeta">{book.genre}</p> : null}
+          <p className="bookMeta">{book.author} · {book.genre}</p>
           <p className="heroBlurb">{book.blurb}</p>
           <div className="dialogStatsRow">
             {book.rating > 0 && (

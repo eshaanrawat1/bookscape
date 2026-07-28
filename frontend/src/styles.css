@@ -708,7 +708,6 @@ svg {
 .heroCard {
   position: relative;
   overflow: hidden;
-  contain: paint;
   border: 1px solid var(--border);
   border-radius: 3.1rem;
   background-color: var(--card);
@@ -717,14 +716,9 @@ svg {
 
 .heroGlow {
   position: absolute;
-  top: -6rem;
-  right: -7rem;
-  width: 22rem;
-  height: 22rem;
-  border-radius: 999px;
-  background: var(--hero-glow, oklch(0.62 0.14 250));
-  opacity: 0.5;
-  filter: blur(48px);
+  inset: 0;
+  background: radial-gradient(32rem 26rem at 100% 0%, var(--hero-glow, oklch(0.62 0.14 250)) 0%, transparent 68%);
+  opacity: 0.55;
   pointer-events: none;
 }
 
@@ -1166,6 +1160,11 @@ svg {
   margin-top: 0.2rem;
   padding-bottom: 0.55rem;
   border-bottom: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+}
+
+.heroCopy .dialogStatsRow {
+  padding-bottom: 0;
+  border-bottom: 0;
 }
 
 .dialogStatItem {
