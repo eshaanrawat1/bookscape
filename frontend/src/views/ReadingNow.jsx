@@ -8,6 +8,7 @@ import Shelf from '../components/Shelf.jsx'
 
 function ReadingNowHero({ books, onOpen }) {
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [direction, setDirection] = useState('next')
 
   // In case the list shrinks
   const safeIndex = books && currentIndex >= books.length ? 0 : currentIndex
@@ -29,8 +30,14 @@ function ReadingNowHero({ books, onOpen }) {
 
   const book = books[safeIndex]
 
-  const nextBook = () => setCurrentIndex((i) => (i + 1) % books.length)
-  const prevBook = () => setCurrentIndex((i) => (i - 1 + books.length) % books.length)
+  const nextBook = () => {
+    setDirection('next')
+    setCurrentIndex((i) => (i + 1) % books.length)
+  }
+  const prevBook = () => {
+    setDirection('prev')
+    setCurrentIndex((i) => (i - 1 + books.length) % books.length)
+  }
 
   const pagesLeft = Math.round((toNumberOrZero(book.pages) * (100 - toNumberOrZero(book.progress))) / 100)
   const heroGlowColor = buildHeroGlow(book.color || `hsl(${book.tint})`)
@@ -48,7 +55,7 @@ function ReadingNowHero({ books, onOpen }) {
           </button>
         </div>
       )}
-      <div className="heroInner">
+      <div className={`heroInner heroSlide-${direction}`} key={book.id}>
         <button className="heroCover" onClick={() => onOpen(book)}>
           <BookCover book={book} glow />
         </button>
