@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Menu, RefreshCcw, Plus, Trash2, File, ArrowLeft } from 'lucide-react'
+import { Menu, Plus, Trash2, File, Upload, Download, ArrowLeft } from 'lucide-react'
 
 // API & Utilities
 import { apiFetch, BOOTSTRAP_RETRIES, BOOTSTRAP_RETRY_DELAY_MS } from './api.js'
@@ -37,7 +37,7 @@ import StatsView from './views/StatsView.jsx'
 import AuthorView from './views/AuthorView.jsx'
 import GenreView from './views/GenreView.jsx'
 import CollectionView from './views/CollectionView.jsx'
-import type { Book, Collection, GenreSection, RawBookPayload, RawList } from './types.js'
+import type { Book, Collection, GenreSection, RawBookPayload, RawList, SyncPullResult, SyncPushResult } from './types.js'
 
 type Selected =
   | { book: Book; variant: 'standard' }
@@ -55,8 +55,8 @@ export default function App() {
   const [wantToReadBooks, setWantToReadBooks] = useState<Book[]>([])
   const [globalLibrary, setGlobalLibrary] = useState<GenreSection[]>([])
   const [loading, setLoading] = useState(true)
-  const [syncing, setSyncing] = useState(false)
-  const [syncError, setSyncError] = useState<string | null>(null)
+  const [vaultBusy, setVaultBusy] = useState<'push' | 'pull' | null>(null)
+  const [vaultError, setVaultError] = useState<string | null>(null)
   const [showScraperDialog, setShowScraperDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -224,17 +224,30 @@ export default function App() {
     await reloadAppData()
   }
 
-  async function syncFromObsidian() {
-    if (syncing) return
-    setSyncing(true)
-    setSyncError(null)
+  async function pushToVault() {
+    if (vaultBusy) return
+    setVaultBusy('push')
+    setVaultError(null)
     try {
-      await apiFetch('/sync/obsidian', { method: 'POST' })
+      await apiFetch<SyncPushResult>('/sync/obsidian/push', { method: 'POST' })
+    } catch (err) {
+      setVaultError(err instanceof Error ? err.message : 'Could not push to Obsidian vault.')
+    } finally {
+      setVaultBusy(null)
+    }
+  }
+
+  async function pullFromVault() {
+    if (vaultBusy) return
+    setVaultBusy('pull')
+    setVaultError(null)
+    try {
+      await apiFetch<SyncPullResult>('/sync/obsidian', { method: 'POST' })
       await reloadAppData()
     } catch (err) {
-      setSyncError(err instanceof Error ? err.message : 'Could not sync from Obsidian.')
+      setVaultError(err instanceof Error ? err.message : 'Could not pull from Obsidian vault.')
     } finally {
-      setSyncing(false)
+      setVaultBusy(null)
     }
   }
 
@@ -266,11 +279,14 @@ export default function App() {
       <NavigationContext.Provider value={navigation}>
         <div className="appRoot">
           <div className="iconPill">
-            <button className="iconPillButton" aria-label="Obsidian Vault" onClick={() => setShowSettingsDialog(true)}>
+            <button className="iconPillButton" aria-label="Vault Settings" onClick={() => setShowSettingsDialog(true)}>
               <File />
             </button>
-            <button className="iconPillButton" aria-label="Sync" onClick={syncFromObsidian} disabled={syncing}>
-              <RefreshCcw className={syncing ? 'syncIcon spinning' : 'syncIcon'} />
+            <button className="iconPillButton" aria-label="Push to Vault" onClick={pushToVault} disabled={vaultBusy !== null}>
+              <Upload className={vaultBusy === 'push' ? 'syncIcon spinning' : 'syncIcon'} />
+            </button>
+            <button className="iconPillButton" aria-label="Pull from Vault" onClick={pullFromVault} disabled={vaultBusy !== null}>
+              <Download className={vaultBusy === 'pull' ? 'syncIcon spinning' : 'syncIcon'} />
             </button>
             <button className="iconPillButton" aria-label="Add Book" onClick={() => setShowScraperDialog(true)}>
               <Plus />
@@ -332,8 +348,8 @@ export default function App() {
                   </div>
                 </div>
                 <div className="topBarActions" />
-                {syncError && (
-                  <p className="topBarNotice syncErrorNotice">{syncError}</p>
+                {vaultError && (
+                  <p className="topBarNotice syncErrorNotice">{vaultError}</p>
                 )}
               </header>
 
@@ -376,7 +392,7 @@ export default function App() {
             />
           )}
           {showSettingsDialog && (
-            <SettingsDialog onClose={() => setShowSettingsDialog(false)} onDataChanged={reloadAppData} />
+            <SettingsDialog onClose={() => setShowSettingsDialog(false)} />
           )}
         </div>
       </NavigationContext.Provider>

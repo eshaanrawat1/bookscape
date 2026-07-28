@@ -1,22 +1,16 @@
 import { useEffect, useState } from 'react'
-import { X, FolderOpen, RefreshCcw } from 'lucide-react'
+import { X, FolderOpen } from 'lucide-react'
 import { apiFetch } from '../api.js'
-import type { SyncPullResult, SyncPushResult } from '../types.js'
 
 interface SettingsDialogProps {
   onClose: () => void
-  onDataChanged?: () => Promise<void>
 }
 
-type SettingsResult = ({ kind: 'pull' } & SyncPullResult) | ({ kind: 'push' } & SyncPushResult)
-
-function SettingsDialog({ onClose, onDataChanged }: SettingsDialogProps) {
+function SettingsDialog({ onClose }: SettingsDialogProps) {
   const [vaultPath, setVaultPath] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [busy, setBusy] = useState<'pull' | 'push' | null>(null)
-  const [result, setResult] = useState<SettingsResult | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -62,36 +56,6 @@ function SettingsDialog({ onClose, onDataChanged }: SettingsDialogProps) {
     }
   }
 
-  async function runPull() {
-    setBusy('pull')
-    setError(null)
-    setResult(null)
-    try {
-      const data = await apiFetch<SyncPullResult>('/sync/obsidian', { method: 'POST' })
-      setResult({ kind: 'pull', ...data })
-      await onDataChanged?.()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Pull from Obsidian failed.')
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  async function runPush() {
-    setBusy('push')
-    setError(null)
-    setResult(null)
-    try {
-      const data = await apiFetch<SyncPushResult>('/sync/obsidian/push', { method: 'POST' })
-      setResult({ kind: 'push', ...data })
-      await onDataChanged?.()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Push to Obsidian failed.')
-    } finally {
-      setBusy(null)
-    }
-  }
-
   return (
     <div className="dialogScrim" onClick={onClose}>
       <article className="bookDialog paperGrain scraperDialog" onClick={(e) => e.stopPropagation()}>
@@ -99,10 +63,10 @@ function SettingsDialog({ onClose, onDataChanged }: SettingsDialogProps) {
           <X />
         </button>
 
-        <h2>Obsidian Vault</h2>
+        <h2>Vault Settings</h2>
         <p className="dialogAuthor" style={{ marginBottom: '1.5rem' }}>
-          Point Bookscape at any folder to Push your reading/finished books out as notes,
-          or Pull existing notes back in.
+          Point Bookscape at any folder. Use the Push/Pull icons in the top bar to sync
+          your reading/finished books with notes in this vault.
         </p>
 
         <div className="scraperForm">
@@ -132,46 +96,6 @@ function SettingsDialog({ onClose, onDataChanged }: SettingsDialogProps) {
           </div>
 
           {error && <p className="scraperError">{error}</p>}
-
-          {result && (
-            <div className="scraperStatus" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem' }}>
-              {result.kind === 'pull' ? (
-                <span className="scraperStatusText">
-                  Scanned {result.scanned_files}, imported {result.imported}
-                  {result.skipped?.length ? `, skipped ${result.skipped.length}` : ''}.
-                </span>
-              ) : (
-                <span className="scraperStatusText">
-                  Wrote {result.written}, removed {result.deleted}
-                  {result.skipped_collisions?.length ? `, ${result.skipped_collisions.length} collision(s) skipped` : ''}.
-                </span>
-              )}
-              {(result.kind === 'push' ? result.skipped_collisions : []).map((c) => (
-                <span key={c.filename} className="scraperError">
-                  "{c.filename}" claimed by {c.uids.join(', ')} — rename in Obsidian and Push again.
-                </span>
-              ))}
-            </div>
-          )}
-
-          <div className="scraperButtons">
-            <button
-              type="button"
-              className="secondaryButton"
-              onClick={runPull}
-              disabled={!vaultPath || busy !== null}
-            >
-              {busy === 'pull' ? <RefreshCcw className="syncIcon spinning" size={16} /> : 'Pull from Vault'}
-            </button>
-            <button
-              type="button"
-              className="primaryButton"
-              onClick={runPush}
-              disabled={!vaultPath || busy !== null}
-            >
-              {busy === 'push' ? <RefreshCcw className="syncIcon spinning" size={16} /> : 'Push to Vault'}
-            </button>
-          </div>
         </div>
       </article>
     </div>
