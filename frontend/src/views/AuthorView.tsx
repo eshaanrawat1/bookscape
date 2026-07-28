@@ -1,4 +1,4 @@
-import { BookOpen, Tag, Star, ChevronRight } from 'lucide-react'
+import { BookOpen, Tag, Star, ChevronRight, BookText } from 'lucide-react'
 import BookCover from '../components/BookCover.jsx'
 import useAuthorBooks from '../hooks/useAuthorBooks.js'
 import { useNavigation } from '../context/NavigationContext.jsx'
@@ -6,6 +6,17 @@ import type { Book } from '../types.js'
 
 interface AuthorViewProps {
   author: string
+}
+
+const BLURB_LIMIT = 260
+
+function truncateBlurb(text: string, limit = BLURB_LIMIT): { text: string; isTruncated: boolean } {
+  const trimmed = text.trim()
+  if (trimmed.length <= limit) return { text: trimmed, isTruncated: false }
+  const clipped = trimmed.slice(0, limit)
+  const lastSpace = clipped.lastIndexOf(' ')
+  const safe = (lastSpace > 40 ? clipped.slice(0, lastSpace) : clipped).trim()
+  return { text: `${safe}…`, isTruncated: true }
 }
 
 function AuthorView({ author }: AuthorViewProps) {
@@ -22,16 +33,14 @@ function AuthorView({ author }: AuthorViewProps) {
     ? ratedBooks.reduce((sum, book) => sum + book.rating, 0) / ratedBooks.length
     : null
 
-  const topRated = [...ratedBooks]
-    .sort((a, b) => b.rating - a.rating || b.ratingCount - a.ratingCount)
-    .slice(0, 3)
+  const featuredBlurb = heroBook?.blurb ? truncateBlurb(heroBook.blurb) : null
 
   return (
     <div className="stack authorPage">
-      <section className="authorHeroPanel paperGrain">
+      <section className="authorHeroPanel">
         <div className="finishedDialogTop authorDialogTop">
           <div className="finishedCoverColumn">
-            <div className="finishedCoverWrap">
+            <div className="finishedCoverWrap authorHeroFrame">
               {heroBook ? (
                 <BookCover book={heroBook} glow />
               ) : (
@@ -40,19 +49,15 @@ function AuthorView({ author }: AuthorViewProps) {
                 </div>
               )}
             </div>
+            {heroBook && <p className="authorHeroCaption">Featured</p>}
           </div>
 
           <div className="finishedCopy">
             <div className="finishedHeader">
               <div>
                 <h2>{author || 'Author'}</h2>
-                <p>Books we have by this author, including co-written titles.</p>
               </div>
             </div>
-
-            <p className="authorSummary">
-              This page gathers every matching title from the catalog and gives you a clean shelf just like the finished-books view.
-            </p>
 
             <div className="authorStats">
               <span className="authorStat">
@@ -68,22 +73,29 @@ function AuthorView({ author }: AuthorViewProps) {
               {avgRating !== null && (
                 <span className="authorStat">
                   <Star />
-                  <span>{avgRating.toFixed(1)} rating</span>
+                  <span>{avgRating.toFixed(1)} average</span>
                 </span>
               )}
             </div>
 
-            {topRated.length > 1 && (
-              <div className="authorNotable">
-                <p className="authorNotableLabel">Highest rated</p>
-                <ul className="authorNotableList">
-                  {topRated.map((book) => (
-                    <li key={book.id}>
-                      <span className="authorNotableTitle">{book.title}</span>
-                      <span className="authorNotableRating">{book.rating.toFixed(1)}</span>
-                    </li>
-                  ))}
-                </ul>
+            <p className="authorSummary">
+              Books we have by this author, including co-written titles. This page gathers every matching title from the catalog and gives you a clean shelf just like the finished-books view.
+            </p>
+
+            {featuredBlurb && heroBook && (
+              <div className="authorFeatured">
+                <p className="authorFeaturedLabel">
+                  <BookText />
+                  <span>About {heroBook.title}</span>
+                </p>
+                <p className="authorFeaturedBlurb">
+                  {featuredBlurb.text}
+                  {featuredBlurb.isTruncated && (
+                    <button type="button" className="authorFeaturedReadMore" onClick={() => onOpen(heroBook)}>
+                      Read more
+                    </button>
+                  )}
+                </p>
               </div>
             )}
           </div>
@@ -102,10 +114,8 @@ function AuthorView({ author }: AuthorViewProps) {
       ) : books.length > 0 ? (
         <section className="authorBooksSection">
           <div className="shelfHeader">
-            <div>
-              <h2>All books</h2>
-              <p>Every title in the catalog matched to this author.</p>
-            </div>
+            <h2>All books</h2>
+            <p className="authorBooksCaption">Every title matched to this author</p>
           </div>
           <ul className="authorBookList">
             {books.map((book) => (
