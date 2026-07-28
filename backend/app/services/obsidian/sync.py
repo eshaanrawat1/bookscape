@@ -50,8 +50,10 @@ def _apply_parsed_book(root: Path, book: dict, *, dry_run: bool) -> str:
         "description": book.get("description", ""),
         "genres": book.get("genres", []),
     })
-    # Note: this is the only place liked/want_to_read are absent by design —
-    # they never appear in the Obsidian markdown format, so Pull never touches them.
+    # Note: liked/want_to_read/collections are absent by design — they never
+    # appear in the Obsidian markdown format, so Pull never touches them.
+    # Notes round-trip like every other field here: Push writes SQL -> file,
+    # Pull writes file -> SQL, last sync direction wins (same as status/dates).
     DataRepository(root).upsert_book_state(
         uid,
         status=status,
@@ -59,6 +61,7 @@ def _apply_parsed_book(root: Path, book: dict, *, dry_run: bool) -> str:
         total_pages=book.get("total_pages", 0),
         start_date=book.get("start_date", ""),
         finish_date=book.get("finish_date", ""),
+        notes=book.get("notes", ""),
     )
     return ""
 

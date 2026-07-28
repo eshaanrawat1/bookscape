@@ -33,14 +33,22 @@ def _parse_frontmatter(md_text: str) -> dict:
     return out if isinstance(out, dict) else {}
 
 
-def _extract_description(md_text: str) -> str:
-    m = re.search(r"(?im)^##\s+Description\s*$", md_text)
+def _extract_section(md_text: str, heading: str) -> str:
+    m = re.search(rf"(?im)^##\s+{heading}\s*$", md_text)
     if not m:
         return ""
     rest = md_text[m.end():]
     next_heading = re.search(r"(?im)^##\s+", rest)
     block = rest[: next_heading.start()] if next_heading else rest
     return "\n".join(ln.strip() for ln in block.splitlines() if ln.strip()).strip()
+
+
+def _extract_description(md_text: str) -> str:
+    return _extract_section(md_text, "Description")
+
+
+def _extract_notes(md_text: str) -> str:
+    return _extract_section(md_text, "Notes")
 
 
 def parse_book(path: Path) -> dict | None:
@@ -76,5 +84,6 @@ def parse_book(path: Path) -> dict | None:
         "review_count":     int(fm.get("review_count") or 0),
         "genres":           genres,
         "genre":            genres[0] if genres else "unknown",
-        "description":      str(fm.get("description") or "").strip() or _extract_description(text)
+        "description":      str(fm.get("description") or "").strip() or _extract_description(text),
+        "notes":            _extract_notes(text),
     }

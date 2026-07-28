@@ -77,8 +77,10 @@ def _atomic_write(path: Path, content: str) -> None:
 
 def push_one(root: Path, uid: str, *, dry_run: bool = False) -> dict:
     """Push a single book's current Bookscape state out to its vault note.
-    Notes are SQL-authoritative: this always regenerates the whole file (including
-    `## Notes`) from current state — it never reads an existing file first."""
+    Always regenerates the whole file (including `## Notes`) from current SQL
+    state — never reads an existing file first. Notes round-trip like every
+    other field: Pull writes file -> SQL, Push writes SQL -> file; whichever
+    direction ran most recently wins, same as status/progress/dates."""
     repo = DataRepository(root)
     state = repo.get_book_state(uid)
     if not state or state.get("status") not in EXPORTABLE_STATUSES:

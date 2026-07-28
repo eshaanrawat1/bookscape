@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { X, FolderOpen, RefreshCcw } from 'lucide-react'
 import { apiFetch } from '../api.js'
 
-function SettingsDialog({ onClose }) {
+function SettingsDialog({ onClose, onDataChanged }) {
   const [vaultPath, setVaultPath] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -61,6 +61,7 @@ function SettingsDialog({ onClose }) {
     try {
       const data = await apiFetch('/sync/obsidian', { method: 'POST' })
       setResult({ kind: 'pull', ...data })
+      await onDataChanged?.()
     } catch (err) {
       setError(err.message || 'Pull from Obsidian failed.')
     } finally {
@@ -75,6 +76,7 @@ function SettingsDialog({ onClose }) {
     try {
       const data = await apiFetch('/sync/obsidian/push', { method: 'POST' })
       setResult({ kind: 'push', ...data })
+      await onDataChanged?.()
     } catch (err) {
       setError(err.message || 'Push to Obsidian failed.')
     } finally {

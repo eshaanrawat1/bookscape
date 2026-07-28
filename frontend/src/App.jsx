@@ -571,7 +571,7 @@ export default function App() {
         />
       )}
       {showSettingsDialog && (
-        <SettingsDialog onClose={() => setShowSettingsDialog(false)} />
+        <SettingsDialog onClose={() => setShowSettingsDialog(false)} onDataChanged={reloadAppData} />
       )}
     </div>
   )

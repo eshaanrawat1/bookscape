@@ -53,8 +53,8 @@ single book at a time:
   export reading/finished books to the vault, full-regenerated each time.
   Filenames are derived from the title and reused thereafter; a title
   collision between two books is skipped (not fatal) and reported back for
-  manual resolution in Obsidian. Notes are SQL-authoritative — write them in
-  Bookscape and Push them out for reference.
+  manual resolution in Obsidian. Notes round-trip like status/progress/dates —
+  whichever direction (Push or Pull) ran most recently wins.
 
 All of the above accept `?dry_run=true` to preview without writing.
 
