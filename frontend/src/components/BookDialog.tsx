@@ -85,8 +85,8 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
   const statusMenuRef = useRef<HTMLDivElement>(null)
   const baseRecord: ReadingProgressRecord = {
     status: book.status || 'not_started',
-    current_page: book.currentPage ?? book.pages ?? 0,
-    total_pages: book.totalPages ?? book.pages ?? 0,
+    current_page: book.currentPage || 0,
+    total_pages: book.totalPages || book.pages || 0,
     start_date: book.startDate || '',
     finish_date: book.finishDate || '',
     notes: '',
@@ -109,6 +109,7 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
         const nextRecord: ReadingProgressRecord = {
           ...baseRecord,
           ...next,
+          total_pages: Number(next.total_pages) || baseRecord.total_pages,
         }
         if (preferLiveStatus) {
           nextRecord.status = baseRecord.status
@@ -158,7 +159,12 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
     try {
       await apiFetch(`/sync/obsidian/pull/${bookId}`, { method: 'POST' })
       const refreshed = await apiFetch<ReadingProgressResponse>(`/reading-progress/${bookId}`)
-      const nextRecord: ReadingProgressRecord = { ...baseRecord, ...(refreshed?.entry || {}) }
+      const nextEntry = refreshed?.entry || {}
+      const nextRecord: ReadingProgressRecord = {
+        ...baseRecord,
+        ...nextEntry,
+        total_pages: Number(nextEntry.total_pages) || baseRecord.total_pages,
+      }
       setRecord(nextRecord)
       lastSavedRef.current = JSON.stringify(nextRecord)
       setObsidianMessage('Pulled from vault.')
