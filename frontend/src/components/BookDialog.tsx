@@ -287,10 +287,10 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
   }, [])
 
   const statusDotClass = ({
-    done: 'finishedStatusDot done',
-    reading: 'finishedStatusDot reading',
-    not_started: 'finishedStatusDot notStarted',
-  } as Record<string, string>)[draft.status] || 'finishedStatusDot'
+    done: 'trackingStatusDot done',
+    reading: 'trackingStatusDot reading',
+    not_started: 'trackingStatusDot notStarted',
+  } as Record<string, string>)[draft.status] || 'trackingStatusDot'
 
   const handleSave = async () => {
     if (!bookId || savingToRead) return
@@ -472,21 +472,21 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
               </>
             ) : (
               <>
-                <div className="finishedStatusRow" ref={statusMenuRef}>
-                  <div className={statusMenuOpen ? 'finishedStatusControl open' : 'finishedStatusControl'}>
+                <div className="trackingStatusRow" ref={statusMenuRef}>
+                  <div className={statusMenuOpen ? 'trackingStatusControl open' : 'trackingStatusControl'}>
                     <button
                       type="button"
-                      className="finishedStatusButton"
+                      className="trackingStatusButton"
                       onClick={() => setStatusMenuOpen((value) => !value)}
                       aria-haspopup="menu"
                       aria-expanded={statusMenuOpen}
                     >
-                      <span>{STATUS_LABELS[draft.status] || 'Finished'}</span>
+                      <span>{STATUS_LABELS[draft.status]}</span>
                       <span className={statusDotClass} />
-                      <ChevronDown className="finishedStatusCaret" strokeWidth={2.25} />
+                      <ChevronDown className="trackingStatusCaret" strokeWidth={2.25} />
                     </button>
                     {statusMenuOpen && (
-                      <div className="finishedStatusMenu" role="menu" aria-label="Reading status">
+                      <div className="trackingStatusMenu" role="menu" aria-label="Reading status">
                         {[
                           ['done', 'Finished'],
                           ['reading', 'Reading'],
@@ -495,7 +495,7 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
                           <button
                             key={value}
                             type="button"
-                            className={draft.status === value ? 'finishedStatusMenuItem active' : 'finishedStatusMenuItem'}
+                            className={draft.status === value ? 'trackingStatusMenuItem active' : 'trackingStatusMenuItem'}
                             role="menuitemradio"
                             aria-checked={draft.status === value}
                             onClick={() => {
@@ -537,33 +537,33 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
                   </div>
                 )}
 
-                <div className="finishedPanel">
-                  <div className="finishedFieldRow">
-                    <label className="finishedField">
+                <div className="trackingPanel">
+                  <div className="trackingFieldRow">
+                    <label className="trackingField">
                       <span>Progress</span>
-                      <div className="finishedFieldValue">
+                      <div className="trackingFieldValue">
                         <input
                           type="number"
                           min="0"
-                          className="finishedPageInput"
+                          className="trackingPageInput"
                           value={draft.current_page}
                           onChange={(event) => updateField('current_page', event.target.value)}
                         />
-                        <span className="finishedFieldSep">/</span>
+                        <span className="trackingFieldSep">/</span>
                         <input
                           type="number"
                           min="0"
-                          className="finishedPageInput"
+                          className="trackingPageInput"
                           value={draft.total_pages}
                           onChange={(event) => updateField('total_pages', event.target.value)}
                         />
-                        <span className="finishedFieldUnit">pages</span>
+                        <span className="trackingFieldUnit">pages</span>
                       </div>
                     </label>
                   </div>
 
-                  <div className="finishedFieldRow twoCol">
-                    <label className="finishedField">
+                  <div className="trackingFieldRow twoCol">
+                    <label className="trackingField">
                       <span>Start</span>
                       <input
                         type="date"
@@ -571,7 +571,7 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
                         onChange={(event) => updateField('start_date', event.target.value)}
                       />
                     </label>
-                    <label className="finishedField">
+                    <label className="trackingField">
                       <span>End</span>
                       <input
                         type="date"
@@ -581,7 +581,7 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
                     </label>
                   </div>
 
-                  <label className="finishedNotes">
+                  <label className="trackingNotes">
                     <span>Notes</span>
                     <textarea
                       rows={7}

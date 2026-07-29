@@ -1492,12 +1492,12 @@ svg {
   animation: dialogTabPanelFadeIn 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.finishedStatusRow {
+.trackingStatusRow {
   display: flex;
   align-items: center;
 }
 
-.finishedStatusControl {
+.trackingStatusControl {
   position: relative;
   display: inline-flex;
   flex-direction: column;
@@ -1506,11 +1506,11 @@ svg {
   color: color-mix(in oklch, var(--foreground) 82%, var(--muted-foreground));
 }
 
-.finishedStatusControl.open {
+.trackingStatusControl.open {
   z-index: 24;
 }
 
-.finishedStatusButton {
+.trackingStatusButton {
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
@@ -1527,18 +1527,18 @@ svg {
   box-shadow: none;
 }
 
-.finishedStatusButton:hover {
+.trackingStatusButton:hover {
   color: color-mix(in oklch, var(--foreground) 90%, var(--primary));
 }
 
-.finishedStatusCaret {
+.trackingStatusCaret {
   width: 1.2rem;
   height: 1.2rem;
   margin-left: 0.05rem;
   color: var(--muted-foreground);
 }
 
-.finishedStatusMenu {
+.trackingStatusMenu {
   position: absolute;
   top: calc(100% + 0.55rem);
   left: 0;
@@ -1551,7 +1551,7 @@ svg {
   box-shadow: var(--shadow-panel);
 }
 
-.finishedStatusMenuItem {
+.trackingStatusMenuItem {
   display: block;
   width: 100%;
   border: 0;
@@ -1565,20 +1565,20 @@ svg {
   cursor: pointer;
 }
 
-.finishedStatusMenuItem:first-child {
+.trackingStatusMenuItem:first-child {
   border-top: 0;
 }
 
-.finishedStatusMenuItem:hover,
-.finishedStatusMenuItem.active {
+.trackingStatusMenuItem:hover,
+.trackingStatusMenuItem.active {
   background: color-mix(in oklch, var(--accent) 34%, white);
 }
 
-.finishedStatusMenuItem.active {
+.trackingStatusMenuItem.active {
   font-weight: 600;
 }
 
-.finishedStatusDot {
+.trackingStatusDot {
   width: 0.72rem;
   height: 0.72rem;
   border-radius: 999px;
@@ -1586,17 +1586,17 @@ svg {
   box-shadow: 0 0 0 4px color-mix(in oklch, var(--status-finished) 18%, transparent);
 }
 
-.finishedStatusDot.reading {
+.trackingStatusDot.reading {
   background: var(--status-reading);
   box-shadow: 0 0 0 4px color-mix(in oklch, var(--status-reading) 18%, transparent);
 }
 
-.finishedStatusDot.notStarted {
+.trackingStatusDot.notStarted {
   background: var(--status-not-started);
   box-shadow: 0 0 0 4px color-mix(in oklch, var(--status-not-started) 18%, transparent);
 }
 
-.finishedPanel {
+.trackingPanel {
   display: flex;
   flex-direction: column;
   gap: 2.25rem;
@@ -1605,29 +1605,29 @@ svg {
   margin-top: 0.25rem;
 }
 
-.finishedFieldRow {
+.trackingFieldRow {
   display: flex;
   gap: 1.35rem;
 }
 
-.finishedFieldRow.twoCol {
+.trackingFieldRow.twoCol {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.finishedField,
-.finishedNotes {
+.trackingField,
+.trackingNotes {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
 }
 
-.finishedFieldRow:first-child .finishedField {
+.trackingFieldRow:first-child .trackingField {
   max-width: 38rem;
 }
 
-.finishedField>span,
-.finishedNotes>span {
+.trackingField>span,
+.trackingNotes>span {
   color: var(--muted-foreground);
   font-size: 1.08rem;
   font-weight: 600;
@@ -1635,9 +1635,9 @@ svg {
   text-transform: uppercase;
 }
 
-.finishedFieldValue,
-.finishedField input,
-.finishedNotes textarea {
+.trackingFieldValue,
+.trackingField input,
+.trackingNotes textarea {
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -1648,7 +1648,7 @@ svg {
   -webkit-appearance: none;
 }
 
-.finishedFieldValue {
+.trackingFieldValue {
   display: inline-flex;
   align-items: baseline;
   gap: 0.4rem;
@@ -1658,7 +1658,7 @@ svg {
   letter-spacing: -0.02em;
 }
 
-.finishedPageInput {
+.trackingPageInput {
   width: auto;
   min-width: 0;
   padding: 0;
@@ -1674,39 +1674,39 @@ svg {
   -moz-appearance: textfield;
 }
 
-.finishedFieldValue .finishedPageInput {
+.trackingFieldValue .trackingPageInput {
   width: auto;
   max-width: none;
 }
 
-.finishedPageInput::-webkit-outer-spin-button,
-.finishedPageInput::-webkit-inner-spin-button {
+.trackingPageInput::-webkit-outer-spin-button,
+.trackingPageInput::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
-.finishedFieldSep {
+.trackingFieldSep {
   color: var(--muted-foreground);
 }
 
-.finishedFieldUnit {
+.trackingFieldUnit {
   color: var(--muted-foreground);
   font-size: 1rem;
 }
 
-.finishedField > input {
+.trackingField > input {
   width: 100%;
   padding: 0;
   font-size: 1.28rem;
   letter-spacing: 0.01em;
 }
 
-.finishedField > input:focus,
-.finishedNotes textarea:focus {
+.trackingField > input:focus,
+.trackingNotes textarea:focus {
   outline: none;
 }
 
-.finishedNotes textarea {
+.trackingNotes textarea {
   resize: vertical;
   min-height: 18rem;
   padding: 0;
@@ -2462,11 +2462,11 @@ svg {
 }
 
 @media (max-width: 620px) {
-  .finishedFieldValue {
+  .trackingFieldValue {
     gap: 0.3rem;
   }
 
-  .finishedFieldRow.twoCol {
+  .trackingFieldRow.twoCol {
     grid-template-columns: 1fr;
   }
 

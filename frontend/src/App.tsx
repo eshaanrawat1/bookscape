@@ -124,7 +124,7 @@ export default function App() {
         : viewMeta[view]
 
   const openBookDialog = (book: Book) => setSelected({ book })
-  const openFinishedBookDialog = (book: Book) => setSelected({ book, preferLiveStatus: true })
+  const openBookTracking = (book: Book) => setSelected({ book, preferLiveStatus: true })
 
   const openAuthorPage = (author: string) => {
     const cleanAuthor = String(author || '').trim()
@@ -268,7 +268,7 @@ export default function App() {
     onOpen: openBookDialog,
     onOpenAuthor: openAuthorPage,
     onOpenGenre: openGenrePage,
-    onOpenReadingNow: openFinishedBookDialog,
+    onOpenReadingNow: openBookTracking,
   }
 
   return (
