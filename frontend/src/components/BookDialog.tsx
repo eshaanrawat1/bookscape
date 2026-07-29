@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type CSSProperties } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react'
 import { X, Star, MessageSquareText, FileText, Plus, Heart, ChevronDown, Upload, Download } from 'lucide-react'
 import { apiFetch } from '../api.js'
 import { normaliseBook, getCatalogBookId, formatCompactNumber, resolveSavedWantToReadBook } from '../utils.js'
@@ -40,6 +40,46 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
   const [view, setView] = useState<'library' | 'tracking'>(() => (
     ['reading', 'done'].includes(book.status) ? 'tracking' : 'library'
   ))
+  const panelViewportRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [panelHeight, setPanelHeight] = useState<number | null>(null)
+  const isFirstViewRender = useRef(true)
+
+  const prefersReducedMotion = () => (
+    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  )
+
+  const switchView = (nextView: 'library' | 'tracking') => {
+    if (nextView === view) return
+    if (!prefersReducedMotion()) {
+      const viewport = panelViewportRef.current
+      if (viewport) {
+        setPanelHeight(viewport.getBoundingClientRect().height)
+      }
+    }
+    setView(nextView)
+  }
+
+  useLayoutEffect(() => {
+    if (isFirstViewRender.current) {
+      isFirstViewRender.current = false
+      return
+    }
+    if (prefersReducedMotion()) {
+      setPanelHeight(null)
+      return
+    }
+    const content = panelRef.current
+    if (!content) return
+    const target = content.scrollHeight
+    const frame = requestAnimationFrame(() => setPanelHeight(target))
+    return () => cancelAnimationFrame(frame)
+  }, [view])
+
+  const handlePanelTransitionEnd = (event: React.TransitionEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget || event.propertyName !== 'height') return
+    setPanelHeight(null)
+  }
 
   const savedWantToReadBook = resolveSavedWantToReadBook(book, wantToReadBooks)
   const [fullBook, setFullBook] = useState<Book | null>(null)
@@ -317,7 +357,7 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
                 aria-selected={view === 'library'}
                 aria-controls="dialogTabPanel"
                 className={view === 'library' ? 'dialogTab active' : 'dialogTab'}
-                onClick={() => setView('library')}
+                onClick={() => switchView('library')}
               >
                 About
               </button>
@@ -328,18 +368,25 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
                 aria-selected={view === 'tracking'}
                 aria-controls="dialogTabPanel"
                 className={view === 'tracking' ? 'dialogTab active' : 'dialogTab'}
-                onClick={() => setView('tracking')}
+                onClick={() => switchView('tracking')}
               >
                 My Reading
               </button>
             </div>
 
             <div
+              className={panelHeight !== null ? 'dialogTabPanelViewport animating' : 'dialogTabPanelViewport'}
+              style={panelHeight !== null ? { height: panelHeight } : undefined}
+              ref={panelViewportRef}
+              onTransitionEnd={handlePanelTransitionEnd}
+            >
+            <div
               className="dialogTabPanel"
               key={view}
               id="dialogTabPanel"
               role="tabpanel"
               aria-labelledby={view === 'library' ? 'dialogTabAbout' : 'dialogTabReading'}
+              ref={panelRef}
             >
             {view === 'library' ? (
               <>
@@ -546,6 +593,7 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
                 </div>
               </>
             )}
+            </div>
             </div>
           </div>
         </div>

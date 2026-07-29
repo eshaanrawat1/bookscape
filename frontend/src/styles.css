@@ -665,6 +665,10 @@ svg {
   .dialogTabPanel {
     animation: none;
   }
+
+  .dialogTabPanelViewport {
+    transition: none;
+  }
 }
 
 .dialogClose {
@@ -1473,11 +1477,19 @@ svg {
   }
 }
 
+.dialogTabPanelViewport {
+  transition: height 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dialogTabPanelViewport.animating {
+  overflow: hidden;
+}
+
 .dialogTabPanel {
   display: flex;
   flex-direction: column;
   gap: 1.2rem;
-  animation: dialogTabPanelFadeIn 200ms ease-out;
+  animation: dialogTabPanelFadeIn 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .finishedStatusRow {
