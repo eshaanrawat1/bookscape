@@ -128,6 +128,7 @@ export default function App() {
 
   const openBookDialog = (book: Book) => setSelected({ book, variant: 'standard' })
   const openFinishedBookDialog = (book: Book) => setSelected({ book, variant: 'finished', preferLiveStatus: true })
+  const openTrackingDialog = (book: Book) => setSelected({ book, variant: 'finished', preferLiveStatus: false })
 
   const openAuthorPage = (author: string) => {
     const cleanAuthor = String(author || '').trim()
@@ -272,6 +273,7 @@ export default function App() {
     onOpenAuthor: openAuthorPage,
     onOpenGenre: openGenrePage,
     onOpenReadingNow: openFinishedBookDialog,
+    onOpenTracking: openTrackingDialog,
   }
 
   return (

@@ -14,12 +14,6 @@ function CollectionView({ activeCollection }: CollectionViewProps) {
 
   return (
     <div className="stack">
-      <div className="shelfHeader">
-        <div>
-          <h2>{activeCollection.name}</h2>
-          <p>{activeCollection.description || 'Custom collection'}</p>
-        </div>
-      </div>
       <BookGrid
         books={books}
         showRemoveButton

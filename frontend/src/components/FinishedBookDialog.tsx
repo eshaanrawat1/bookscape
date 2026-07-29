@@ -201,7 +201,7 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose }: Finishe
   const statusLabelMap: Record<string, string> = {
     done: 'Finished',
     reading: 'Reading',
-    not_started: 'Want to read',
+    not_started: 'Not started',
   }
   const statusDotClass = ({
     done: 'finishedStatusDot done',
@@ -258,7 +258,7 @@ function FinishedBookDialog({ book, preferLiveStatus = false, onClose }: Finishe
                     {[
                       ['done', 'Finished'],
                       ['reading', 'Reading'],
-                      ['not_started', 'Want to read'],
+                      ['not_started', 'Not started'],
                     ].map(([value, label]) => (
                       <button
                         key={value}

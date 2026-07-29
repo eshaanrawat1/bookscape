@@ -1,5 +1,5 @@
 import { useState, useEffect, type CSSProperties } from 'react'
-import { X, Star, MessageSquareText, FileText, Plus, Heart } from 'lucide-react'
+import { X, Star, MessageSquareText, FileText, Plus, Heart, BookOpen } from 'lucide-react'
 import { apiFetch } from '../api.js'
 import { normaliseBook, getCatalogBookId, formatCompactNumber, resolveSavedWantToReadBook } from '../utils.js'
 import { buildDialogGlow } from '../color.js'
@@ -16,7 +16,7 @@ interface BookDialogProps {
 
 function BookDialog({ book, onClose }: BookDialogProps) {
   const { collections, wantToReadBooks, addBookToCollection, toggleBookWantToRead } = useLibraryData()
-  const { onOpen, onOpenAuthor } = useNavigation()
+  const { onOpen, onOpenAuthor, onOpenTracking } = useNavigation()
   const savedWantToReadBook = resolveSavedWantToReadBook(book, wantToReadBooks)
   const [fullBook, setFullBook] = useState<Book | null>(null)
   const [collectionMenuOpen, setCollectionMenuOpen] = useState(false)
@@ -42,11 +42,11 @@ function BookDialog({ book, onClose }: BookDialogProps) {
   const dialogGenres = (displayBook.genres && displayBook.genres.length > 0)
     ? displayBook.genres.slice(0, 5)
     : (displayBook.genre ? [displayBook.genre] : [])
-  const isFinishedBook = book.status === 'done' || displayBook.status === 'done'
+  const isTrackedBook = ['reading', 'done'].includes(book.status) || ['reading', 'done'].includes(displayBook.status)
   const savedWantToReadKey = getCatalogBookId(savedWantToReadBook)
   const isSavedToWantToRead = Boolean(savedWantToReadBook)
 
-  if (isFinishedBook) {
+  if (isTrackedBook) {
     return (
       <FinishedBookDialog
         book={displayBook}
@@ -186,6 +186,17 @@ function BookDialog({ book, onClose }: BookDialogProps) {
                   title={isSavedToWantToRead ? 'Remove from Want to read' : 'Save to Want to read'}
                 >
                   <Heart fill={isSavedToWantToRead ? 'currentColor' : 'none'} />
+                </button>
+
+                <button
+                  type="button"
+                  className="dialogIconButton"
+                  onClick={() => onOpenTracking(displayBook)}
+                  disabled={!bookId}
+                  aria-label="Track reading progress"
+                  title="Track reading progress"
+                >
+                  <BookOpen />
                 </button>
               </div>
 
