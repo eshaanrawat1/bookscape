@@ -24,7 +24,6 @@ import { NavigationContext } from './context/NavigationContext.jsx'
 // Components
 import Sidebar from './components/Sidebar.jsx'
 import BookDialog from './components/BookDialog.jsx'
-import FinishedBookDialog from './components/FinishedBookDialog.jsx'
 import ScraperDialog from './components/ScraperDialog.jsx'
 import SettingsDialog from './components/SettingsDialog.jsx'
 import BookGrid from './components/BookGrid.jsx'
@@ -39,9 +38,7 @@ import GenreView from './views/GenreView.jsx'
 import CollectionView from './views/CollectionView.jsx'
 import type { Book, Collection, GenreSection, RawBookPayload, RawList, SyncPullResult, SyncPushResult } from './types.js'
 
-type Selected =
-  | { book: Book; variant: 'standard' }
-  | { book: Book; variant: 'finished'; preferLiveStatus: boolean }
+type Selected = { book: Book; preferLiveStatus?: boolean }
 
 export default function App() {
   const [view, setView] = useState('reading-now')
@@ -126,9 +123,8 @@ export default function App() {
         ? { title: activeGenreName || 'Genre' }
         : viewMeta[view]
 
-  const openBookDialog = (book: Book) => setSelected({ book, variant: 'standard' })
-  const openFinishedBookDialog = (book: Book) => setSelected({ book, variant: 'finished', preferLiveStatus: true })
-  const openTrackingDialog = (book: Book) => setSelected({ book, variant: 'finished', preferLiveStatus: false })
+  const openBookDialog = (book: Book) => setSelected({ book })
+  const openFinishedBookDialog = (book: Book) => setSelected({ book, preferLiveStatus: true })
 
   const openAuthorPage = (author: string) => {
     const cleanAuthor = String(author || '').trim()
@@ -273,7 +269,6 @@ export default function App() {
     onOpenAuthor: openAuthorPage,
     onOpenGenre: openGenrePage,
     onOpenReadingNow: openFinishedBookDialog,
-    onOpenTracking: openTrackingDialog,
   }
 
   return (
@@ -368,20 +363,12 @@ export default function App() {
           </div>
 
           {selected && (
-            selected.variant === 'finished' ? (
-              <FinishedBookDialog
-                key={selected.book.id}
-                book={selected.book}
-                preferLiveStatus={selected.preferLiveStatus}
-                onClose={() => setSelected(null)}
-              />
-            ) : (
-              <BookDialog
-                key={selected.book.id}
-                book={selected.book}
-                onClose={() => setSelected(null)}
-              />
-            )
+            <BookDialog
+              key={selected.book.id}
+              book={selected.book}
+              preferLiveStatus={selected.preferLiveStatus}
+              onClose={() => setSelected(null)}
+            />
           )}
           {showScraperDialog && (
             <ScraperDialog
@@ -389,7 +376,7 @@ export default function App() {
               onSuccess={async (newBook) => {
                 setShowScraperDialog(false)
                 await reloadAppData()
-                setSelected({ book: normaliseBook(newBook), variant: 'standard' })
+                setSelected({ book: normaliseBook(newBook) })
               }}
             />
           )}

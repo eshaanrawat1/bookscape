@@ -134,5 +134,4 @@ export interface NavigationContextValue {
   onOpenAuthor: (author: string) => void
   onOpenGenre: (genre: string) => void
   onOpenReadingNow: (book: Book) => void
-  onOpenTracking: (book: Book) => void
 }
