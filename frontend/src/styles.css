@@ -1412,7 +1412,6 @@ svg {
   display: flex;
   align-items: center;
   gap: 1.4rem;
-  border-bottom: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
 }
 
 .dialogTab {
