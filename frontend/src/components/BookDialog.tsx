@@ -11,6 +11,7 @@ import type { Book, RawBookPayload } from '../types.js'
 interface BookDialogProps {
   book: Book
   preferLiveStatus?: boolean
+  isNavigation?: boolean
   onClose: () => void
 }
 
@@ -34,7 +35,7 @@ const STATUS_LABELS: Record<string, string> = {
   not_started: 'Not started',
 }
 
-function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps) {
+function BookDialog({ book, preferLiveStatus = false, isNavigation = false, onClose }: BookDialogProps) {
   const { collections, wantToReadBooks, addBookToCollection, toggleBookWantToRead } = useLibraryData()
   const { onOpen, onOpenAuthor } = useNavigation()
   const [view, setView] = useState<'library' | 'tracking'>(() => (
@@ -60,6 +61,8 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
     setView(nextView)
   }
 
+  const panelResizeObserverRef = useRef<ResizeObserver | null>(null)
+
   useLayoutEffect(() => {
     if (isFirstViewRender.current) {
       isFirstViewRender.current = false
@@ -71,13 +74,29 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
     }
     const content = panelRef.current
     if (!content) return
-    const target = content.scrollHeight
-    const frame = requestAnimationFrame(() => setPanelHeight(target))
-    return () => cancelAnimationFrame(frame)
+
+    // Keep the animated height in sync with the panel's actual content while it
+    // settles — a one-shot scrollHeight snapshot can be taken before async data
+    // (e.g. the /book/{id} fetch, or collections from context) finishes landing,
+    // permanently clipping whatever renders last (the action buttons row).
+    const observer = new ResizeObserver(() => {
+      setPanelHeight(content.scrollHeight)
+    })
+    observer.observe(content)
+    panelResizeObserverRef.current = observer
+
+    const frame = requestAnimationFrame(() => setPanelHeight(content.scrollHeight))
+    return () => {
+      cancelAnimationFrame(frame)
+      observer.disconnect()
+      if (panelResizeObserverRef.current === observer) panelResizeObserverRef.current = null
+    }
   }, [view])
 
   const handlePanelTransitionEnd = (event: React.TransitionEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget || event.propertyName !== 'height') return
+    panelResizeObserverRef.current?.disconnect()
+    panelResizeObserverRef.current = null
     setPanelHeight(null)
   }
 
@@ -323,9 +342,8 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
   }
 
   return (
-    <div className="dialogScrim" onClick={onClose}>
       <article
-        className="bookDialog paperGrain"
+        className={isNavigation ? 'bookDialog paperGrain navigating' : 'bookDialog paperGrain'}
         style={{ '--dialog-glow': buildDialogGlow(displayBook.color || `hsl(${displayBook.tint})`) } as CSSProperties}
         onClick={(event) => event.stopPropagation()}
       >
@@ -619,7 +637,6 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
           </div>
         )}
       </article>
-    </div>
   )
 }
 

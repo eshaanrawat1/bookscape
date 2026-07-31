@@ -38,7 +38,7 @@ import GenreView from './views/GenreView.jsx'
 import CollectionView from './views/CollectionView.jsx'
 import type { Book, Collection, GenreSection, RawBookPayload, RawList, SyncPullResult, SyncPushResult } from './types.js'
 
-type Selected = { book: Book; preferLiveStatus?: boolean }
+type Selected = { book: Book; preferLiveStatus?: boolean; isNavigation?: boolean }
 
 export default function App() {
   const [view, setView] = useState('reading-now')
@@ -123,7 +123,8 @@ export default function App() {
         ? { title: activeGenreName || 'Genre' }
         : viewMeta[view]
 
-  const openBookDialog = (book: Book) => setSelected({ book })
+  const openBookDialog = (book: Book) =>
+    setSelected((prev) => ({ book, isNavigation: prev !== null }))
   const openBookTracking = (book: Book) => setSelected({ book, preferLiveStatus: true })
 
   const openAuthorPage = (author: string) => {
@@ -363,12 +364,15 @@ export default function App() {
           </div>
 
           {selected && (
-            <BookDialog
-              key={selected.book.id}
-              book={selected.book}
-              preferLiveStatus={selected.preferLiveStatus}
-              onClose={() => setSelected(null)}
-            />
+            <div className="dialogScrim" onClick={() => setSelected(null)}>
+              <BookDialog
+                key={selected.book.id}
+                book={selected.book}
+                preferLiveStatus={selected.preferLiveStatus}
+                isNavigation={selected.isNavigation}
+                onClose={() => setSelected(null)}
+              />
+            </div>
           )}
           {showScraperDialog && (
             <ScraperDialog
