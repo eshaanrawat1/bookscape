@@ -1888,10 +1888,14 @@ svg {
   border: none;
   padding: 0;
   margin-top: 0.15rem;
-  color: var(--accent, var(--foreground));
-  font-weight: 500;
+  color: var(--primary);
+  font-weight: 600;
   cursor: pointer;
   width: fit-content;
+}
+
+.scraperViewLink:hover {
+  opacity: 0.85;
 }
 
 /* ========================================================================== */
