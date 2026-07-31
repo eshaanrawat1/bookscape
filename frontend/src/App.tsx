@@ -322,7 +322,7 @@ export default function App() {
             )}
 
             <main className="contentPane">
-              <header className="topBar">
+              <header className="topBar" data-tauri-drag-region>
                 <div className="titleGroup">
                   <button className="mobileMenuButton" onClick={() => setMobileNav(true)} aria-label="Open menu">
                     <Menu />

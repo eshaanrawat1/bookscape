@@ -20,6 +20,12 @@
       "dialog": {
         "all": false,
         "open": true
+      },
+      "window": {
+        "all": false,
+        "startDragging": true,
+        "maximize": true,
+        "unmaximize": true
       }
     },
     "bundle": {
@@ -70,6 +76,7 @@
         "width": 1200,
         "minWidth": 800,
         "minHeight": 600,
+        "maximized": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true
       }
