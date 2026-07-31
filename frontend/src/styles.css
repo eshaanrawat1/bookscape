@@ -703,6 +703,18 @@ svg {
   height: 1.55rem;
 }
 
+.dialogIconButton.dialogClose {
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 0;
+  background: transparent;
+}
+
+.dialogIconButton.dialogClose svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
 /* ========================================================================== */
 /* Reading Now / Hero                                                       */
 /* ========================================================================== */
