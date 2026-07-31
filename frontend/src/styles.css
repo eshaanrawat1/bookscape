@@ -1824,6 +1824,82 @@ svg {
   padding: 0 1.5rem;
 }
 
+.scraperInputRow .secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.scraperPreviewCard {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--background);
+}
+
+.scraperPreviewCover {
+  width: 4.5rem;
+  height: 6.75rem;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 0.4rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.scraperPreviewCoverPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--muted, var(--border));
+}
+
+.scraperPreviewInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.scraperPreviewTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.scraperPreviewAuthor {
+  font-style: italic;
+  color: var(--muted-foreground);
+  margin: 0;
+}
+
+.scraperPreviewMeta {
+  color: var(--muted-foreground);
+  font-size: 0.92rem;
+  margin: 0;
+}
+
+.scraperViewLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 0.15rem;
+  color: var(--accent, var(--foreground));
+  font-weight: 500;
+  cursor: pointer;
+  width: fit-content;
+}
+
 /* ========================================================================== */
 /* Stats Page                                                               */
 /* ========================================================================== */

@@ -34,6 +34,10 @@ Usage:
                                               #   books to ONE level only, then stop
     python scraper.py --import-one <url>     # scrape and save ONE book only
     python scraper.py --parse-one <url>      # fetch/parse one book, print, don't save
+    python scraper.py --fetch-one <url>      # fetch/parse one book + similar books,
+                                              #   emit @@STAGE@@/@@RESULT@@/@@ERROR@@
+                                              #   markers on stdout, don't save
+                                              #   (used by the app's live import flow)
     python scraper.py --dump                 # print books.json and exit
     python scraper.py --stats                # print frontier stats and exit
     python scraper.py --headed               # show the browser window (debugging)
@@ -597,6 +601,7 @@ def scrape_book_page(url: str, *, headed: bool = False, include_similar: bool = 
     with sync_playwright() as pw:
         browser, context, page = make_browser_context(pw, headed=headed)
         try:
+            print("@@STAGE@@ fetching_page", flush=True)
             _get_appsync_config(page)
             html = fetch_page(url, page)
             if not html:
@@ -606,6 +611,7 @@ def scrape_book_page(url: str, *, headed: bool = False, include_similar: bool = 
                 return None
             book, kca_id = result
             if include_similar:
+                print("@@STAGE@@ fetching_similar", flush=True)
                 limiter = RateLimiter()
                 limiter.wait()
                 book.similar_book_ids = fetch_similar_books(kca_id, page, limiter.wait)
@@ -881,6 +887,7 @@ def main():
     p.add_argument("--single",    metavar="URL",  help="Scrape ONE seed book plus its similar books to ONE level only, then stop")
     p.add_argument("--import-one", metavar="URL", help="Scrape ONE book, save it to books.json, and stop")
     p.add_argument("--parse-one", metavar="URL",  help="Fetch and parse a single URL, print result, do not save or enqueue")
+    p.add_argument("--fetch-one", metavar="URL",  help="Fetch+parse ONE book with similar books, emit machine-readable progress/result markers, do not save")
     p.add_argument("--dump",      action="store_true", help="Print books.json and exit")
     p.add_argument("--stats",     action="store_true", help="Print frontier stats and exit")
     p.add_argument("--headed",    action="store_true", help="Show the browser window (useful for debugging WAF challenges)")
@@ -912,6 +919,25 @@ def main():
             print("❌  Could not fetch or parse page")
             return
         print(json.dumps(asdict(book), indent=2, ensure_ascii=False))
+        return
+
+    if args.fetch_one:
+        url = args.fetch_one
+        try:
+            book = scrape_book_page(url, headed=args.headed, include_similar=True)
+        except FatalHTTPError as e:
+            print(f"@@ERROR@@ Goodreads is rate-limiting requests (HTTP {e.status_code}). Please wait a few minutes and try again.", flush=True)
+            sys.exit(1)
+        except Exception as e:
+            print(f"@@ERROR@@ Unexpected error while fetching the book page: {e}", flush=True)
+            sys.exit(1)
+        if not book:
+            print("@@ERROR@@ Could not load or parse that page. Make sure the link points to a real Goodreads book page.", flush=True)
+            sys.exit(1)
+        if not book.uid:
+            print("@@ERROR@@ The page loaded, but no book ID could be found on it.", flush=True)
+            sys.exit(1)
+        print("@@RESULT@@ " + json.dumps(asdict(book), ensure_ascii=False), flush=True)
         return
 
     if args.import_one:
