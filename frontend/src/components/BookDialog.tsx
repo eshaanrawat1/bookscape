@@ -329,7 +329,7 @@ function BookDialog({ book, preferLiveStatus = false, onClose }: BookDialogProps
         style={{ '--dialog-glow': buildDialogGlow(displayBook.color || `hsl(${displayBook.tint})`) } as CSSProperties}
         onClick={(event) => event.stopPropagation()}
       >
-        <button className="dialogClose" onClick={onClose} aria-label="Close details">
+        <button className="dialogIconButton dialogClose" onClick={onClose} aria-label="Close details">
           <X />
         </button>
         <div className="dialogTop">
