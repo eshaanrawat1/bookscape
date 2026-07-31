@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, RefreshCcw, ChevronRight, Clipboard } from 'lucide-react'
+import { X, RefreshCcw, ChevronRight } from 'lucide-react'
 import { apiFetch, apiFetchStream } from '../api.js'
 import type { RawBookPayload } from '../types.js'
 
@@ -105,15 +105,6 @@ function ScraperDialog({ onClose, onSuccess }: ScraperDialogProps) {
     await runPreview(trimmedUrl, false)
   }
 
-  const handlePaste = async () => {
-    try {
-      const text = await navigator.clipboard.readText()
-      if (text) setUrl(text.trim())
-    } catch {
-      setStage({ kind: 'error', message: 'Could not read from the clipboard.' })
-    }
-  }
-
   const reset = () => setStage({ kind: 'idle' })
 
   return (
@@ -134,27 +125,16 @@ function ScraperDialog({ onClose, onSuccess }: ScraperDialogProps) {
               <label htmlFor="goodreads-url" className="scraperLabel">
                 Goodreads Book URL
               </label>
-              <div className="scraperInputRow">
-                <input
-                  id="goodreads-url"
-                  type="url"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  disabled={busy}
-                  placeholder="https://www.goodreads.com/book/show/..."
-                  className="scraperInput"
-                  required
-                />
-                <button
-                  type="button"
-                  className="secondaryButton"
-                  onClick={handlePaste}
-                  disabled={busy}
-                >
-                  <Clipboard size={16} />
-                  Paste
-                </button>
-              </div>
+              <input
+                id="goodreads-url"
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                disabled={busy}
+                placeholder="https://www.goodreads.com/book/show/..."
+                className="scraperInput"
+                required
+              />
             </div>
 
             {stage.kind === 'error' && <p className="scraperError">{stage.message}</p>}

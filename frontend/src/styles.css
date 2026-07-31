@@ -1824,12 +1824,6 @@ svg {
   padding: 0 1.5rem;
 }
 
-.scraperInputRow .secondaryButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
 .scraperPreviewCard {
   display: flex;
   align-items: center;
