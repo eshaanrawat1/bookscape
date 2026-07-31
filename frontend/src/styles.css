@@ -1127,6 +1127,13 @@ svg {
   width: 100%;
 }
 
+.dialogDescription {
+  margin: 0 0 1.5rem;
+  color: var(--muted-foreground);
+  font-size: 1.1rem;
+  line-height: 1.4;
+}
+
 .dialogAuthor {
   display: inline-flex;
   align-items: center;
@@ -1756,6 +1763,7 @@ svg {
 
 .scraperInputRow {
   display: flex;
+  align-items: stretch;
   gap: 0.5rem;
 }
 
@@ -1766,7 +1774,9 @@ svg {
 
 .scraperInputRow .secondaryButton {
   flex-shrink: 0;
+  min-height: 0;
   padding: 0 1rem;
+  border-radius: 0.75rem;
 }
 
 .scraperStatus {

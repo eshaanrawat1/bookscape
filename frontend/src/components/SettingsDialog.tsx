@@ -72,7 +72,7 @@ function SettingsDialog({ onClose }: SettingsDialogProps) {
         </button>
 
         <h2>Vault Settings</h2>
-        <p className="dialogAuthor" style={{ marginBottom: '1.5rem' }}>
+        <p className="dialogDescription">
           Point Bookscape at any folder. Use the Push/Pull icons in the top bar to sync
           your reading/finished books with notes in this vault.
         </p>
