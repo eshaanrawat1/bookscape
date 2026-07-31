@@ -1754,6 +1754,21 @@ svg {
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
+.scraperInputRow {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.scraperInputRow .scraperInput {
+  flex: 1;
+  min-width: 0;
+}
+
+.scraperInputRow .secondaryButton {
+  flex-shrink: 0;
+  padding: 0 1rem;
+}
+
 .scraperStatus {
   display: flex;
   align-items: center;

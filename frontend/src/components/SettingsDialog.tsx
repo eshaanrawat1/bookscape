@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, FolderOpen } from 'lucide-react'
+import { X, FolderOpen, RefreshCcw } from 'lucide-react'
 import { apiFetch } from '../api.js'
 
 interface SettingsDialogProps {
@@ -9,8 +9,8 @@ interface SettingsDialogProps {
 function SettingsDialog({ onClose }: SettingsDialogProps) {
   const [vaultPath, setVaultPath] = useState('')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -31,12 +31,12 @@ function SettingsDialog({ onClose }: SettingsDialogProps) {
     setSaving(true)
     setError(null)
     try {
-      const data = await apiFetch<{ vault_path?: string }>('/settings/vault-path', {
+      await apiFetch<{ vault_path?: string }>('/settings/vault-path', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path }),
       })
-      setVaultPath(data.vault_path || '')
+      onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the vault path.')
     } finally {
@@ -49,12 +49,20 @@ function SettingsDialog({ onClose }: SettingsDialogProps) {
       const { open } = await import('@tauri-apps/api/dialog')
       const dir = await open({ directory: true, multiple: false })
       if (typeof dir === 'string' && dir) {
+        setVaultPath(dir)
         await saveVaultPath(dir)
       }
     } catch {
       setError('Could not open the folder picker. Are you running the desktop app?')
     }
   }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    saveVaultPath(vaultPath.trim())
+  }
+
+  const busy = loading || saving
 
   return (
     <div className="dialogScrim" onClick={onClose}>
@@ -69,17 +77,16 @@ function SettingsDialog({ onClose }: SettingsDialogProps) {
           your reading/finished books with notes in this vault.
         </p>
 
-        <div className="scraperForm">
+        <form onSubmit={handleSubmit} className="scraperForm">
           <div className="scraperField">
             <label htmlFor="vault-path" className="scraperLabel">Vault folder</label>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div className="scraperInputRow">
               <input
                 id="vault-path"
                 type="text"
                 value={vaultPath}
                 onChange={(e) => setVaultPath(e.target.value)}
-                onBlur={(e) => saveVaultPath(e.target.value.trim())}
-                disabled={loading || saving}
+                disabled={busy}
                 placeholder="/path/to/any/folder"
                 className="scraperInput"
               />
@@ -87,7 +94,7 @@ function SettingsDialog({ onClose }: SettingsDialogProps) {
                 type="button"
                 className="secondaryButton"
                 onClick={handleBrowse}
-                disabled={loading || saving}
+                disabled={busy}
                 aria-label="Browse for a folder"
               >
                 <FolderOpen size={16} />
@@ -96,7 +103,25 @@ function SettingsDialog({ onClose }: SettingsDialogProps) {
           </div>
 
           {error && <p className="scraperError">{error}</p>}
-        </div>
+
+          {busy && (
+            <div className="scraperStatus">
+              <RefreshCcw className="syncIcon spinning" />
+              <span className="scraperStatusText">
+                {loading ? 'Loading vault path...' : 'Saving...'}
+              </span>
+            </div>
+          )}
+
+          <div className="scraperButtons">
+            <button type="button" className="secondaryButton" onClick={onClose} disabled={saving}>
+              Cancel
+            </button>
+            <button type="submit" className="primaryButton" disabled={busy}>
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </form>
       </article>
     </div>
   )
