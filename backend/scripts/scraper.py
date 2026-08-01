@@ -22,9 +22,13 @@ Similar books:
   browser fingerprint / cookies that solved the WAF challenge.
   The API key + endpoint are extracted from the JS bundle on first run.
 
-Cover colors are NOT extracted here — every scraped book's uid is appended
-to colors.txt (one per line), and gradient.py handles that separately
+Cover colors are NOT extracted here — gradient.py handles those separately
 on its own rate-limited pass.
+
+Scraped books are written straight into bookscape.db via the app's own
+upsert_book(), so the crawler and the desktop app share one source of truth.
+Cover colors are filled in afterwards by gradient.py, which finds its own work
+by querying for rows with an empty `color`.
 
 Usage:
     python scraper.py                        # run from existing frontier
@@ -38,14 +42,12 @@ Usage:
                                               #   emit @@STAGE@@/@@RESULT@@/@@ERROR@@
                                               #   markers on stdout, don't save
                                               #   (used by the app's live import flow)
-    python scraper.py --dump                 # print books.json and exit
     python scraper.py --stats                # print frontier stats and exit
     python scraper.py --headed               # show the browser window (debugging)
 
 Output (all written to backend/data/, regardless of cwd):
+    bookscape.db — the catalog itself (books/genres), shared with the app
     frontier.db  — SQLite queue (survives restarts, tracks crawl depth)
-    books.json   — collected records (appended every FLUSH_EVERY books)
-    colors.txt   — uid of every scraped book, one per line (for gradient.py)
 
 Install:
     pip install playwright beautifulsoup4 lxml
@@ -54,7 +56,6 @@ Install:
 
 import argparse
 import json
-import os
 import random
 import re
 import signal
@@ -68,7 +69,16 @@ from pathlib import Path
 from typing import Optional
 
 from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright, Page, BrowserContext
+from playwright.sync_api import sync_playwright, Page
+
+# This script lives in backend/scripts/; the app package lives alongside it at
+# backend/app/. Put the repo root on sys.path so the crawler can reuse the very
+# same upsert path the desktop app uses, rather than re-implementing the schema.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from backend.app.db import init_app_db                       # noqa: E402
+from backend.app.services.catalog import resolve_book, upsert_book  # noqa: E402
 
 
 MIN_DELAY    = 12.0
@@ -78,10 +88,7 @@ MAX_DELAY    = 20.0
 # Anchor to __file__ so the paths hold no matter what cwd it is run from.
 DATA_DIR     = Path(__file__).resolve().parents[1] / "data"
 FRONTIER_DB  = str(DATA_DIR / "frontier.db")
-OUTPUT_JSON  = str(DATA_DIR / "books.json")
-COLORS_FILE  = str(DATA_DIR / "colors.txt")
-FLUSH_EVERY  = 50     
-SIMILAR_CAP  = 20     
+SIMILAR_CAP  = 20
 
 FATAL_STATUS_CODES = {429, 502, 503}
 WAF_RETRY_LIMIT    = 2   
@@ -171,10 +178,16 @@ def _get_appsync_config(page: Page) -> Optional[dict]:
             if not js or "appsync" not in js.lower():
                 continue
 
+            # The bundle carries one of these blocks per environment; the prod
+            # one is identified by publishWebVitalMetrics:true a little further
+            # along. The span between the two must be matched with [\s\S], not
+            # [^"]: Goodreads injects "waf":{"challengeScriptUrl":""} in that
+            # gap, and its quotes silently broke a quote-free run — which cost
+            # every book scraped afterwards its similar-books list.
             block_re = re.compile(
                 r'"graphql"\s*:\s*\{[^}]*"apiKey"\s*:\s*"([^"]+)"'
                 r'[^}]*"endpoint"\s*:\s*"([^"]+)"[^}]*\}'
-                r'[^"]{0,500}?"publishWebVitalMetrics"\s*:\s*(true|false)'
+                r'[\s\S]{0,500}?"publishWebVitalMetrics"\s*:\s*(true|false)'
             )
             prod   = next((m for m in block_re.finditer(js) if m.group(3) == "true"), None)
             chosen = prod or next(block_re.finditer(js), None)
@@ -646,75 +659,21 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-# ── colors.txt tracking ───────────────────────────────────────────────────────
+# ── Catalog persistence ───────────────────────────────────────────────────────
 
-def append_color_id(uid: str, path: str = COLORS_FILE):
+def save_book(book: Book) -> None:
+    """Write a scraped book into bookscape.db through the app's own upsert.
+
+    Deliberately reuses upsert_book() rather than issuing SQL here: it already
+    knows which columns exist, JSON-encodes similar_book_ids, and replaces the
+    genre rows. It also updates only the keys present, so a re-scrape never
+    clobbers a `color` that gradient.py filled in later.
     """
-    Append a book uid to colors.txt, one per line, skipping duplicates
-    that are already present in the file.
-    """
-    if not uid:
-        return
-    existing = set()
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            existing = {line.strip() for line in f if line.strip()}
-    if uid in existing:
-        return
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(f"{uid}\n")
+    upsert_book(PROJECT_ROOT, asdict(book))
 
 
-# ── Storage ───────────────────────────────────────────────────────────────────
-
-class Storage:
-    def __init__(self, path: str = OUTPUT_JSON):
-        self.path     = path
-        self._buffer: list[dict] = []
-        self._total   = 0
-        self.seen_ids: set[str] = self._load_seen_ids()
-
-    def _load_seen_ids(self) -> set[str]:
-        """Load all UIDs already written to books.json on disk."""
-        if not os.path.exists(self.path):
-            return set()
-        with open(self.path, "r", encoding="utf-8") as f:
-            try:
-                books = json.load(f)
-                ids = {b.get("uid", "") for b in books if b.get("uid")}
-                if ids:
-                    print(f"  📚 Loaded {len(ids):,} existing book IDs from {self.path}")
-                return ids
-            except json.JSONDecodeError:
-                return set()
-
-    def add(self, book: Book):
-        self._buffer.append(asdict(book))
-        self.seen_ids.add(book.uid)
-        self._total += 1
-        if len(self._buffer) >= FLUSH_EVERY:
-            self.flush()
-
-    def flush(self):
-        if not self._buffer:
-            return
-        existing: list[dict] = []
-        if os.path.exists(self.path):
-            with open(self.path, "r", encoding="utf-8") as f:
-                try:
-                    existing = json.load(f)
-                except json.JSONDecodeError:
-                    existing = []
-        existing.extend(self._buffer)
-        with open(self.path, "w", encoding="utf-8") as f:
-            json.dump(existing, f, indent=2, ensure_ascii=False)
-        print(f"  💾 flushed {len(self._buffer)} records "
-              f"→ {self.path} (total: {len(existing)})")
-        self._buffer = []
-
-    @property
-    def total_scraped(self) -> int:
-        return self._total
+def already_scraped(uid: str) -> bool:
+    return bool(uid) and resolve_book(PROJECT_ROOT, uid) is not None
 
 
 # ── Browser context helper ────────────────────────────────────────────────────
@@ -738,13 +697,12 @@ def make_browser_context(playwright, headed: bool = False) -> tuple:
 
 def run(
     frontier: Frontier,
-    storage: Storage,
     limiter: RateLimiter,
     max_depth: Optional[int] = None,
     headed: bool = False,
 ):
     """
-    Drain the frontier.
+    Drain the frontier, writing each scraped book straight into bookscape.db.
 
     max_depth:
         None  -> unlimited recursion (default multi-seed crawl behaviour).
@@ -752,6 +710,7 @@ def run(
                  would be <= N. Used by --single (N=1) to scrape one seed
                  book plus its similar books, but not their similar books.
     """
+    scraped_count = 0
     shutdown = {"requested": False}
 
     def _handle_signal(sig, frame):
@@ -776,16 +735,16 @@ def run(
 
                 stats = frontier.stats()
                 print(
-                    f"\n[scraped={storage.total_scraped} | "
+                    f"\n[scraped={scraped_count} | "
                     f"pending={stats.get('pending', 0)} | "
                     f"done={stats.get('done', 0)} | "
                     f"failed={stats.get('failed', 0)}]"
                 )
                 print(f"  → {url}  (depth={depth})")
 
-                # ── Skip if already in books.json ────────────────────────────
+                # ── Skip if already in the catalog ───────────────────────────
                 uid_match = re.search(r"/book/show/(\d+)", url)
-                if uid_match and uid_match.group(1) in storage.seen_ids:
+                if uid_match and already_scraped(uid_match.group(1)):
                     print(f"  ⏭️  Already scraped — skipping")
                     frontier.mark_done(url)
                     continue
@@ -797,7 +756,6 @@ def run(
                     html = fetch_page(url, page)
                 except FatalHTTPError as e:
                     print(f"\n🚨 {e}")
-                    storage.flush()
                     browser.close()
                     sys.exit(1)
 
@@ -825,14 +783,13 @@ def run(
                     book.similar_book_ids = similar_ids
                 except FatalHTTPError as e:
                     print(f"\n🚨 {e}")
-                    storage.flush()
                     browser.close()
                     sys.exit(1)
 
                 # ── Store ─────────────────────────────────────────────────────
-                storage.add(book)
+                save_book(book)
+                scraped_count += 1
                 frontier.mark_done(url)
-                append_color_id(book.uid)
 
                 print(
                     f"  ✅ [{book.uid}] {book.title!r} — {book.author}"
@@ -868,11 +825,10 @@ def run(
         finally:
             browser.close()
 
-    storage.flush()
     final = frontier.stats()
     print(
         f"\n🏁 Session complete.  "
-        f"scraped={storage.total_scraped}  "
+        f"scraped={scraped_count}  "
         f"pending={final.get('pending', 0)}  "
         f"done={final.get('done', 0)}"
     )
@@ -885,32 +841,17 @@ def main():
     p.add_argument("--seed",      metavar="URL",  help="Add one book URL and run (recursive crawl)")
     p.add_argument("--seed-file", metavar="FILE", help="Seed multiple book URLs from file, one per line (recursive crawl)")
     p.add_argument("--single",    metavar="URL",  help="Scrape ONE seed book plus its similar books to ONE level only, then stop")
-    p.add_argument("--import-one", metavar="URL", help="Scrape ONE book, save it to books.json, and stop")
+    p.add_argument("--import-one", metavar="URL", help="Scrape ONE book, save it to the catalog, and stop")
     p.add_argument("--parse-one", metavar="URL",  help="Fetch and parse a single URL, print result, do not save or enqueue")
     p.add_argument("--fetch-one", metavar="URL",  help="Fetch+parse ONE book with similar books, emit machine-readable progress/result markers, do not save")
-    p.add_argument("--dump",      action="store_true", help="Print books.json and exit")
     p.add_argument("--stats",     action="store_true", help="Print frontier stats and exit")
     p.add_argument("--headed",    action="store_true", help="Show the browser window (useful for debugging WAF challenges)")
     args = p.parse_args()
 
-    frontier = Frontier()
-    storage  = Storage()
-    limiter  = RateLimiter()
-
-    if args.dump:
-        if os.path.exists(OUTPUT_JSON):
-            with open(OUTPUT_JSON) as f:
-                data = json.load(f)
-            print(json.dumps(data, indent=2))
-            print(f"\n— {len(data)} books total —")
-        else:
-            print("No data file found.")
-        return
-
-    if args.stats:
-        print(json.dumps(frontier.stats(), indent=2))
-        return
-
+    # ── Non-persisting modes first ───────────────────────────────────────────
+    # These touch neither the catalog nor the frontier. --fetch-one is the one
+    # the desktop app shells out to on every "Add Book", so it must stay free
+    # of side effects: no database is opened or created on its behalf.
     if args.parse_one:
         url = args.parse_one
         print(f"\n📖 Parsing single book: {url}\n")
@@ -940,6 +881,15 @@ def main():
         print("@@RESULT@@ " + json.dumps(asdict(book), ensure_ascii=False), flush=True)
         return
 
+    if args.stats:
+        print(json.dumps(Frontier().stats(), indent=2))
+        return
+
+    # ── Persisting modes: bring up the catalog and the crawl queue ───────────
+    init_app_db(PROJECT_ROOT)
+    frontier = Frontier()
+    limiter  = RateLimiter()
+
     if args.import_one:
         url = args.import_one
         print(f"\n📥 Importing single book: {url}\n")
@@ -950,12 +900,10 @@ def main():
         if not book.uid:
             print("❌  Parsed book has no UID")
             return
-        if book.uid in storage.seen_ids:
+        if already_scraped(book.uid):
             print(f"⏭️  Already imported: {book.uid}")
             return
-        storage.add(book)
-        append_color_id(book.uid)
-        storage.flush()
+        save_book(book)
         print(f"✅ Imported {book.uid}: {book.title!r}")
         return
 
@@ -963,7 +911,7 @@ def main():
     if args.single:
         frontier.add(args.single, depth=0)
         print(f"Seeded (single-book mode, depth-limited to 1): {args.single}")
-        run(frontier, storage, limiter, max_depth=1, headed=args.headed)
+        run(frontier, limiter, max_depth=1, headed=args.headed)
         return
 
     # ── Multi-book / recursive seeding ────────────────────────────────────────
@@ -977,7 +925,7 @@ def main():
         frontier.add_many(urls, depth=0)
         print(f"Seeded {len(urls)} URLs from {args.seed_file}")
 
-    run(frontier, storage, limiter, max_depth=None, headed=args.headed)
+    run(frontier, limiter, max_depth=None, headed=args.headed)
 
 
 if __name__ == "__main__":

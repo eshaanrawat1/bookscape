@@ -4,23 +4,23 @@ gradient.py
 Standalone, rate-limited cover-color extractor.
 
 What it does:
-  1. Load all uids from colors.txt (one per line)
-  2. For each uid not yet colored in books.json, download its cover
-     image and extract a single dominant color via ColorThief
-  3. Write the result as `"color": "rgb(r, g, b)"` onto that book's
-     record in books.json
+  1. Ask bookscape.db for every book that has a cover image but no color yet
+  2. Download each cover and extract a single dominant color via ColorThief
+  3. Write it straight back to that book's `color` column
 
-Reads and writes backend/data/ regardless of the cwd it is run from.
+Colors are committed one at a time, so a rate-limit shutdown (or a Ctrl-C)
+never loses the work already done — just re-run to pick up where it stopped.
+The database is the queue: there is no separate list of ids to keep in sync.
+
+Reads and writes backend/data/bookscape.db regardless of the cwd it is run from.
 
 Usage:
     python3 backend/scripts/gradient.py
-    python3 backend/scripts/gradient.py --colors-file <file> --books-file <file>
+    python3 backend/scripts/gradient.py --limit 25
 """
 
 import argparse
 import io
-import json
-import os
 import random
 import sys
 import time
@@ -29,16 +29,18 @@ from pathlib import Path
 import httpx
 from colorthief import ColorThief
 
+# This script lives in backend/scripts/; the app package lives alongside it at
+# backend/app/. Put the repo root on sys.path so colors are written through the
+# same upsert the desktop app and the scraper use.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from backend.app.db import init_app_db, transaction        # noqa: E402
+from backend.app.services.catalog import upsert_book       # noqa: E402
+
 
 MIN_DELAY    = 8.0
 MAX_DELAY    = 14.0
-
-# This script lives in backend/scripts/; its data lives in backend/data/.
-# Anchor to __file__ so the paths hold no matter what cwd it is run from.
-DATA_DIR     = Path(__file__).resolve().parents[1] / "data"
-COLORS_FILE  = str(DATA_DIR / "colors.txt")
-BOOKS_FILE   = str(DATA_DIR / "books.json")
-FLUSH_EVERY  = 25   
 
 FATAL_STATUS_CODES = {429, 502, 503}
 
@@ -113,88 +115,57 @@ def get_dominant_color(image_url: str, session: httpx.Client) -> str:
         return ""
 
 
-# ── File I/O ──────────────────────────────────────────────────────────────────
+# ── Catalog access ────────────────────────────────────────────────────────────
 
-def load_color_ids(path: str) -> list[str]:
-    if not os.path.exists(path):
-        print(f"❌  {path} not found — nothing to do")
-        return []
-    with open(path, "r", encoding="utf-8") as f:
-        ids = [line.strip() for line in f if line.strip()]
-    # de-dupe while preserving order
-    seen = set()
-    deduped = []
-    for uid in ids:
-        if uid not in seen:
-            seen.add(uid)
-            deduped.append(uid)
-    return deduped
+def books_needing_color(limit: int | None = None) -> list[dict]:
+    """Books that have a cover to sample but no color yet.
 
-
-def load_books(path: str) -> list[dict]:
-    if not os.path.exists(path):
-        print(f"❌  {path} not found")
-        return []
-    with open(path, "r", encoding="utf-8") as f:
-        try:
-            return json.load(f)
-        except json.JSONDecodeError:
-            print(f"⚠️  Could not parse {path} — is it valid JSON?")
-            return []
+    Newest first, so books just added by the app or the crawler get their color
+    before the long tail of the back catalog.
+    """
+    sql = (
+        "SELECT uid, title, image_url FROM books "
+        "WHERE color = '' AND image_url != '' "
+        "ORDER BY updated_at DESC"
+    )
+    params: tuple = ()
+    if limit:
+        sql += " LIMIT ?"
+        params = (int(limit),)
+    with transaction(PROJECT_ROOT) as conn:
+        return [dict(row) for row in conn.execute(sql, params).fetchall()]
 
 
-def save_books(path: str, books: list[dict]):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(books, f, indent=2, ensure_ascii=False)
+def save_color(uid: str, color: str) -> None:
+    """Persist one color. Uses upsert_book so only the `color` column is
+    touched — every scraper-owned field on the row is left exactly as it was."""
+    upsert_book(PROJECT_ROOT, {"uid": uid, "color": color})
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    p = argparse.ArgumentParser(description="Cover color extractor for Goodreads book dataset")
-    p.add_argument("--colors-file", default=COLORS_FILE, metavar="FILE",
-                    help="File with one book uid per line (default: backend/data/colors.txt)")
-    p.add_argument("--books-file", default=BOOKS_FILE, metavar="FILE",
-                    help="books.json to read/update (default: backend/data/books.json)")
+    p = argparse.ArgumentParser(description="Cover color extractor for the Bookscape catalog")
+    p.add_argument("--limit", type=int, metavar="N",
+                   help="Process at most N books this run (each one costs 8-14s of rate limiting)")
     args = p.parse_args()
 
-    uids = load_color_ids(args.colors_file)
-    if not uids:
-        return
+    init_app_db(PROJECT_ROOT)
 
-    books = load_books(args.books_file)
-    if not books:
-        return
-
-    # Index by uid for fast lookup + in-place update
-    by_uid = {b.get("uid", ""): b for b in books if b.get("uid")}
-
-    # Only process uids that exist in books.json, have an image_url,
-    # and don't already have a color
-    todo = [
-        uid for uid in uids
-        if uid in by_uid
-        and by_uid[uid].get("image_url")
-        and not by_uid[uid].get("color")
-    ]
-
-    already_done = len(uids) - len(todo)
-    print(f"📋  {len(uids)} ids in {args.colors_file}  "
-          f"({already_done} already colored or skippable, {len(todo)} to process)\n")
-
+    todo = books_needing_color(args.limit)
     if not todo:
-        print("✅  Nothing to do.")
+        print("✅  Every book with a cover already has a color.")
         return
+
+    print(f"📋  {len(todo)} book(s) need a cover color\n")
 
     limiter = RateLimiter()
     found   = 0
-    since_flush = 0
 
     session_headers = {"User-Agent": random.choice(USER_AGENTS)}
     with httpx.Client(headers=session_headers, timeout=20, follow_redirects=True) as session:
-        for i, uid in enumerate(todo, 1):
-            book = by_uid[uid]
-            print(f"[{i}/{len(todo)}] {uid}  {book.get('title', '')!r}")
+        for i, book in enumerate(todo, 1):
+            print(f"[{i}/{len(todo)}] {book['uid']}  {book['title']!r}")
 
             limiter.wait()
 
@@ -202,25 +173,17 @@ def main():
                 color = get_dominant_color(book["image_url"], session)
             except FatalHTTPError as e:
                 print(f"\n🚨 {e}")
-                save_books(args.books_file, books)
-                print(f"  💾 saved progress ({found} colors found) before exit")
+                print(f"  💾 {found} color(s) already committed — re-run to continue")
                 sys.exit(1)
 
             if color:
-                book["color"] = color
+                save_color(book["uid"], color)
                 found += 1
-                since_flush += 1
                 print(f"  🎨 {color}")
             else:
                 print("  ⚠️  No color extracted")
 
-            if since_flush >= FLUSH_EVERY:
-                save_books(args.books_file, books)
-                print(f"  💾 flushed progress → {args.books_file}")
-                since_flush = 0
-
-    save_books(args.books_file, books)
-    print(f"\n🏁 Done. {found}/{len(todo)} colors found and saved to {args.books_file}")
+    print(f"\n🏁 Done. {found}/{len(todo)} colors found and written to bookscape.db")
 
 
 if __name__ == "__main__":

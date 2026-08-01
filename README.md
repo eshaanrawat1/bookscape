@@ -60,15 +60,13 @@ All of the above accept `?dry_run=true` to preview without writing.
 
 ## Scraper
 
-`backend/scripts/scraper.py` drives real Chromium via Playwright (Goodreads
-sits behind an AWS WAF JS challenge that plain HTTP clients cannot pass). Both
-scripts resolve their data paths relative to `backend/data/`, so they can be
-run from any directory.
+`backend/scripts/scraper.py` scrapes Goodreads via Playwright, and
+`backend/scripts/gradient.py` extracts dominant cover colors. Both write
+straight into `bookscape.db` — there is no intermediate file.
 
-- `python backend/scripts/scraper.py --import-one <url>` — scrape one book
-  (what the app's "Add Book" dialog shells out to)
-- `python backend/scripts/scraper.py --seed <url>` — recursive crawl from a seed
-- `python backend/scripts/scraper.py --stats` — frontier queue stats
+The app's "Add Book" dialog shells out to `scraper.py --fetch-one`, which
+prints the book and saves nothing; the API persists the result itself.
+Everything else is run by hand.
 
-Requires `playwright install chromium` once. `backend/scripts/gradient.py` runs
-a separate rate-limited pass to extract dominant cover colors into `books.json`.
+See [`backend/scripts/README.md`](backend/scripts/README.md) for the full mode
+list, the crawl queue, and how the two scripts divide the work.
