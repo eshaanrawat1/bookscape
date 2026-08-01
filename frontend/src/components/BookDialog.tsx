@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, type CSSProperties, type Ref } from 'react'
 import { X, Star, MessageSquareText, FileText, Plus, Heart, ChevronDown, Upload, Download } from 'lucide-react'
 import { apiFetch } from '../api.js'
 import { normaliseBook, getCatalogBookId, formatCompactNumber, resolveSavedWantToReadBook } from '../utils.js'
@@ -13,6 +13,7 @@ interface BookDialogProps {
   preferLiveStatus?: boolean
   isNavigation?: boolean
   exiting?: boolean
+  cardRef?: Ref<HTMLElement>
   onClose: () => void
 }
 
@@ -36,7 +37,7 @@ const STATUS_LABELS: Record<string, string> = {
   not_started: 'Not started',
 }
 
-function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exiting = false, onClose }: BookDialogProps) {
+function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exiting = false, cardRef, onClose }: BookDialogProps) {
   const { collections, wantToReadBooks, addBookToCollection, toggleBookWantToRead } = useLibraryData()
   const { onOpen, onOpenAuthor } = useNavigation()
   const [view, setView] = useState<'library' | 'tracking'>(() => (
@@ -358,6 +359,7 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
 
   return (
       <article
+        ref={cardRef}
         className={articleClassName}
         style={{ '--dialog-glow': buildDialogGlow(displayBook.color || `hsl(${displayBook.tint})`) } as CSSProperties}
         onClick={(event) => event.stopPropagation()}

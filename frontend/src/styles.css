@@ -622,6 +622,14 @@ svg {
   position: relative;
 }
 
+/* Pinned by BookDialogStage while a card-to-card swap settles, so the height
+   difference between the two cards eases instead of snapping the centred
+   stage. auto -> px (and back) is not interpolable, so only the deliberate
+   px -> px settle animates. */
+.dialogCrossfadeStage.settling {
+  transition: height 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 .dialogCrossfadeStage > .bookDialog.exiting {
   position: absolute;
   top: 0;
@@ -665,9 +673,17 @@ svg {
   }
 }
 
+/* The incoming card paints on top of the outgoing one, so the two fades are
+   deliberately not symmetrical: the incoming card reaches full opacity before
+   the outgoing one starts to leave. Two cards at half opacity would both let
+   the scrim through at the midpoint, which reads as a brightness dip. */
 @keyframes dialogCrossfadeIn {
   from {
     opacity: 0;
+  }
+
+  70% {
+    opacity: 1;
   }
 
   to {
@@ -676,7 +692,8 @@ svg {
 }
 
 @keyframes dialogCrossfadeOut {
-  from {
+  0%,
+  60% {
     opacity: 1;
   }
 
@@ -707,6 +724,7 @@ svg {
     animation: none;
   }
 
+  .dialogCrossfadeStage.settling,
   .dialogTabPanelViewport {
     transition: none;
   }
