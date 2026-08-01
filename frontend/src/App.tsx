@@ -23,7 +23,7 @@ import { NavigationContext } from './context/NavigationContext.jsx'
 
 // Components
 import Sidebar from './components/Sidebar.jsx'
-import BookDialog from './components/BookDialog.jsx'
+import BookDialogStage from './components/BookDialogStage.jsx'
 import ScraperDialog from './components/ScraperDialog.jsx'
 import SettingsDialog from './components/SettingsDialog.jsx'
 import BookGrid from './components/BookGrid.jsx'
@@ -364,15 +364,7 @@ export default function App() {
           </div>
 
           {selected && (
-            <div className="dialogScrim" onClick={() => setSelected(null)}>
-              <BookDialog
-                key={selected.book.id}
-                book={selected.book}
-                preferLiveStatus={selected.preferLiveStatus}
-                isNavigation={selected.isNavigation}
-                onClose={() => setSelected(null)}
-              />
-            </div>
+            <BookDialogStage selected={selected} onClose={() => setSelected(null)} />
           )}
           {showScraperDialog && (
             <ScraperDialog

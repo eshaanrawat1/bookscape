@@ -12,6 +12,7 @@ interface BookDialogProps {
   book: Book
   preferLiveStatus?: boolean
   isNavigation?: boolean
+  exiting?: boolean
   onClose: () => void
 }
 
@@ -35,7 +36,7 @@ const STATUS_LABELS: Record<string, string> = {
   not_started: 'Not started',
 }
 
-function BookDialog({ book, preferLiveStatus = false, isNavigation = false, onClose }: BookDialogProps) {
+function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exiting = false, onClose }: BookDialogProps) {
   const { collections, wantToReadBooks, addBookToCollection, toggleBookWantToRead } = useLibraryData()
   const { onOpen, onOpenAuthor } = useNavigation()
   const [view, setView] = useState<'library' | 'tracking'>(() => (
@@ -44,7 +45,7 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, onCl
   const panelViewportRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const [panelHeight, setPanelHeight] = useState<number | null>(null)
-  const isFirstViewRender = useRef(true)
+  const lastAnimatedView = useRef(view)
 
   const prefersReducedMotion = () => (
     typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -64,10 +65,17 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, onCl
   const panelResizeObserverRef = useRef<ResizeObserver | null>(null)
 
   useLayoutEffect(() => {
-    if (isFirstViewRender.current) {
-      isFirstViewRender.current = false
+    // Guard against React StrictMode's dev-only double-invocation of effects
+    // (mount -> cleanup -> mount again, same `view` both times). A plain
+    // "have we ever run" boolean ref gets flipped by the throwaway first
+    // invocation and no longer protects the second one, which then wrongly
+    // treats a fresh mount as a real transition. Comparing against the last
+    // `view` we actually animated for is idempotent under a replay with an
+    // unchanged `view`, while still catching every genuine transition.
+    if (lastAnimatedView.current === view) {
       return
     }
+    lastAnimatedView.current = view
     if (prefersReducedMotion()) {
       setPanelHeight(null)
       return
@@ -341,9 +349,16 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, onCl
     }
   }
 
+  const articleClassName = [
+    'bookDialog',
+    'paperGrain',
+    isNavigation && 'navigating',
+    exiting && 'exiting',
+  ].filter(Boolean).join(' ')
+
   return (
       <article
-        className={isNavigation ? 'bookDialog paperGrain navigating' : 'bookDialog paperGrain'}
+        className={articleClassName}
         style={{ '--dialog-glow': buildDialogGlow(displayBook.color || `hsl(${displayBook.tint})`) } as CSSProperties}
         onClick={(event) => event.stopPropagation()}
       >

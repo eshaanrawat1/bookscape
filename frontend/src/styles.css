@@ -618,6 +618,16 @@ svg {
   overflow-y: auto;
 }
 
+.dialogCrossfadeStage {
+  position: relative;
+}
+
+.dialogCrossfadeStage > .bookDialog.exiting {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
 .bookDialog {
   position: relative;
   flex: 0 0 auto;
@@ -640,6 +650,11 @@ svg {
   animation: dialogCrossfadeIn 180ms ease-out forwards;
 }
 
+.bookDialog.exiting {
+  animation: dialogCrossfadeOut 180ms ease-in forwards;
+  pointer-events: none;
+}
+
 @keyframes scrimFadeIn {
   from {
     opacity: 0;
@@ -660,6 +675,16 @@ svg {
   }
 }
 
+@keyframes dialogCrossfadeOut {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
 @keyframes dialogEnterIn {
   from {
     opacity: 0;
@@ -677,6 +702,7 @@ svg {
   .mobileScrim,
   .bookDialog,
   .bookDialog.navigating,
+  .bookDialog.exiting,
   .dialogTabPanel {
     animation: none;
   }
