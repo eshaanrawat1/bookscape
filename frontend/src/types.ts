@@ -26,9 +26,7 @@ export interface RawBookPayload {
   avg_rating?: number | string
   book_rating?: number | string
   review_count?: number | string
-  book_review_count?: number | string
   rating_count?: number | string
-  book_rating_count?: number | string
   reading_status?: ReadingStatus
   status?: ReadingStatus
   description?: string
@@ -55,7 +53,6 @@ export interface Book {
   ratingCount: number
   progress: number
   status: ReadingStatus
-  format: never[]
   blurb: string
   _raw: RawBookPayload
   similar_books?: RawBookPayload[]
@@ -65,7 +62,6 @@ export interface RawList {
   name: string
   book_ids?: string[]
   books?: RawBookPayload[]
-  count?: number
 }
 
 export interface Collection {
@@ -82,9 +78,6 @@ export interface GenreSection {
 }
 
 export interface StatsSummary {
-  year: number | null
-  month: number | null
-  period_label: string
   available_years: number[]
   books_read: number
   pages_read: number
@@ -114,7 +107,6 @@ export interface SyncPushResult {
 }
 
 export interface LibraryDataContextValue {
-  books: Book[]
   collections: Collection[]
   wantToReadBooks: Book[]
   globalLibrary: GenreSection[]

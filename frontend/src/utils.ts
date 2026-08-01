@@ -83,8 +83,8 @@ function normaliseBook(raw: RawBookPayload): Book {
   const primaryGenre = raw.genre || genres[0] || ''
   const rating = parseFloat(String(raw.avg_rating ?? raw.book_rating ?? '')) || 0
   const pages = raw.page_count || raw.total_pages || raw.reading_total_pages || totalPages
-  const reviewCount = parseInt(String(raw.review_count ?? raw.book_review_count ?? 0), 10) || 0
-  const ratingCount = parseInt(String(raw.rating_count ?? raw.book_rating_count ?? 0), 10) || 0
+  const reviewCount = parseInt(String(raw.review_count ?? 0), 10) || 0
+  const ratingCount = parseInt(String(raw.rating_count ?? 0), 10) || 0
 
   return {
     id: raw.id || raw.uid || '',
@@ -105,7 +105,6 @@ function normaliseBook(raw: RawBookPayload): Book {
     ratingCount,
     progress,
     status,
-    format: [], // not tracked in our dataset; omit audio badge
     blurb: raw.description || '',
     // keep raw fields for completeness
     _raw: raw,

@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import difflib
 import json
-import re
 from pathlib import Path
 
-from ..db import LOCAL_UID_PREFIX, transaction
+from ..db import transaction
 from ..utils import normalize_text, split_author_field
 
 BOOK_COLUMNS = {
@@ -24,11 +23,6 @@ BOOK_COLUMNS = {
     "color",
     "scraped_at",
 }
-
-
-def make_local_uid(title: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", str(title or "").strip().lower()).strip("-")
-    return f"{LOCAL_UID_PREFIX}{slug or 'untitled'}"
 
 
 def _parse_json_list(value: object) -> list:

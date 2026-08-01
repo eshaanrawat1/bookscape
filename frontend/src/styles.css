@@ -406,12 +406,6 @@ svg {
   gap: 0.9rem;
 }
 
-.topBarActions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
 .kickerLink {
   display: inline-flex;
   align-items: center;

@@ -23,7 +23,7 @@ import { NavigationContext } from './context/NavigationContext.jsx'
 
 // Components
 import Sidebar from './components/Sidebar.jsx'
-import BookDialogStage from './components/BookDialogStage.jsx'
+import BookDialogStage, { type Selected } from './components/BookDialogStage.jsx'
 import ScraperDialog from './components/ScraperDialog.jsx'
 import SettingsDialog from './components/SettingsDialog.jsx'
 import BookGrid from './components/BookGrid.jsx'
@@ -37,8 +37,6 @@ import AuthorView from './views/AuthorView.jsx'
 import GenreView from './views/GenreView.jsx'
 import CollectionView from './views/CollectionView.jsx'
 import type { Book, Collection, GenreSection, RawBookPayload, RawList, SyncPullResult, SyncPushResult } from './types.js'
-
-type Selected = { book: Book; preferLiveStatus?: boolean; isNavigation?: boolean }
 
 export default function App() {
   const [view, setView] = useState('reading-now')
@@ -250,7 +248,6 @@ export default function App() {
   }
 
   const libraryData = {
-    books,
     collections,
     wantToReadBooks,
     globalLibrary,
@@ -345,7 +342,6 @@ export default function App() {
                     <p>{meta?.subtitle || meta?.description}</p>
                   </div>
                 </div>
-                <div className="topBarActions" />
                 {vaultError && (
                   <p className="topBarNotice syncErrorNotice">{vaultError}</p>
                 )}

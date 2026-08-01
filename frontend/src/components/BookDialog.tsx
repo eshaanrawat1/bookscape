@@ -27,9 +27,22 @@ interface ReadingProgressRecord {
 }
 
 interface ReadingProgressResponse {
-  book_id?: string
   entry?: Partial<ReadingProgressRecord>
 }
+
+// The saved-state fingerprint used to decide whether an edit is worth
+// persisting. Both sides of that comparison must be built from exactly these
+// six normalised fields — the server's `entry` also carries a `book_id`, and
+// stringifying the raw record let it leak into one side only, so the check
+// never matched and an unedited PUT fired on every dialog open.
+const recordSignature = (record: ReadingProgressRecord): string => JSON.stringify({
+  status: String(record.status || 'done').trim().toLowerCase() || 'done',
+  current_page: Number(record.current_page) || 0,
+  total_pages: Number(record.total_pages) || 0,
+  start_date: String(record.start_date || '').trim(),
+  finish_date: String(record.finish_date || '').trim(),
+  notes: String(record.notes || '').trim(),
+})
 
 const STATUS_LABELS: Record<string, string> = {
   done: 'Finished',
@@ -165,7 +178,7 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
     setHydrated(false)
     if (!bookId) {
       setRecord(baseRecord)
-      lastSavedRef.current = JSON.stringify(baseRecord)
+      lastSavedRef.current = recordSignature(baseRecord)
       setHydrated(true)
       return () => { cancelled = true }
     }
@@ -183,7 +196,7 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
           nextRecord.status = baseRecord.status
         }
         setRecord(nextRecord)
-        lastSavedRef.current = JSON.stringify(nextRecord)
+        lastSavedRef.current = recordSignature(nextRecord)
         setHydrated(true)
       })
       .catch(() => {
@@ -193,7 +206,7 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
             nextRecord.status = baseRecord.status
           }
           setRecord(nextRecord)
-          lastSavedRef.current = JSON.stringify(nextRecord)
+          lastSavedRef.current = recordSignature(nextRecord)
           setHydrated(true)
         }
       })
@@ -234,7 +247,7 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
         total_pages: Number(nextEntry.total_pages) || baseRecord.total_pages,
       }
       setRecord(nextRecord)
-      lastSavedRef.current = JSON.stringify(nextRecord)
+      lastSavedRef.current = recordSignature(nextRecord)
       setObsidianMessage('Pulled from vault.')
     } catch (err) {
       setObsidianMessage(err instanceof Error ? err.message : 'Could not pull from vault.')
@@ -268,7 +281,7 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
       })
       const nextSaved: ReadingProgressRecord = { ...baseRecord, ...(data.entry || payload) }
       setRecord(nextSaved)
-      lastSavedRef.current = JSON.stringify(nextSaved)
+      lastSavedRef.current = recordSignature(nextSaved)
     } catch {
       // Keep the draft visible; autosave will retry on the next edit.
     }
@@ -276,14 +289,7 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
 
   useEffect(() => {
     if (!hydrated || !record) return undefined
-    const signature = JSON.stringify({
-      status: String(record.status || 'done').trim().toLowerCase() || 'done',
-      current_page: Number(record.current_page) || 0,
-      total_pages: Number(record.total_pages) || 0,
-      start_date: String(record.start_date || '').trim(),
-      finish_date: String(record.finish_date || '').trim(),
-      notes: String(record.notes || '').trim(),
-    })
+    const signature = recordSignature(record)
 
     if (signature === lastSavedRef.current) return undefined
 

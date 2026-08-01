@@ -44,7 +44,6 @@ function SearchView() {
       <div className="stack">
         <SearchHeader
           draft={draft}
-          query={query}
           previewResults={previewResults}
           previewLoading={previewLoading}
           showPreview={showPreview}
@@ -63,7 +62,6 @@ function SearchView() {
       <div className="stack">
         <SearchHeader
           draft={draft}
-          query={query}
           previewResults={previewResults}
           previewLoading={previewLoading}
           showPreview={showPreview}
@@ -85,7 +83,6 @@ function SearchView() {
     <div className="stack">
       <SearchHeader
         draft={draft}
-        query={query}
         previewResults={previewResults}
         previewLoading={previewLoading}
         showPreview={showPreview}
@@ -109,7 +106,6 @@ function SearchView() {
 
 interface SearchHeaderProps {
   draft: string
-  query?: string
   previewResults?: Book[]
   previewLoading?: boolean
   showPreview?: boolean

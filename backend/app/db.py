@@ -77,8 +77,6 @@ CREATE TABLE IF NOT EXISTS app_settings (
 );
 """
 
-LOCAL_UID_PREFIX = "local:"
-
 
 def db_path(root: Path) -> Path:
     data_dir = root / "backend" / "data"

@@ -1,30 +1,8 @@
 from __future__ import annotations
 
-import json
 import re
 import unicodedata
 from datetime import date
-from pathlib import Path
-
-
-# JSON
-
-def read_json(path: Path, default: dict | list | None = None) -> dict | list:
-    if not path.exists():
-        return default if default is not None else {}
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            payload = json.load(f)
-        return payload if isinstance(payload, (dict, list)) else (default if default is not None else {})
-    except Exception:
-        return default if default is not None else {}
-
-
-def write_json(path: Path, payload: dict | list) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
-
 
 
 # Text Normalization from obsidian fields
@@ -61,16 +39,3 @@ def parse_iso_date(value: object) -> date | None:
 def parse_iso_date_string(value: object) -> str:
     d = parse_iso_date(value)
     return d.isoformat() if d else ""
-
-
-
-# Integer Parsing
-
-def to_int(value: object, default: int = 0) -> int:
-    """Safely convert value to int"""
-    if value is None:
-        return default
-    
-    raw = str(value).strip().replace(",", "")
-    digits = "".join(ch for ch in raw if ch.isdigit())
-    return max(0, int(digits)) if digits else default
