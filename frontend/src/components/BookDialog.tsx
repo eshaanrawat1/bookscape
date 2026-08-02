@@ -7,6 +7,7 @@ import { apiFetch } from '../api.js'
 import { normaliseBook, getCatalogBookId, formatCompactNumber, resolveSavedWantToReadBook } from '../utils.js'
 import { buildDialogGlow } from '../color.js'
 import BookCover from './BookCover.jsx'
+import DateProperty from './DateProperty.jsx'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
 import type { Book, RawBookPayload } from '../types.js'
@@ -46,20 +47,6 @@ const recordSignature = (record: ReadingProgressRecord): string => JSON.stringif
   finish_date: String(record.finish_date || '').trim(),
   notes: String(record.notes || '').trim(),
 })
-
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-]
-
-// `YYYY-MM-DD` -> `February 1, 2026`. Split by hand rather than going through
-// `new Date(value)`, which parses a bare date as UTC and lands on the previous
-// day for anyone west of Greenwich.
-const formatPropDate = (value: string): string => {
-  const [year, month, day] = String(value || '').split('-').map(Number)
-  if (!year || !month || !day || month < 1 || month > 12) return ''
-  return `${MONTH_NAMES[month - 1]} ${day}, ${year}`
-}
 
 const STATUS_LABELS: Record<string, string> = {
   done: 'Finished',
@@ -398,6 +385,33 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
         <div className="dialogTop">
           <div className="dialogCover">
             <BookCover book={displayBook} glow />
+            {view === 'tracking' && canSyncObsidian && (
+              <div className="trackingVault">
+                <div className="trackingVaultRow">
+                  <button
+                    type="button"
+                    className="dialogIconButton"
+                    onClick={pushToVault}
+                    disabled={obsidianBusy !== null}
+                    aria-label="Push this book to the Obsidian vault"
+                    title="Push to vault"
+                  >
+                    <Upload />
+                  </button>
+                  <button
+                    type="button"
+                    className="dialogIconButton"
+                    onClick={pullFromVault}
+                    disabled={obsidianBusy !== null}
+                    aria-label="Pull this book from the Obsidian vault"
+                    title="Pull from vault"
+                  >
+                    <Download />
+                  </button>
+                </div>
+                {obsidianMessage && <p className="dialogActionMessage">{obsidianMessage}</p>}
+              </div>
+            )}
           </div>
           <div className="dialogCopy">
             <h2>{displayBook.title}</h2>
@@ -635,47 +649,33 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
                     </span>
                   </div>
 
-                  <label className="trackingProp">
+                  <div className="trackingProp">
                     <span className="trackingPropLabel">
                       <Calendar aria-hidden="true" />
                       <span>Started</span>
                     </span>
                     <span className="trackingPropValue">
-                      <input
-                        type="date"
-                        className="trackingDateInput"
+                      <DateProperty
+                        label="Started"
                         value={draft.start_date}
-                        onChange={(event) => updateField('start_date', event.target.value)}
+                        onChange={(next) => updateField('start_date', next)}
                       />
-                      <span
-                        className={formatPropDate(draft.start_date) ? 'trackingDateDisplay' : 'trackingDateDisplay empty'}
-                        aria-hidden="true"
-                      >
-                        {formatPropDate(draft.start_date) || 'Empty'}
-                      </span>
                     </span>
-                  </label>
+                  </div>
 
-                  <label className="trackingProp">
+                  <div className="trackingProp">
                     <span className="trackingPropLabel">
                       <CalendarCheck aria-hidden="true" />
                       <span>Completed</span>
                     </span>
                     <span className="trackingPropValue">
-                      <input
-                        type="date"
-                        className="trackingDateInput"
+                      <DateProperty
+                        label="Completed"
                         value={draft.finish_date}
-                        onChange={(event) => updateField('finish_date', event.target.value)}
+                        onChange={(next) => updateField('finish_date', next)}
                       />
-                      <span
-                        className={formatPropDate(draft.finish_date) ? 'trackingDateDisplay' : 'trackingDateDisplay empty'}
-                        aria-hidden="true"
-                      >
-                        {formatPropDate(draft.finish_date) || 'Empty'}
-                      </span>
                     </span>
-                  </label>
+                  </div>
 
                   <label className="trackingProp notes">
                     <span className="trackingPropLabel">
@@ -692,32 +692,6 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
                     </span>
                   </label>
                 </div>
-
-                {canSyncObsidian && (
-                  <div className="trackingVaultRow">
-                    <button
-                      type="button"
-                      className="dialogIconButton"
-                      onClick={pushToVault}
-                      disabled={obsidianBusy !== null}
-                      aria-label="Push this book to the Obsidian vault"
-                      title="Push to vault"
-                    >
-                      <Upload />
-                    </button>
-                    <button
-                      type="button"
-                      className="dialogIconButton"
-                      onClick={pullFromVault}
-                      disabled={obsidianBusy !== null}
-                      aria-label="Pull this book from the Obsidian vault"
-                      title="Pull from vault"
-                    >
-                      <Download />
-                    </button>
-                    {obsidianMessage && <span className="dialogActionMessage">{obsidianMessage}</span>}
-                  </div>
-                )}
               </>
             )}
             </div>
