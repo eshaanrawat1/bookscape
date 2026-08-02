@@ -1636,6 +1636,13 @@ svg {
   align-items: stretch;
 }
 
+/* The accent tint reads as a highlight on the one-line rows, but across the
+   full notes block it turns the field into a sticky note — keep it on the card. */
+.trackingProp.notes:hover .trackingPropValue,
+.trackingProp.notes .trackingPropValue:focus-within {
+  background: transparent;
+}
+
 .trackingPropValue input,
 .trackingPropValue textarea {
   width: 100%;
