@@ -75,6 +75,23 @@ CREATE TABLE IF NOT EXISTS app_settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL DEFAULT ''
 );
+
+-- One row per book whose cover we have tried to sample a color from. An empty
+-- books.color cannot say whether a book is untried or permanently unsamplable,
+-- so the color extractor would retry dead cover URLs forever. This table is
+-- that missing bit, and the PRIMARY KEY makes "at most one attempt per book" a
+-- constraint rather than a convention: a runner claims a book by inserting
+-- 'pending' here *before* downloading, so a crash mid-fetch leaves a visible
+-- claim instead of silently re-running later.
+CREATE TABLE IF NOT EXISTS cover_attempts (
+  uid          TEXT PRIMARY KEY REFERENCES books(uid) ON DELETE CASCADE,
+  status       TEXT NOT NULL DEFAULT 'pending'
+                  CHECK (status IN ('pending','ok','failed')),
+  reason       TEXT NOT NULL DEFAULT '',
+  detail       TEXT NOT NULL DEFAULT '',
+  attempted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_cover_attempts_status ON cover_attempts(status);
 """
 
 

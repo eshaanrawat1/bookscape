@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from ..services.catalog import get_book_with_similar as load_book_with_similar
 from ..services.catalog import resolve_book, upsert_book
+from ..services.cover_worker import poke_worker
 
 
 class ScrapeBookIn(BaseModel):
@@ -141,6 +142,9 @@ def create_router(root: Path) -> APIRouter:
             raise HTTPException(status_code=400, detail="Missing book data to import.")
 
         upsert_book(root, book)
+        # The scraper leaves `color` empty on purpose; wake the extractor so the
+        # new book gets one now rather than at the worker's next idle poll.
+        poke_worker()
         saved = load_book_with_similar(root, uid)
         if not saved:
             raise HTTPException(status_code=500, detail="Book was saved but could not be reloaded.")

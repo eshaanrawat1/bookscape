@@ -6,8 +6,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .db import init_app_db
+from .observability import configure_logging
 from .repository import DataRepository
 from .services.catalog import has_data
+from .services.cover_worker import start_worker
 from .services.reading import ReadingListStore
 from .routes.catalog import create_router as create_catalog_router
 from .routes.books import create_router as create_books_router
@@ -23,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 BACKEND_API_VERSION = 4
 
 init_app_db(ROOT)
+configure_logging(ROOT)
 
 app = FastAPI(title="Bookscape API", version="0.1.0")
 app.add_middleware(
@@ -46,6 +49,11 @@ api_router.include_router(create_scraper_router(ROOT))
 api_router.include_router(create_settings_router(ROOT, repo))
 
 app.include_router(api_router, prefix="/api")
+
+# Fills in cover colors for newly imported books in the background. Started
+# after the routes so a slow first claim cannot delay the health check the
+# Tauri shell waits on.
+start_worker(ROOT)
 
 
 @app.get("/health")

@@ -1,189 +1,134 @@
 """
 gradient.py
 ────────────────
-Standalone, rate-limited cover-color extractor.
+Command-line front end for the cover-color extractor.
 
-What it does:
-  1. Ask bookscape.db for every book that has a cover image but no color yet
-  2. Download each cover and extract a single dominant color via ColorThief
-  3. Write it straight back to that book's `color` column
+The work itself lives in `backend/app/services/covers.py`, which the API's
+background worker also runs — one implementation, two entry points, so a book
+coloured by hand and a book coloured by the app go through exactly the same
+code and land in exactly the same log.
 
-Colors are committed one at a time, so a rate-limit shutdown (or a Ctrl-C)
-never loses the work already done — just re-run to pick up where it stopped.
-The database is the queue: there is no separate list of ids to keep in sync.
+Nothing here needs to be run for normal use: the app's worker picks up new
+books on its own. This is for draining a large backlog faster than an idle
+desktop app will, and for reviewing what failed.
+
+Every attempt — success or failure — is recorded in `cover_attempts`, so a book
+is tried exactly once and a dead cover URL never comes back around. Failures
+are reviewable in `backend/data/logs/covers.jsonl`:
+
+    jq 'select(.status == "failed")' backend/data/logs/covers.jsonl
+
+and can be re-queued in bulk with `--retry-failed` once the cause is fixed.
 
 Reads and writes backend/data/bookscape.db regardless of the cwd it is run from.
 
 Usage:
     python3 backend/scripts/gradient.py
     python3 backend/scripts/gradient.py --limit 25
+    python3 backend/scripts/gradient.py --status
+    python3 backend/scripts/gradient.py --retry-failed
 """
 
 import argparse
-import io
-import random
+import logging
 import sys
-import time
 from pathlib import Path
 
-import httpx
-from colorthief import ColorThief
-
 # This script lives in backend/scripts/; the app package lives alongside it at
-# backend/app/. Put the repo root on sys.path so colors are written through the
-# same upsert the desktop app and the scraper use.
+# backend/app/. Put the repo root on sys.path so the shared service layer —
+# and with it the same upsert, the same rate limiter and the same log file the
+# app uses — is importable.
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from backend.app.db import init_app_db, transaction        # noqa: E402
-from backend.app.services.catalog import upsert_book       # noqa: E402
+from backend.app.db import init_app_db                      # noqa: E402
+from backend.app.observability import configure_logging     # noqa: E402
+from backend.app.services import covers                     # noqa: E402
+from backend.app.services.covers import Outcome             # noqa: E402
 
 
-MIN_DELAY    = 8.0
-MAX_DELAY    = 14.0
-
-FATAL_STATUS_CODES = {429, 502, 503}
-
-USER_AGENTS = [
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-]
+def print_status() -> None:
+    print(f"📋  {covers.queue_depth(PROJECT_ROOT)} book(s) waiting for a color")
+    print(f"🚫  {covers.failed_count(PROJECT_ROOT)} book(s) recorded as failed")
 
 
-class FatalHTTPError(Exception):
-    def __init__(self, status_code: int):
-        self.status_code = status_code
-        super().__init__(f"Fatal HTTP {status_code} — shutting down immediately")
+def drain(limit: int | None) -> int:
+    """Colour books until the queue empties, the limit is hit, or the host
+    starts pushing back. Returns a process exit code."""
+    limiter = covers.RateLimiter()
+    processed = 0
+    found = 0
+
+    with covers.new_session() as session:
+        while limit is None or processed < limit:
+            result = covers.process_one(PROJECT_ROOT, session, limiter)
+
+            if result is None:
+                print("✅  Every book with a cover has now been tried.")
+                break
+
+            processed += 1
+            label = f"[{processed}] {result.uid}  {result.title!r}"
+
+            if result.outcome is Outcome.OK:
+                found += 1
+                print(f"{label}\n  🎨 {result.color}")
+            elif result.terminal:
+                print(f"{label}\n  ⚠️  {result.outcome}: {result.detail} — recorded, will not retry")
+            else:
+                # Transient: the claim was released, so the book is still queued.
+                print(f"{label}\n  🚨 {result.outcome}: {result.detail}")
+                print(f"\n  💾 {found} color(s) committed — re-run to continue")
+                return 1
+
+    print(f"\n🏁 Done. {found}/{processed} attempted book(s) got a color")
+    return 0
 
 
-# ── Rate limiter ─────────────────────────────────────────────────────────────
-
-class RateLimiter:
-    def __init__(self):
-        self._last = 0.0
-
-    def wait(self):
-        elapsed   = time.monotonic() - self._last
-        delay     = random.uniform(MIN_DELAY, MAX_DELAY)
-        remaining = delay - elapsed
-        if remaining > 0:
-            print(f"  ⏳ waiting {remaining:.1f}s …")
-            time.sleep(remaining)
-        self._last = time.monotonic()
-
-
-# ── Color extraction ───────────────────────────────────────────────────────────
-
-def get_dominant_color(image_url: str, session: httpx.Client) -> str:
-    """
-    Download a cover image and extract its single dominant color.
-    Returns "rgb(r, g, b)" or "" on any failure.
-    Raises FatalHTTPError on 429/502/503 — same hard-stop policy as scraper.py.
-    """
-    if not image_url:
-        return ""
-
-    headers = {
-        "User-Agent": random.choice(USER_AGENTS),
-        "Referer":    "https://www.goodreads.com/",
-    }
-
-    try:
-        r = session.get(image_url, headers=headers, timeout=15)
-
-        if r.status_code in FATAL_STATUS_CODES:
-            raise FatalHTTPError(r.status_code)
-        if r.status_code != 200:
-            print(f"  ⚠️  HTTP {r.status_code} fetching cover — skipping")
-            return ""
-
-        thief = ColorThief(io.BytesIO(r.content))
-        red, green, blue = thief.get_color(quality=1)
-        return f"rgb({red}, {green}, {blue})"
-
-    except FatalHTTPError:
-        raise
-    except httpx.RequestError as e:
-        print(f"  ⚠️  Network error fetching cover: {e}")
-        return ""
-    except Exception as e:
-        print(f"  ⚠️  Color extraction failed: {e}")
-        return ""
-
-
-# ── Catalog access ────────────────────────────────────────────────────────────
-
-def books_needing_color(limit: int | None = None) -> list[dict]:
-    """Books that have a cover to sample but no color yet.
-
-    Newest first, so books just added by the app or the crawler get their color
-    before the long tail of the back catalog.
-    """
-    sql = (
-        "SELECT uid, title, image_url FROM books "
-        "WHERE color = '' AND image_url != '' "
-        "ORDER BY updated_at DESC"
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Cover color extractor for the Bookscape catalog",
     )
-    params: tuple = ()
-    if limit:
-        sql += " LIMIT ?"
-        params = (int(limit),)
-    with transaction(PROJECT_ROOT) as conn:
-        return [dict(row) for row in conn.execute(sql, params).fetchall()]
-
-
-def save_color(uid: str, color: str) -> None:
-    """Persist one color. Uses upsert_book so only the `color` column is
-    touched — every scraper-owned field on the row is left exactly as it was."""
-    upsert_book(PROJECT_ROOT, {"uid": uid, "color": color})
-
-
-# ── Main ──────────────────────────────────────────────────────────────────────
-
-def main():
-    p = argparse.ArgumentParser(description="Cover color extractor for the Bookscape catalog")
-    p.add_argument("--limit", type=int, metavar="N",
-                   help="Process at most N books this run (each one costs 8-14s of rate limiting)")
-    args = p.parse_args()
+    parser.add_argument(
+        "--limit", type=int, metavar="N",
+        help="Attempt at most N books this run (each one costs 8-14s of rate limiting)",
+    )
+    parser.add_argument(
+        "--status", action="store_true",
+        help="Print queue depth and failure count, then exit",
+    )
+    parser.add_argument(
+        "--retry-failed", action="store_true",
+        help="Forget every recorded failure so those books are queued again",
+    )
+    args = parser.parse_args()
 
     init_app_db(PROJECT_ROOT)
+    # This script is its own presentation layer — it prints a readable line per
+    # book below, so the console handler stays quiet to avoid saying everything
+    # twice. Both still land in covers.jsonl, identically to the app's.
+    configure_logging(PROJECT_ROOT, console_level=logging.ERROR)
 
-    todo = books_needing_color(args.limit)
-    if not todo:
-        print("✅  Every book with a cover already has a color.")
+    if args.status:
+        print_status()
         return
 
-    print(f"📋  {len(todo)} book(s) need a cover color\n")
+    if args.retry_failed:
+        cleared = covers.clear_failed(PROJECT_ROOT)
+        print(f"♻️   {cleared} failed book(s) returned to the queue")
+        return
 
-    limiter = RateLimiter()
-    found   = 0
+    released = covers.clear_stale_claims(PROJECT_ROOT)
+    if released:
+        print(f"♻️   {released} abandoned claim(s) released")
 
-    session_headers = {"User-Agent": random.choice(USER_AGENTS)}
-    with httpx.Client(headers=session_headers, timeout=20, follow_redirects=True) as session:
-        for i, book in enumerate(todo, 1):
-            print(f"[{i}/{len(todo)}] {book['uid']}  {book['title']!r}")
+    if covers.queue_depth(PROJECT_ROOT) == 0:
+        print("✅  Every book with a cover already has a color or a recorded failure.")
+        return
 
-            limiter.wait()
-
-            try:
-                color = get_dominant_color(book["image_url"], session)
-            except FatalHTTPError as e:
-                print(f"\n🚨 {e}")
-                print(f"  💾 {found} color(s) already committed — re-run to continue")
-                sys.exit(1)
-
-            if color:
-                save_color(book["uid"], color)
-                found += 1
-                print(f"  🎨 {color}")
-            else:
-                print("  ⚠️  No color extracted")
-
-    print(f"\n🏁 Done. {found}/{len(todo)} colors found and written to bookscape.db")
+    print_status()
+    print()
+    sys.exit(drain(args.limit))
 
 
 if __name__ == "__main__":

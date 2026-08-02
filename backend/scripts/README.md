@@ -1,8 +1,8 @@
 # Scripts
 
-Standalone tooling for building out the catalog. Neither script is imported by
-the app — both are run by hand from the command line, with one exception noted
-below.
+Command-line tooling for building out the catalog. Both are run by hand, with
+two exceptions noted below: the app shells out to `scraper.py --fetch-one`, and
+`gradient.py` is now a front end for a service the app also runs on its own.
 
 Both resolve their paths relative to `backend/data/`, so they can be run from
 any directory, and both write straight into `bookscape.db` through the same
@@ -77,22 +77,70 @@ Extracts one dominant color per cover via ColorThief and writes it to the
 book's `color` column as `rgb(r, g, b)`. The frontend uses it to build the
 glow behind each cover; books without one fall back to a neutral tint.
 
+**You do not normally need to run this.** The logic lives in
+[`app/services/covers.py`](../app/services/covers.py), and the API runs it
+continuously on a background thread — a book imported through the app gets its
+color within a few seconds. This script is the same code with a terminal in
+front of it, for draining a large backlog faster than an idle desktop app will
+and for reviewing what went wrong.
+
 There is no input file to keep in sync — the work list *is* a query:
 
 ```sql
 SELECT uid, title, image_url FROM books
 WHERE color = '' AND image_url != ''
+  AND uid NOT IN (SELECT uid FROM cover_attempts)
 ORDER BY updated_at DESC
 ```
 
 Newest first, so books just added by the app or the crawler get a color before
 the long tail of the back catalog. Each color is committed the moment it is
-found, and a colored book drops out of the query, so the run is resumable and
-idempotent: interrupt it whenever, re-run, and it picks up exactly where it
-stopped.
+found, so a run is resumable: interrupt it whenever, re-run, and it picks up
+where it stopped.
 
-`--limit N` caps a single pass. Worth using — every book costs 8–14s of rate
-limiting, so a few hundred uncolored books is an overnight job.
+| Flag | What it does |
+|---|---|
+| `--limit N` | Attempt at most N books. Every one costs 8–14s of rate limiting, so a few hundred is an overnight job. |
+| `--status` | Print queue depth and failure count, then exit. |
+| `--retry-failed` | Forget every recorded failure so those books queue again. |
 
-Like the scraper, it hard-stops on HTTP 429 / 502 / 503 rather than hammering a
-host that is already pushing back.
+### Attempted exactly once
+
+`cover_attempts` holds one row per book we have tried, and its `PRIMARY KEY` is
+what makes "once" a constraint rather than a convention. A runner *claims* a
+book by inserting `pending` there before downloading, so the background worker
+and a hand-run `gradient.py` can never pick the same book, and a process killed
+mid-fetch leaves a visible claim instead of quietly redoing the work. Claims
+older than an hour are assumed abandoned and released at startup.
+
+Failures split two ways, and the split is the whole point:
+
+| Outcome | Meaning | Result |
+|---|---|---|
+| `ok` | Color extracted | recorded, book leaves the queue |
+| `http_status` | Cover URL returned 404/403/… | recorded `failed`, never retried |
+| `decode_error` | ColorThief cannot read the bytes | recorded `failed`, never retried |
+| `empty_image` | Book has no cover URL | recorded `failed`, never retried |
+| `rate_limited` | HTTP 429 / 502 / 503 | **claim released**, worker backs off 10 min |
+| `network_error` | Connection failed | **claim released**, retried later |
+
+The first four are attributable to the book and will not change on a retry. The
+last two are about us, not the cover — recording those as terminal would
+permanently un-color every book that happened to be in flight during a
+rate-limit window.
+
+### Reviewing failures
+
+Every attempt, from both the script and the app, is appended to
+`backend/data/logs/covers.jsonl` (rotating, 2 MB × 3):
+
+```bash
+jq 'select(.status == "failed")' backend/data/logs/covers.jsonl
+```
+
+All attempts are logged rather than just failures, because a failures-only file
+cannot answer "what is the failure rate" — and those counters are already being
+kept in-process by
+[`app/observability.py`](../app/observability.py), ready to be exposed at
+`/metrics` when that is wanted. Once a cause is fixed, `--retry-failed` puts
+the affected books back in the queue.
