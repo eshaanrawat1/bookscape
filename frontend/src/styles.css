@@ -1564,16 +1564,168 @@ svg {
   animation: dialogTabPanelFadeIn 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.trackingStatusRow {
+/* Property rows — a Notion page's property table, in this card's type scale. */
+.trackingProps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-top: -0.35rem;
+}
+
+.trackingProp {
+  display: grid;
+  grid-template-columns: minmax(0, 13rem) minmax(0, 1fr);
+  align-items: start;
+  gap: 0.5rem;
+}
+
+.trackingPropLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  padding: 0.5rem 0.55rem;
+  color: var(--muted-foreground);
+  font-size: 1.12rem;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.trackingPropLabel > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trackingPropLabel svg {
+  flex: none;
+  width: 1.3rem;
+  height: 1.3rem;
+  color: color-mix(in oklch, var(--muted-foreground) 72%, transparent);
+  stroke-width: 2;
+}
+
+.trackingPropValue {
+  position: relative;
   display: flex;
   align-items: center;
+  gap: 0.8rem;
+  min-width: 0;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.55rem;
+  color: var(--foreground);
+  font-size: 1.16rem;
+  line-height: 1.35;
+  transition: background 140ms ease;
+}
+
+.trackingProp:hover .trackingPropValue:not(.static),
+.trackingPropValue:focus-within {
+  background: color-mix(in oklch, var(--accent) 30%, transparent);
+}
+
+.trackingProp.notes {
+  margin-top: 0.35rem;
+}
+
+.trackingProp.notes .trackingPropValue {
+  align-items: stretch;
+}
+
+.trackingPropValue input,
+.trackingPropValue textarea {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  padding: 0;
+  box-shadow: none;
+  outline: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.trackingPropValue input::placeholder,
+.trackingPropValue textarea::placeholder {
+  color: color-mix(in oklch, var(--muted-foreground) 62%, transparent);
+}
+
+.trackingPropValue textarea {
+  resize: none;
+  min-height: 8.5rem;
+  max-height: 26rem;
+  line-height: 1.6;
+  font-family: inherit;
+  field-sizing: content;
+}
+
+/* Dates read as Notion's formatted value (or a muted "Empty") until the field
+   takes focus, at which point the native editor takes back over. The unfocused
+   input is hidden with `opacity`, not by colouring `::-webkit-datetime-edit`
+   transparent: WebKit paints an empty date field with today's date as filler
+   and colours the individual segment pseudo-elements, so the parent rule left
+   today's date showing through under the overlay. */
+.trackingDateInput:not(:focus) {
+  opacity: 0;
+}
+
+.trackingDateDisplay {
+  position: absolute;
+  left: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.trackingDateDisplay.empty {
+  color: color-mix(in oklch, var(--muted-foreground) 62%, transparent);
+}
+
+.trackingPropValue:focus-within .trackingDateDisplay {
+  display: none;
+}
+
+.trackingDateInput::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.4;
+}
+
+.trackingProgressPct {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.trackingProgressTrack {
+  flex: 1;
+  max-width: 24rem;
+  height: 0.55rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--border) 75%, transparent);
+}
+
+.trackingProgressFill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+  transition: width 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.trackingVaultRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
 }
 
 .trackingStatusControl {
   position: relative;
   display: inline-flex;
-  flex-direction: column;
-  gap: 0.8rem;
   width: fit-content;
   color: color-mix(in oklch, var(--foreground) 82%, var(--muted-foreground));
 }
@@ -1585,29 +1737,45 @@ svg {
 .trackingStatusButton {
   display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.55rem;
   border: 0;
-  border-radius: 0.95rem;
-  background: transparent;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--status-not-started) 30%, transparent);
   color: var(--foreground);
-  padding: 0.2rem 0.1rem 0.35rem;
+  padding: 0.28rem 0.7rem 0.28rem 0.75rem;
   font-family: var(--font-sans);
-  font-size: 1.38rem;
+  font-size: 1.1rem;
   font-weight: 500;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
+  line-height: 1.3;
   cursor: pointer;
   box-shadow: none;
+  transition: filter 140ms ease;
+}
+
+.trackingStatusButton[data-status='reading'] {
+  background: color-mix(in oklch, var(--status-reading) 30%, transparent);
+}
+
+.trackingStatusButton[data-status='done'] {
+  background: color-mix(in oklch, var(--status-finished) 34%, transparent);
 }
 
 .trackingStatusButton:hover {
-  color: color-mix(in oklch, var(--foreground) 90%, var(--primary));
+  filter: brightness(0.97);
+}
+
+.trackingStatusButton .trackingStatusDot {
+  width: 0.6rem;
+  height: 0.6rem;
+  box-shadow: none;
 }
 
 .trackingStatusCaret {
-  width: 1.2rem;
-  height: 1.2rem;
-  margin-left: 0.05rem;
-  color: var(--muted-foreground);
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-left: -0.05rem;
+  color: color-mix(in oklch, var(--muted-foreground) 85%, transparent);
 }
 
 .trackingStatusMenu {
@@ -1668,123 +1836,17 @@ svg {
   box-shadow: 0 0 0 4px color-mix(in oklch, var(--status-not-started) 18%, transparent);
 }
 
-.trackingPanel {
-  display: flex;
-  flex-direction: column;
-  gap: 2.25rem;
-  border-top: 1px solid color-mix(in oklch, var(--border) 75%, transparent);
-  padding-top: 1rem;
-  margin-top: 0.25rem;
-}
-
-.trackingFieldRow {
-  display: flex;
-  gap: 1.35rem;
-}
-
-.trackingFieldRow.twoCol {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.trackingField,
-.trackingNotes {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-}
-
-.trackingFieldRow:first-child .trackingField {
-  max-width: 38rem;
-}
-
-.trackingField>span,
-.trackingNotes>span {
-  color: var(--muted-foreground);
-  font-size: 1.08rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.trackingFieldValue,
-.trackingField input,
-.trackingNotes textarea {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--foreground);
-  box-shadow: none;
-  outline: 0;
-  appearance: none;
-  -webkit-appearance: none;
-}
-
-.trackingFieldValue {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  width: fit-content;
-  padding: 0;
-  font-size: 1.35rem;
-  letter-spacing: -0.02em;
-}
-
 .trackingPageInput {
-  width: auto;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--foreground);
-  font: inherit;
-  letter-spacing: inherit;
   text-align: left;
-  field-sizing: content;
   appearance: textfield;
   -webkit-appearance: none;
   -moz-appearance: textfield;
-}
-
-.trackingFieldValue .trackingPageInput {
-  width: auto;
-  max-width: none;
 }
 
 .trackingPageInput::-webkit-outer-spin-button,
 .trackingPageInput::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
-}
-
-.trackingFieldSep {
-  color: var(--muted-foreground);
-}
-
-.trackingFieldUnit {
-  color: var(--muted-foreground);
-  font-size: 1rem;
-}
-
-.trackingField > input {
-  width: 100%;
-  padding: 0;
-  font-size: 1.28rem;
-  letter-spacing: 0.01em;
-}
-
-.trackingField > input:focus,
-.trackingNotes textarea:focus {
-  outline: none;
-}
-
-.trackingNotes textarea {
-  resize: vertical;
-  min-height: 18rem;
-  padding: 0;
-  font-size: 1.24rem;
-  line-height: 1.68;
-  font-family: inherit;
 }
 
 /* ========================================================================== */
@@ -2626,12 +2688,13 @@ svg {
 }
 
 @media (max-width: 620px) {
-  .trackingFieldValue {
-    gap: 0.3rem;
+  .trackingProp {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
   }
 
-  .trackingFieldRow.twoCol {
-    grid-template-columns: 1fr;
+  .trackingPropLabel {
+    padding-bottom: 0.15rem;
   }
 
   .sidebar {

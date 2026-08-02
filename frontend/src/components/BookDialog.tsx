@@ -1,5 +1,8 @@
 import { useState, useEffect, useLayoutEffect, useRef, type CSSProperties, type Ref } from 'react'
-import { X, Star, MessageSquareText, FileText, Plus, Heart, ChevronDown, Upload, Download } from 'lucide-react'
+import {
+  X, Star, MessageSquareText, FileText, Plus, Heart, ChevronDown, Upload, Download,
+  LoaderCircle, Hash, Sigma, Calendar, CalendarCheck, TextAlignStart,
+} from 'lucide-react'
 import { apiFetch } from '../api.js'
 import { normaliseBook, getCatalogBookId, formatCompactNumber, resolveSavedWantToReadBook } from '../utils.js'
 import { buildDialogGlow } from '../color.js'
@@ -43,6 +46,20 @@ const recordSignature = (record: ReadingProgressRecord): string => JSON.stringif
   finish_date: String(record.finish_date || '').trim(),
   notes: String(record.notes || '').trim(),
 })
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+// `YYYY-MM-DD` -> `February 1, 2026`. Split by hand rather than going through
+// `new Date(value)`, which parses a bare date as UTC and lands on the previous
+// day for anyone west of Greenwich.
+const formatPropDate = (value: string): string => {
+  const [year, month, day] = String(value || '').split('-').map(Number)
+  if (!year || !month || !day || month < 1 || month > 12) return ''
+  return `${MONTH_NAMES[month - 1]} ${day}, ${year}`
+}
 
 const STATUS_LABELS: Record<string, string> = {
   done: 'Finished',
@@ -215,6 +232,11 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
   }, [bookId, baseRecord.current_page, baseRecord.total_pages, baseRecord.start_date, baseRecord.finish_date])
 
   const draft = record || baseRecord
+  const trackedTotalPages = Number(draft.total_pages) || 0
+  const trackedCurrentPage = Number(draft.current_page) || 0
+  const progressPct = trackedTotalPages > 0
+    ? Math.min(100, Math.max(0, Math.round((trackedCurrentPage / trackedTotalPages) * 100)))
+    : 0
   const [obsidianBusy, setObsidianBusy] = useState<'push' | 'pull' | null>(null)
   const [obsidianMessage, setObsidianMessage] = useState('')
   const canSyncObsidian = Boolean(bookId) && (draft.status === 'reading' || draft.status === 'done')
@@ -513,47 +535,166 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
               </>
             ) : (
               <>
-                <div className="trackingStatusRow" ref={statusMenuRef}>
-                  <div className={statusMenuOpen ? 'trackingStatusControl open' : 'trackingStatusControl'}>
-                    <button
-                      type="button"
-                      className="trackingStatusButton"
-                      onClick={() => setStatusMenuOpen((value) => !value)}
-                      aria-haspopup="menu"
-                      aria-expanded={statusMenuOpen}
-                    >
-                      <span>{STATUS_LABELS[draft.status]}</span>
-                      <span className={statusDotClass} />
-                      <ChevronDown className="trackingStatusCaret" strokeWidth={2.25} />
-                    </button>
-                    {statusMenuOpen && (
-                      <div className="trackingStatusMenu" role="menu" aria-label="Reading status">
-                        {[
-                          ['done', 'Finished'],
-                          ['reading', 'Reading'],
-                          ['not_started', 'Not started'],
-                        ].map(([value, label]) => (
-                          <button
-                            key={value}
-                            type="button"
-                            className={draft.status === value ? 'trackingStatusMenuItem active' : 'trackingStatusMenuItem'}
-                            role="menuitemradio"
-                            aria-checked={draft.status === value}
-                            onClick={() => {
-                              updateField('status', value)
-                              setStatusMenuOpen(false)
-                            }}
-                          >
-                            {label}
-                          </button>
-                        ))}
+                <div className="trackingProps">
+                  <div className="trackingProp" ref={statusMenuRef}>
+                    <span className="trackingPropLabel">
+                      <LoaderCircle aria-hidden="true" />
+                      <span>Status</span>
+                    </span>
+                    <div className="trackingPropValue">
+                      <div className={statusMenuOpen ? 'trackingStatusControl open' : 'trackingStatusControl'}>
+                        <button
+                          type="button"
+                          className="trackingStatusButton"
+                          data-status={draft.status}
+                          onClick={() => setStatusMenuOpen((value) => !value)}
+                          aria-haspopup="menu"
+                          aria-expanded={statusMenuOpen}
+                        >
+                          <span className={statusDotClass} />
+                          <span>{STATUS_LABELS[draft.status]}</span>
+                          <ChevronDown className="trackingStatusCaret" strokeWidth={2.25} />
+                        </button>
+                        {statusMenuOpen && (
+                          <div className="trackingStatusMenu" role="menu" aria-label="Reading status">
+                            {[
+                              ['done', 'Finished'],
+                              ['reading', 'Reading'],
+                              ['not_started', 'Not started'],
+                            ].map(([value, label]) => (
+                              <button
+                                key={value}
+                                type="button"
+                                className={draft.status === value ? 'trackingStatusMenuItem active' : 'trackingStatusMenuItem'}
+                                role="menuitemradio"
+                                aria-checked={draft.status === value}
+                                onClick={() => {
+                                  updateField('status', value)
+                                  setStatusMenuOpen(false)
+                                }}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
+
+                  <label className="trackingProp">
+                    <span className="trackingPropLabel">
+                      <Hash aria-hidden="true" />
+                      <span>Total Pages</span>
+                    </span>
+                    <span className="trackingPropValue">
+                      <input
+                        type="number"
+                        min="0"
+                        className="trackingPageInput"
+                        placeholder="Empty"
+                        value={draft.total_pages}
+                        onChange={(event) => updateField('total_pages', event.target.value)}
+                      />
+                    </span>
+                  </label>
+
+                  <label className="trackingProp">
+                    <span className="trackingPropLabel">
+                      <Hash aria-hidden="true" />
+                      <span>Current Page</span>
+                    </span>
+                    <span className="trackingPropValue">
+                      <input
+                        type="number"
+                        min="0"
+                        className="trackingPageInput"
+                        placeholder="Empty"
+                        value={draft.current_page}
+                        onChange={(event) => updateField('current_page', event.target.value)}
+                      />
+                    </span>
+                  </label>
+
+                  <div className="trackingProp">
+                    <span className="trackingPropLabel">
+                      <Sigma aria-hidden="true" />
+                      <span>Progress</span>
+                    </span>
+                    <span className="trackingPropValue static">
+                      <span className="trackingProgressPct">{progressPct}%</span>
+                      <span
+                        className="trackingProgressTrack"
+                        role="progressbar"
+                        aria-valuenow={progressPct}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                      >
+                        <span className="trackingProgressFill" style={{ width: `${progressPct}%` }} />
+                      </span>
+                    </span>
+                  </div>
+
+                  <label className="trackingProp">
+                    <span className="trackingPropLabel">
+                      <Calendar aria-hidden="true" />
+                      <span>Started</span>
+                    </span>
+                    <span className="trackingPropValue">
+                      <input
+                        type="date"
+                        className="trackingDateInput"
+                        value={draft.start_date}
+                        onChange={(event) => updateField('start_date', event.target.value)}
+                      />
+                      <span
+                        className={formatPropDate(draft.start_date) ? 'trackingDateDisplay' : 'trackingDateDisplay empty'}
+                        aria-hidden="true"
+                      >
+                        {formatPropDate(draft.start_date) || 'Empty'}
+                      </span>
+                    </span>
+                  </label>
+
+                  <label className="trackingProp">
+                    <span className="trackingPropLabel">
+                      <CalendarCheck aria-hidden="true" />
+                      <span>Completed</span>
+                    </span>
+                    <span className="trackingPropValue">
+                      <input
+                        type="date"
+                        className="trackingDateInput"
+                        value={draft.finish_date}
+                        onChange={(event) => updateField('finish_date', event.target.value)}
+                      />
+                      <span
+                        className={formatPropDate(draft.finish_date) ? 'trackingDateDisplay' : 'trackingDateDisplay empty'}
+                        aria-hidden="true"
+                      >
+                        {formatPropDate(draft.finish_date) || 'Empty'}
+                      </span>
+                    </span>
+                  </label>
+
+                  <label className="trackingProp notes">
+                    <span className="trackingPropLabel">
+                      <TextAlignStart aria-hidden="true" />
+                      <span>Notes</span>
+                    </span>
+                    <span className="trackingPropValue">
+                      <textarea
+                        rows={6}
+                        value={draft.notes}
+                        onChange={(event) => updateField('notes', event.target.value)}
+                        placeholder="Empty"
+                      />
+                    </span>
+                  </label>
                 </div>
 
                 {canSyncObsidian && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div className="trackingVaultRow">
                     <button
                       type="button"
                       className="dialogIconButton"
@@ -577,61 +718,6 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
                     {obsidianMessage && <span className="dialogActionMessage">{obsidianMessage}</span>}
                   </div>
                 )}
-
-                <div className="trackingPanel">
-                  <div className="trackingFieldRow">
-                    <label className="trackingField">
-                      <span>Progress</span>
-                      <div className="trackingFieldValue">
-                        <input
-                          type="number"
-                          min="0"
-                          className="trackingPageInput"
-                          value={draft.current_page}
-                          onChange={(event) => updateField('current_page', event.target.value)}
-                        />
-                        <span className="trackingFieldSep">/</span>
-                        <input
-                          type="number"
-                          min="0"
-                          className="trackingPageInput"
-                          value={draft.total_pages}
-                          onChange={(event) => updateField('total_pages', event.target.value)}
-                        />
-                        <span className="trackingFieldUnit">pages</span>
-                      </div>
-                    </label>
-                  </div>
-
-                  <div className="trackingFieldRow twoCol">
-                    <label className="trackingField">
-                      <span>Start</span>
-                      <input
-                        type="date"
-                        value={draft.start_date}
-                        onChange={(event) => updateField('start_date', event.target.value)}
-                      />
-                    </label>
-                    <label className="trackingField">
-                      <span>End</span>
-                      <input
-                        type="date"
-                        value={draft.finish_date}
-                        onChange={(event) => updateField('finish_date', event.target.value)}
-                      />
-                    </label>
-                  </div>
-
-                  <label className="trackingNotes">
-                    <span>Notes</span>
-                    <textarea
-                      rows={7}
-                      value={draft.notes}
-                      onChange={(event) => updateField('notes', event.target.value)}
-                      placeholder="Add a few thoughts, a memorable passage, or why this one mattered."
-                    />
-                  </label>
-                </div>
               </>
             )}
             </div>
