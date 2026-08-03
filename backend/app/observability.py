@@ -103,16 +103,6 @@ class MetricsRegistry:
         with self._lock:
             self._counters[key] = self._counters.get(key, 0) + amount
 
-    def snapshot(self) -> list[dict]:
-        """Every counter as a flat list. Useful from a REPL, and the shape a
-        /metrics handler would iterate over."""
-        with self._lock:
-            items = list(self._counters.items())
-        return [
-            {"name": name, "labels": dict(labels), "value": value}
-            for (name, labels), value in items
-        ]
-
 
 metrics = MetricsRegistry()
 
