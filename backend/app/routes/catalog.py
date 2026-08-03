@@ -8,7 +8,6 @@ from ..services.catalog import (
     get_books_by_author,
     get_books_by_genre,
     get_global_library,
-    resolve_book,
     search_books,
 )
 

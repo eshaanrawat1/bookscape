@@ -88,11 +88,6 @@ TERMINAL_OUTCOMES = frozenset({
     Outcome.EMPTY_IMAGE,
 })
 
-TRANSIENT_OUTCOMES = frozenset({
-    Outcome.RATE_LIMITED,
-    Outcome.NETWORK_ERROR,
-})
-
 
 class RateLimiter:
     """Spaces outbound cover fetches by 8–14s.
