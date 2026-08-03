@@ -2376,7 +2376,7 @@ svg {
 }
 
 .statsMetric,
-.statsFeature {
+.statsFocusCard {
   border: 1px solid var(--border);
   border-radius: 1.6rem;
   background: color-mix(in oklch, var(--card) 92%, white);
@@ -2412,21 +2412,16 @@ svg {
   font-size: 1.05rem;
 }
 
-.statsFeatured {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.4rem;
-  align-items: stretch;
-}
+/* In focus carousel --------------------------------------------------------- */
 
-.statsFeature {
+.statsFocus {
   display: flex;
   flex-direction: column;
-  gap: 0.95rem;
-  padding: 1.2rem;
+  gap: 1.1rem;
+  min-width: 0;
 }
 
-.statsFeatureHeader,
+.statsFocusHeader,
 .shelfHeader {
   display: flex;
   align-items: end;
@@ -2434,7 +2429,7 @@ svg {
   gap: 1rem;
 }
 
-.statsFeatureHeader h2 {
+.statsFocusHeader h2 {
   margin: 0;
   font-family: var(--font-serif);
   font-size: 1.8rem;
@@ -2443,11 +2438,145 @@ svg {
   line-height: 1.05;
 }
 
-.statsFeatureHeader p {
+.statsFocusControls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.statsFocusControls .carouselButton {
+  width: 2.4rem;
+  height: 2.4rem;
+}
+
+.statsFocusControls .carouselButton:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.statsFocusScroll {
+  /* Cards are sized off the visible row rather than a fixed width so exactly
+     this many sit across it, with the rest scrolling. Stepped down at the
+     narrow breakpoints below. */
+  --focus-cards: 3;
+  display: flex;
+  gap: 1.4rem;
+  overflow-x: auto;
+  /* The cards carry a shadow and a focus ring, so the padding is what keeps
+     both from being clipped by the scroll container's own bounds. */
+  padding: 0.3rem 0.2rem 1.1rem;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.statsFocusScroll:focus-visible {
+  outline: 2px solid var(--ring, var(--border));
+  outline-offset: 4px;
+  border-radius: 1.6rem;
+}
+
+.statsFocusCard {
+  flex: 0 0 calc((100% - (var(--focus-cards) - 1) * 1.4rem) / var(--focus-cards));
+  /* Covers are 2:3, so an uncapped card on a single-up phone layout would be
+     taller than the viewport. */
+  max-width: 26rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 0.9rem;
+  scroll-snap-align: start;
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+.statsFocusCard:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklch, var(--foreground) 22%, transparent);
+}
+
+.statsFocusCover {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.statsFocusBody {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.statsFocusLabel {
   margin: 0;
   color: var(--muted-foreground);
-  font-size: 1.02rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.statsFocusValue {
+  display: block;
+  margin-top: 0.4rem;
+  font-family: var(--font-serif);
+  font-size: 2.4rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--foreground);
+}
+
+.statsFocusUnit {
+  margin: 0.3rem 0 0;
+  color: var(--muted-foreground);
+  font-size: 0.98rem;
+  line-height: 1.3;
+}
+
+.statsFocusTitle,
+.statsFocusAuthor {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.statsFocusTitle {
+  margin-top: 0.7rem;
+  color: var(--foreground);
+  font-size: 1.02rem;
+  font-weight: 500;
+}
+
+.statsFocusAuthor {
+  margin-top: 0.15rem;
+  color: var(--muted-foreground);
+  font-size: 0.95rem;
+}
+
+.statsFocusTitle:hover,
+.statsFocusAuthor:not(:disabled):hover {
+  text-decoration: underline;
+}
+
+.statsFocusAuthor:disabled {
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .statsFocusCard {
+    transition: none;
+  }
+
+  .statsFocusCard:hover {
+    transform: none;
+  }
 }
 
 /* Reading heatmap ------------------------------------------------------------ */
@@ -3008,8 +3137,7 @@ svg {
     min-width: 0;
   }
 
-  .statsSummary,
-  .statsFeatured {
+  .statsSummary {
     grid-template-columns: 1fr;
   }
 }
@@ -3057,9 +3185,15 @@ svg {
     flex-basis: 100%;
   }
 
-  .statsFeatureHeader {
+  .statsFocusHeader {
     align-items: start;
     flex-direction: column;
+  }
+
+  /* A fractional count leaves the next card peeking, so the row still reads as
+     scrollable once the arrows drop below the heading here. */
+  .statsFocusScroll {
+    --focus-cards: 1.25;
   }
 
   .statsHeroCopy h2 {

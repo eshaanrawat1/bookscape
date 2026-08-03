@@ -10,6 +10,107 @@ from ..services.catalog import resolve_book as load_book
 from ..utils import parse_iso_date, parse_iso_date_string
 
 
+def _pages(book: dict) -> int:
+    return int(book.get("totalPages") or 0)
+
+
+# The carousel's cards, in priority order. `rank` sorts candidates best-first and
+# `eligible` drops books the card cannot honestly describe (a book with no page
+# count is not the shortest one, it is unmeasured). `value`/`unit` are split so
+# the card can typeset the number large and the unit small.
+#
+# Order is load-bearing: picking is de-duplicated, so an earlier card claims its
+# winner outright and a later one falls through to its next-best book. Densest
+# and longest lead because they are the two the page has always shown.
+def _featured_specs(days_spent) -> list[dict]:
+    def pace(book: dict) -> float:
+        days = days_spent(book)
+        return _pages(book) / days if days else 0.0
+
+    return [
+        {
+            "key": "densest",
+            "label": "Densest book",
+            "unit": "pages",
+            "eligible": lambda b: _pages(b) > 0,
+            "rank": _pages,
+            "value": lambda b: _pages(b),
+        },
+        {
+            "key": "longest",
+            "label": "Most time spent",
+            "unit": "days from first page to last",
+            "eligible": lambda b: days_spent(b) > 0,
+            "rank": days_spent,
+            "value": days_spent,
+        },
+        {
+            "key": "fastest",
+            "label": "Fastest read",
+            "unit": "days",
+            "eligible": lambda b: days_spent(b) > 0,
+            "rank": lambda b: -days_spent(b),
+            "value": days_spent,
+        },
+        {
+            "key": "pace",
+            "label": "Best pace",
+            "unit": "pages a day",
+            "eligible": lambda b: pace(b) > 0,
+            "rank": pace,
+            "value": lambda b: round(pace(b)),
+        },
+        # Goodreads' numbers, not the reader's own — the labels say "crowd" and
+        # "deepest cut" rather than "highest rated" so the page never implies
+        # these are personal ratings.
+        {
+            "key": "acclaimed",
+            "label": "Crowd favourite",
+            "unit": "average rating",
+            "eligible": lambda b: float(b.get("rating") or 0) > 0,
+            "rank": lambda b: float(b.get("rating") or 0),
+            "value": lambda b: round(float(b.get("rating") or 0), 2),
+        },
+        {
+            "key": "obscure",
+            "label": "Deepest cut",
+            "unit": "ratings on Goodreads",
+            "eligible": lambda b: int(b.get("ratingCount") or 0) > 0,
+            "rank": lambda b: -int(b.get("ratingCount") or 0),
+            "value": lambda b: int(b.get("ratingCount") or 0),
+        },
+    ]
+
+
+def _featured_books(books_list: list[dict], days_spent) -> list[dict]:
+    """Pick one book per superlative, never repeating a book across cards.
+
+    Filtering to a single month can leave two or three books, at which point one
+    of them legitimately wins nearly every category. Showing the same cover six
+    times reads as a bug, so each card takes the best book not already claimed
+    and is dropped entirely once no eligible book is left.
+    """
+    claimed: set[str] = set()
+    cards: list[dict] = []
+    for spec in _featured_specs(days_spent):
+        pool = [
+            b for b in books_list
+            if str(b.get("id")) not in claimed and spec["eligible"](b)
+        ]
+        if not pool:
+            continue
+        winner = max(pool, key=spec["rank"])
+        claimed.add(str(winner.get("id")))
+        cards.append({
+            "key": spec["key"],
+            "label": spec["label"],
+            "value": spec["value"](winner),
+            "unit": spec["unit"],
+            "book": winner,
+        })
+    return cards
+
+
 def create_router(root: Path, repo: DataRepository) -> APIRouter:
     router = APIRouter()
 
@@ -81,6 +182,8 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
         densest = max(books_list, key=lambda b: int(b.get("totalPages") or 0), default=None)
         longest = max(books_list, key=_days_spent, default=None)
 
+        featured = _featured_books(books_list, _days_spent)
+
         if year is not None and month is not None:
             period_label = date(year, month, 1).strftime("%B %Y")
         elif year is not None:
@@ -102,6 +205,7 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
             "densest_book": densest,
             "most_time_spent": longest,
             "most_time_spent_days": _days_spent(longest) if longest else 0,
+            "featured": featured,
         }
 
     @router.get("/stats/heatmap")

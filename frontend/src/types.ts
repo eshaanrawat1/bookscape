@@ -77,6 +77,17 @@ export interface GenreSection {
   books: Book[]
 }
 
+// One carousel card: a superlative, the number that earned it, and the book that
+// won. The backend picks these and never repeats a book across cards, so the
+// list is already display-ready and can be shorter than the six specs.
+export interface FeaturedStat {
+  key: string
+  label: string
+  value: number
+  unit: string
+  book: Book
+}
+
 export interface StatsSummary {
   available_years: number[]
   books_read: number
@@ -86,6 +97,7 @@ export interface StatsSummary {
   densest_book: Book | null
   most_time_spent: Book | null
   most_time_spent_days: number
+  featured: FeaturedStat[]
 }
 
 export interface HeatmapDay {

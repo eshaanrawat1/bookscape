@@ -1,7 +1,7 @@
 import { type CSSProperties } from 'react'
 import AccordionFilter from '../components/AccordionFilter.jsx'
-import BookCard from '../components/BookCard.jsx'
 import ReadingHeatmap from '../components/ReadingHeatmap.jsx'
+import StatsCarousel from '../components/StatsCarousel.jsx'
 import { monthOptions } from '../constants.js'
 import { buildHeroGlow } from '../color.js'
 import { formatCompactNumber } from '../utils.js'
@@ -78,26 +78,7 @@ function StatsView() {
 
           {heatmap && <ReadingHeatmap data={heatmap} year={heatmapYear} />}
 
-          <section className="statsFeatured">
-            {summary.densest_book && (
-              <div className="statsFeature">
-                <div className="statsFeatureHeader">
-                  <h2>Densest book</h2>
-                  <p>{formatCompactNumber(summary.densest_book.totalPages)} pages</p>
-                </div>
-                <BookCard book={summary.densest_book} />
-              </div>
-            )}
-            {summary.most_time_spent && (
-              <div className="statsFeature">
-                <div className="statsFeatureHeader">
-                  <h2>Most time spent</h2>
-                  <p>{summary.most_time_spent_days ? `${summary.most_time_spent_days} days` : 'No date range'}</p>
-                </div>
-                <BookCard book={summary.most_time_spent} />
-              </div>
-            )}
-          </section>
+          <StatsCarousel featured={summary.featured || []} />
         </>
       ) : (
         <div className="emptyState statsEmptyState">
