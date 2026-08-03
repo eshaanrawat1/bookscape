@@ -26,6 +26,20 @@ def window(end: date, days: int = DEFAULT_DAYS) -> tuple[date, date]:
     return start - timedelta(days=(start.weekday() + 1) % 7), end
 
 
+def year_window(year: int) -> tuple[date, date]:
+    """A full calendar year, padded out to whole Sunday–Saturday weeks.
+
+    The grid's columns are weeks, so a year starting mid-week needs its leading
+    and trailing partial weeks included: without the padding the first and last
+    columns come up short and every row below shifts out of its weekday.
+    """
+    first, last = date(year, 1, 1), date(year, 12, 31)
+    return (
+        first - timedelta(days=(first.weekday() + 1) % 7),
+        last + timedelta(days=(5 - last.weekday()) % 7),
+    )
+
+
 def thresholds(days: list[dict], levels: int = LEVELS) -> list[int]:
     """Quantile cut points over the days that had reading.
 

@@ -1,9 +1,11 @@
 import { type CSSProperties } from 'react'
 import AccordionFilter from '../components/AccordionFilter.jsx'
 import BookCard from '../components/BookCard.jsx'
+import ReadingHeatmap from '../components/ReadingHeatmap.jsx'
 import { monthOptions } from '../constants.js'
 import { buildHeroGlow } from '../color.js'
 import { formatCompactNumber } from '../utils.js'
+import useHeatmap from '../hooks/useHeatmap.js'
 import useStats from '../hooks/useStats.js'
 
 function StatsView() {
@@ -11,6 +13,12 @@ function StatsView() {
   const years = summary?.available_years || []
   const hasBooks = (summary?.books_read || 0) > 0
   const heroColor = summary?.most_time_spent?.color || summary?.densest_book?.color || 'oklch(0.62 0.14 55)'
+
+  // The grid is a calendar year, so "All years" has to resolve to one: the most
+  // recent year with finished books, falling back to the current one. The month
+  // filter is deliberately ignored — a single month is not a heatmap.
+  const heatmapYear = Number(year) || years[0] || new Date().getFullYear()
+  const { heatmap } = useHeatmap(hasBooks ? heatmapYear : null)
 
   return (
     <div className="stack statsPage">
@@ -67,6 +75,8 @@ function StatsView() {
               {summary.genre_list?.length > 0 ? <span>{summary.genre_list.slice(0, 4).join(' · ')}</span> : null}
             </div>
           </section>
+
+          {heatmap && <ReadingHeatmap data={heatmap} year={heatmapYear} />}
 
           <section className="statsFeatured">
             {summary.densest_book && (

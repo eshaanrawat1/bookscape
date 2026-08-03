@@ -88,6 +88,29 @@ export interface StatsSummary {
   most_time_spent_days: number
 }
 
+export interface HeatmapDay {
+  date: string
+  pages: number
+  books: number
+  book_ids: string[]
+  level: number
+}
+
+// Only days with reading are listed — the grid's empty cells are filled in from
+// start/end, so a year does not ship ~370 mostly-zero objects.
+export interface ReadingHeatmap {
+  start: string
+  end: string
+  year: number | null
+  days: HeatmapDay[]
+  thresholds: number[]
+  levels: number
+  total_pages: number
+  days_read: number
+  best_day: HeatmapDay | null
+  streak: { current: number; longest: number }
+}
+
 export interface SyncPullResult {
   ok: boolean
   dry_run: boolean

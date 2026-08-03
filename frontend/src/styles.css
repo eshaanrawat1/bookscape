@@ -28,6 +28,18 @@
   --status-reading: oklch(0.72 0.16 72);
   --status-not-started: oklch(0.69 0.05 85);
   --status-finished: #7dbf85;
+  /* Reading-heatmap ramp: one hue, light -> dark, on the app's warm primary.
+     --heat-0 is "no reading" and sits outside the ramp as a neutral, so an
+     empty day never reads as a light one. Steps were solved for, not picked:
+     lightness is strictly decreasing (0.892 > 0.794 > 0.644 > 0.429) and every
+     adjacent pair clears 8 dE in OKLab under normal, protanopic and
+     deuteranopic vision — the empty -> lowest boundary is the tight one at 8.0,
+     so nudge these together or not at all. */
+  --heat-0: #dfdeda;
+  --heat-1: #fbd59b;
+  --heat-2: #ddb571;
+  --heat-3: #b78137;
+  --heat-4: #6b4719;
   --shadow-tint: 60, 40, 20;
   --shadow-warm: 0 14px 30px -12px rgba(var(--shadow-tint), 0.55);
   --shadow-panel: 0 18px 40px -20px rgba(var(--shadow-tint), 0.5);
@@ -2436,6 +2448,148 @@ svg {
   color: var(--muted-foreground);
   font-size: 1.02rem;
   white-space: nowrap;
+}
+
+/* Reading heatmap ------------------------------------------------------------ */
+
+.statsHeatmap {
+  /* 53 weeks at 1rem + 0.22rem gap is ~710px, which clears the 787px content
+     column — so the grid fills the card without scrolling at full width, and
+     .heatmapScroll catches the narrow breakpoints. */
+  --heatmap-cell: 1rem;
+  --heatmap-gap: 0.22rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding: 1.3rem 1.4rem 1.15rem;
+  border: 1px solid var(--border);
+  border-radius: 1.6rem;
+  background: color-mix(in oklch, var(--card) 92%, white);
+}
+
+.heatmapHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+}
+
+.heatmapHeader h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.8rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.heatmapHeader p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 1.02rem;
+  white-space: nowrap;
+}
+
+/* The grid is the one thing here allowed to scroll: a year of weeks has a floor
+   width, and squeezing the cells to fit would break the square marks. */
+.heatmapScroll {
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+}
+
+.heatmapGrid {
+  display: grid;
+  grid-template-columns: auto min-content;
+  grid-template-rows: auto auto;
+  column-gap: 0.55rem;
+  row-gap: 0.45rem;
+}
+
+.heatmapMonths,
+.heatmapWeekdays,
+.heatmapCells {
+  gap: var(--heatmap-gap);
+}
+
+.heatmapMonths {
+  grid-area: 1 / 2;
+  display: grid;
+  grid-template-columns: repeat(var(--heatmap-weeks), var(--heatmap-cell));
+}
+
+.heatmapMonths span {
+  grid-row: 1;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.heatmapWeekdays {
+  grid-area: 2 / 1;
+  display: grid;
+  grid-template-rows: repeat(7, var(--heatmap-cell));
+  align-items: center;
+  justify-items: end;
+  color: var(--muted-foreground);
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+/* Column-flow over seven fixed rows is what makes a week a column. The backend
+   aligns start to a Sunday, so cell 0 lands on the Sunday row and the weekday
+   gutter stays true for the whole year. */
+.heatmapCells {
+  grid-area: 2 / 2;
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, var(--heatmap-cell));
+  grid-auto-columns: var(--heatmap-cell);
+}
+
+.heatmapCell {
+  border-radius: 0.3rem;
+  background: var(--heat-0);
+}
+
+.heatmapCell[data-level='1'] { background: var(--heat-1); }
+.heatmapCell[data-level='2'] { background: var(--heat-2); }
+.heatmapCell[data-level='3'] { background: var(--heat-3); }
+.heatmapCell[data-level='4'] { background: var(--heat-4); }
+
+/* Padding days from the neighbouring years hold their column without drawing a
+   cell, so the first and last weeks stay full-height without lying about dates. */
+.heatmapPad {
+  background: none;
+}
+
+.heatmapCells .heatmapCell:hover {
+  outline: 1.5px solid color-mix(in oklch, var(--foreground) 55%, transparent);
+  outline-offset: 1px;
+}
+
+.heatmapLegend {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--muted-foreground);
+  font-size: 1rem;
+}
+
+.heatmapLegendScale {
+  display: flex;
+  gap: var(--heatmap-gap);
+}
+
+.heatmapLegendScale .heatmapCell {
+  width: var(--heatmap-cell);
+  height: var(--heatmap-cell);
 }
 
 .statsEmptyState {

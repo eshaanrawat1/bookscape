@@ -106,19 +106,27 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
 
     @router.get("/stats/heatmap")
     def get_heatmap(
+        year: int | None = Query(default=None, ge=1900, le=3000),
         end: str = Query(default="", description="Last day of the window, YYYY-MM-DD"),
         days: int = Query(default=heatmap.DEFAULT_DAYS, ge=7, le=1100),
     ) -> dict:
         """Per-day page totals for the calendar heatmap.
 
+        `year` gives a Jan–Dec grid and is what the stats page uses, so the
+        heatmap follows the same year filter as the summary above it. Without
+        it the window is the `days` ending at `end` — a trailing year by
+        default, which is the more natural shape for a sidebar or a widget.
+
         `end` defaults to the machine's local today, matching how progress is
-        credited on write — the API is a local process, so its date is the
-        user's. It stays overridable so the UI can page back through years.
+        credited on write: the API is a local process, so its date is the user's.
         """
         today = date.today()
-        last = parse_iso_date(parse_iso_date_string(end)) or today
-        start, last = heatmap.window(last, days)
+        if year is not None:
+            start, last = heatmap.year_window(year)
+        else:
+            last = parse_iso_date(parse_iso_date_string(end)) or today
+            start, last = heatmap.window(last, days)
         rows = repo.reading_days(start.isoformat(), last.isoformat())
-        return heatmap.build(rows, start=start, end=last, today=today)
+        return {**heatmap.build(rows, start=start, end=last, today=today), "year": year}
 
     return router
