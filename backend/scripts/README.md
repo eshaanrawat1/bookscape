@@ -1,20 +1,21 @@
 # Scripts
 
-Command-line tooling for building out the catalog. Both are run by hand, with
+Command-line tooling for building out the catalog. All are run by hand, with
 two exceptions noted below: the app shells out to `scraper.py --fetch-one`, and
 `gradient.py` is now a front end for a service the app also runs on its own.
 
-Both resolve their paths relative to `backend/data/`, so they can be run from
-any directory, and both write straight into `bookscape.db` through the same
-`upsert_book()` the API uses. There is no intermediate file: the database is
-the single source of truth.
+All resolve their paths relative to `backend/data/`, so they can be run from
+any directory, and all write straight into `bookscape.db` through the same
+`upsert_book()` / repository the API uses. There is no intermediate file: the
+database is the single source of truth.
 
 ```
-python backend/scripts/scraper.py  --seed <url>
-python backend/scripts/gradient.py --limit 25
+python backend/scripts/scraper.py               --seed <url>
+python backend/scripts/gradient.py              --limit 25
+python backend/scripts/backfill_reading_days.py --apply
 ```
 
-Requires `playwright install chromium` once.
+`scraper.py` requires `playwright install chromium` once.
 
 ---
 
@@ -144,3 +145,39 @@ kept in-process by
 [`app/observability.py`](../app/observability.py), ready to be exposed at
 `/metrics` when that is wanted. Once a cause is fixed, `--retry-failed` puts
 the affected books back in the queue.
+
+---
+
+## backfill_reading_days.py
+
+Seeds `reading_days` — the table behind the stats heatmap — from books already
+marked finished.
+
+Reading is recorded forward from the moment of the edit: every write that moves
+a book's `current_page` also writes a row for that local calendar day, so the
+delta is captured where it is actually known rather than reconstructed later.
+That is the right mechanism and it has one obvious gap — on an existing library
+it knows nothing about the past, so the calendar renders empty for months and
+looks broken rather than new.
+
+For finished books we do have `start_date`, `finish_date` and `total_pages`, so
+this spreads each book's pages evenly across the days it was open. That is
+invented detail, and it is labelled as such: every row is written with
+`source = 'backfill'`, so it can be styled differently in the UI, audited, or
+removed wholesale.
+
+```sql
+DELETE FROM reading_days WHERE source = 'backfill';
+```
+
+| Flag | What it does |
+|---|---|
+| *(none)* | Dry run — prints the plan and writes nothing |
+| `--apply` | Commit the rows |
+| `--force` | Also backfill books that already have day history |
+
+Books that already have rows are skipped, so a guess never overwrites a real
+recorded day and re-running is a no-op. Books without a finish date or a page
+count are skipped and counted in the summary — there is no day to attribute
+their pages to, and inventing one would be a lie the heatmap can't distinguish
+from data.

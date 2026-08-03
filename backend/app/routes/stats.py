@@ -5,8 +5,9 @@ from fastapi import APIRouter, Query
 from pathlib import Path
 
 from ..repository import DataRepository
+from ..services import heatmap
 from ..services.catalog import resolve_book as load_book
-from ..utils import parse_iso_date
+from ..utils import parse_iso_date, parse_iso_date_string
 
 
 def create_router(root: Path, repo: DataRepository) -> APIRouter:
@@ -102,5 +103,22 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
             "most_time_spent": longest,
             "most_time_spent_days": _days_spent(longest) if longest else 0,
         }
+
+    @router.get("/stats/heatmap")
+    def get_heatmap(
+        end: str = Query(default="", description="Last day of the window, YYYY-MM-DD"),
+        days: int = Query(default=heatmap.DEFAULT_DAYS, ge=7, le=1100),
+    ) -> dict:
+        """Per-day page totals for the calendar heatmap.
+
+        `end` defaults to the machine's local today, matching how progress is
+        credited on write — the API is a local process, so its date is the
+        user's. It stays overridable so the UI can page back through years.
+        """
+        today = date.today()
+        last = parse_iso_date(parse_iso_date_string(end)) or today
+        start, last = heatmap.window(last, days)
+        rows = repo.reading_days(start.isoformat(), last.isoformat())
+        return heatmap.build(rows, start=start, end=last, today=today)
 
     return router

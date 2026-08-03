@@ -57,6 +57,34 @@ CREATE TABLE IF NOT EXISTS user_book_state (
 );
 CREATE INDEX IF NOT EXISTS idx_ubs_status ON user_book_state(status);
 
+-- One row per (book, local calendar day) on which that book's page count moved.
+-- user_book_state only ever holds the latest page, so it cannot answer "when";
+-- this is the history, written at the moment of the edit because that is the
+-- only point at which the delta is actually known.
+--
+-- `pages` is the day's *net* movement, which is what the (uid, day) primary key
+-- buys: a page typed wrong and corrected the same day cancels out instead of
+-- counting twice, and `last_page` still holds the page the book ended the day
+-- on, so a row stays auditable against user_book_state after the fact.
+--
+-- Negative nets are stored as written rather than clamped, because restarting a
+-- book is a real -300 and discarding it would make that day indistinguishable
+-- from one never recorded. Reads filter to pages > 0 instead.
+--
+-- `source` is last-write-wins for a day that saw more than one kind of write,
+-- which is the useful reading of it: a day that both progressed and finished a
+-- book is a finish.
+CREATE TABLE IF NOT EXISTS reading_days (
+  uid       TEXT NOT NULL REFERENCES books(uid) ON DELETE CASCADE,
+  day       TEXT NOT NULL,
+  pages     INTEGER NOT NULL DEFAULT 0,
+  last_page INTEGER NOT NULL DEFAULT 0,
+  source    TEXT NOT NULL DEFAULT 'progress'
+               CHECK (source IN ('progress','finish','backfill')),
+  PRIMARY KEY (uid, day)
+);
+CREATE INDEX IF NOT EXISTS idx_reading_days_day ON reading_days(day);
+
 CREATE TABLE IF NOT EXISTS collections (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   name       TEXT NOT NULL UNIQUE COLLATE NOCASE,
