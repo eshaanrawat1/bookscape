@@ -2587,6 +2587,8 @@ svg {
      .heatmapScroll catches the narrow breakpoints. */
   --heatmap-cell: 1rem;
   --heatmap-gap: 0.22rem;
+  /* Containing block for .heatmapTooltip. */
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
@@ -2701,6 +2703,36 @@ svg {
 .heatmapCells .heatmapCell:hover {
   outline: 1.5px solid color-mix(in oklch, var(--foreground) 55%, transparent);
   outline-offset: 1px;
+}
+
+/* Sits above the hovered cell, centred on it. pointer-events: none keeps it from
+   stealing the mouseover that positioned it, which would flicker it away. */
+.heatmapTooltip {
+  position: absolute;
+  z-index: 4;
+  transform: translate(-50%, calc(-100% - 0.45rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.4rem 0.65rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: var(--card);
+  box-shadow: var(--shadow-warm);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.heatmapTooltip strong {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.heatmapTooltip span {
+  color: var(--muted-foreground);
+  font-size: 0.86rem;
+  line-height: 1.2;
 }
 
 .heatmapLegend {

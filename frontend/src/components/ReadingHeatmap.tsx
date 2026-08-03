@@ -1,4 +1,4 @@
-import { type CSSProperties, useMemo } from 'react'
+import { type CSSProperties, type MouseEvent, useCallback, useMemo, useRef, useState } from 'react'
 import { formatCompactNumber } from '../utils.js'
 import type { ReadingHeatmap as ReadingHeatmapData } from '../types.js'
 
@@ -60,13 +60,54 @@ function formatDate(iso: string): string {
   return `${MONTH_LABELS[m - 1]} ${d}, ${y}`
 }
 
+/** Half the widest tooltip, used to keep it off the card's edges. */
+const TOOLTIP_INSET = 70
+
+interface Hover {
+  cell: Cell
+  /** Anchor point, in pixels from the card's top-left corner. */
+  x: number
+  y: number
+}
+
 function ReadingHeatmap({ data, year }: { data: ReadingHeatmapData; year: number }) {
   const cells = useMemo(() => buildCells(data, year), [data, year])
   const months = useMemo(() => monthColumns(cells), [cells])
+  const byDate = useMemo(() => new Map(cells.map((cell) => [cell.key, cell])), [cells])
   const weeks = Math.ceil(cells.length / 7)
 
+  const cardRef = useRef<HTMLElement>(null)
+  const [hover, setHover] = useState<Hover | null>(null)
+
+  // One delegated handler rather than a pair per cell: a year is ~365 cells, and
+  // mouseover already fires once per cell as the pointer crosses into it.
+  const handleCellOver = useCallback((event: MouseEvent<HTMLDivElement>) => {
+    const target = (event.target as HTMLElement).closest<HTMLElement>('.heatmapCell')
+    const card = cardRef.current
+    const cell = target?.dataset.date ? byDate.get(target.dataset.date) : undefined
+    if (!target || !card || !cell) {
+      setHover(null)
+      return
+    }
+
+    const cellBox = target.getBoundingClientRect()
+    const cardBox = card.getBoundingClientRect()
+    setHover({
+      cell,
+      // Clamped so a January or December cell does not push the tooltip off the
+      // card; the arrow follows the cell, so a small offset reads fine.
+      x: Math.min(
+        Math.max(cellBox.left - cardBox.left + cellBox.width / 2, TOOLTIP_INSET),
+        Math.max(cardBox.width - TOOLTIP_INSET, TOOLTIP_INSET),
+      ),
+      y: cellBox.top - cardBox.top,
+    })
+  }, [byDate])
+
+  const clearHover = useCallback(() => setHover(null), [])
+
   return (
-    <section className="statsHeatmap">
+    <section className="statsHeatmap" ref={cardRef}>
       <header className="heatmapHeader">
         <h2>Reading days</h2>
         <p>
@@ -95,7 +136,13 @@ function ReadingHeatmap({ data, year }: { data: ReadingHeatmapData; year: number
           {/* A grid of cells is a table of one measure by date, so it is exposed
               as one — the tooltips are pointer-only and would otherwise be the
               sole way to read a value. */}
-          <div className="heatmapCells" role="img" aria-label={heatmapSummary(data, year)}>
+          <div
+            className="heatmapCells"
+            role="img"
+            aria-label={heatmapSummary(data, year)}
+            onMouseOver={handleCellOver}
+            onMouseLeave={clearHover}
+          >
             {cells.map((cell) => (
               cell.date === null
                 ? <span key={cell.key} className="heatmapPad" />
@@ -104,13 +151,29 @@ function ReadingHeatmap({ data, year }: { data: ReadingHeatmapData; year: number
                     key={cell.key}
                     className="heatmapCell"
                     data-level={cell.level}
-                    title={cellTitle(cell)}
+                    data-date={cell.date}
                   />
                 )
             ))}
           </div>
         </div>
       </div>
+
+      {/* Anchored to the card, not the scroller: .heatmapScroll clips on the
+          x-axis, which would cut the tooltip off above the top row. */}
+      {hover && (
+        <div
+          className="heatmapTooltip"
+          style={{ left: `${hover.x}px`, top: `${hover.y}px` }}
+          aria-hidden="true"
+        >
+          <strong>{formatPages(hover.cell.pages)}</strong>
+          <span>
+            {formatDate(hover.cell.date as string)}
+            {hover.cell.books > 0 && ` · ${hover.cell.books === 1 ? '1 book' : `${hover.cell.books} books`}`}
+          </span>
+        </div>
+      )}
 
       <footer className="heatmapLegend">
         <span>Fewer pages</span>
@@ -125,10 +188,9 @@ function ReadingHeatmap({ data, year }: { data: ReadingHeatmapData; year: number
   )
 }
 
-function cellTitle(cell: Cell): string {
-  if (cell.pages <= 0) return `${formatDate(cell.date as string)} — no pages`
-  const books = cell.books === 1 ? '1 book' : `${cell.books} books`
-  return `${formatCompactNumber(cell.pages)} pages · ${books} — ${formatDate(cell.date as string)}`
+function formatPages(pages: number): string {
+  if (pages <= 0) return 'No pages'
+  return pages === 1 ? '1 page' : `${formatCompactNumber(pages)} pages`
 }
 
 function heatmapSummary(data: ReadingHeatmapData, year: number): string {
