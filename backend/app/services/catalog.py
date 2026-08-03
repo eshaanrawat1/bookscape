@@ -25,6 +25,11 @@ BOOK_COLUMNS = {
 }
 
 
+# Goodreads renders an expand link inside the genre list that matches the same
+# tag selector as real genres, so filter it out wherever genres get written.
+NON_GENRE_NAMES = {"...more", "…more", "more"}
+
+
 def _parse_json_list(value: object) -> list:
     try:
         parsed = json.loads(value) if value else []
@@ -67,7 +72,11 @@ def _load_all_books(conn) -> list[dict]:
 
 def _replace_genres(conn, uid: str, genre_names: list) -> None:
     conn.execute("DELETE FROM book_genres WHERE uid = ?", (uid,))
-    clean = [str(g).strip() for g in (genre_names or []) if str(g).strip()]
+    clean = [
+        name
+        for g in (genre_names or [])
+        if (name := str(g).strip()) and name.lower() not in NON_GENRE_NAMES
+    ]
     for position, name in enumerate(clean):
         conn.execute("INSERT INTO genres (name) VALUES (?) ON CONFLICT(name) DO NOTHING", (name,))
         genre_row = conn.execute("SELECT id FROM genres WHERE name = ? COLLATE NOCASE", (name,)).fetchone()

@@ -538,13 +538,16 @@ def parse_book(html: str, url: str) -> Optional[tuple]:
     )
 
     # ── Genres ───────────────────────────────────────────────────────────────
+    # The trailing "...more" expand link shares the .Button--tag class with the
+    # real genre chips, so drop it rather than storing it as a genre.
     genres = [
-        el.get_text(strip=True)
+        text
         for el in soup.select(
             ".BookPageMetadataSection__genres .Button--tag, "
             '[data-testid="genresList"] .Button--tag'
         )
-        if el.get_text(strip=True)
+        if (text := el.get_text(strip=True))
+        and text.lower().lstrip(".…").strip() != "more"
     ]
 
     # ── Description ──────────────────────────────────────────────────────────
