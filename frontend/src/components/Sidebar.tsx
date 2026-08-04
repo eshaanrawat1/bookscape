@@ -209,8 +209,8 @@ function Sidebar({ active, onSelect }: SidebarProps) {
       {pendingDelete && (
         <ConfirmDialog
           title={`Delete “${pendingDelete.name}”?`}
-          message="This collection will be removed for good. Your books stay in the library — this can't be undone."
-          confirmLabel="Delete collection"
+          message="This collection will be removed for good. This action is irreversible."
+          confirmLabel="Delete"
           busy={deleting}
           error={deleteError}
           onConfirm={confirmDelete}

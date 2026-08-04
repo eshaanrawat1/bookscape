@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import { X } from 'lucide-react'
 
 interface ConfirmDialogProps {
   title: string
@@ -39,25 +38,22 @@ function ConfirmDialog({
         aria-label={title}
         onClick={(event) => event.stopPropagation()}
       >
-        <button
-          className="dialogIconButton dialogClose"
-          onClick={onCancel}
-          disabled={busy}
-          aria-label="Close dialog"
-        >
-          <X />
-        </button>
+        <h2 className="confirmTitle">{title}</h2>
+        <p className="confirmMessage">{message}</p>
 
-        <h2>{title}</h2>
-        <p className="dialogDescription">{message}</p>
+        {error && <p className="confirmError">{error}</p>}
 
-        {error && <p className="scraperError">{error}</p>}
-
-        <div className="scraperButtons">
-          <button type="button" className="secondaryButton" onClick={onCancel} disabled={busy}>
+        <div className="confirmActions">
+          <button type="button" className="secondaryButton confirmButton" onClick={onCancel} disabled={busy}>
             {cancelLabel}
           </button>
-          <button type="button" className="primaryButton dangerButton" onClick={onConfirm} disabled={busy} autoFocus>
+          <button
+            type="button"
+            className="primaryButton confirmButton dangerButton"
+            onClick={onConfirm}
+            disabled={busy}
+            autoFocus
+          >
             {busy ? 'Deleting…' : confirmLabel}
           </button>
         </div>
