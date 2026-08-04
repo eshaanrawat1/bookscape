@@ -102,8 +102,16 @@ function BookDialogStage({ selected, onClose }: BookDialogStageProps) {
     // while the cards are still dissolving into each other.
     let awaitingFirstMeasure = true
 
+    // offsetHeight, not getBoundingClientRect().height: the latter is the
+    // post-transform rect. The first card of a session enters with
+    // dialogEnterIn, which scales it from 0.94, and ResizeObserver does not
+    // fire on transform changes — so every measurement taken during that
+    // 380ms recorded a shrunken height that then stuck. The first card-to-card
+    // hop pinned the stage to it, and since the stage is centred in the scrim
+    // a too-short pin dropped the incoming card before the settle lifted it
+    // back. Layout height is what the pin is about, so measure layout height.
     const measure = () => {
-      const height = card.getBoundingClientRect().height
+      const height = card.offsetHeight
       if (height <= 0) return
       cardHeightRef.current = height
       if (stageHeightRef.current === null) return
