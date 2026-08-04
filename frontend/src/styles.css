@@ -1270,16 +1270,23 @@ svg {
   white-space: nowrap;
 }
 
+/* Single row, always: a second row of pills changes the card's height, which
+   makes the dialog resize as you navigate between books. GenrePills measures
+   what fits and folds the rest into a +N chip; the clip here is the backstop
+   for the frame before that lands. */
 .dialogGenrePills {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
   gap: 0.55rem;
   margin-top: 0.2rem;
 }
 
 .dialogGenrePill {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
+  white-space: nowrap;
   border: 1px solid color-mix(in oklch, var(--primary) 14%, var(--border));
   border-radius: 999px;
   background: linear-gradient(180deg, color-mix(in oklch, var(--accent) 78%, white) 0%, color-mix(in oklch, var(--secondary) 92%, white) 100%);
@@ -1288,6 +1295,14 @@ svg {
   font-size: 0.96rem;
   font-weight: 600;
   letter-spacing: 0.01em;
+}
+
+/* Tabular figures so the measured "+0" placeholder is exactly as wide as the
+   "+3" that replaces it. */
+.dialogGenrePillOverflow {
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+  cursor: default;
 }
 
 .dialogActionPanel {

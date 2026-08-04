@@ -8,6 +8,7 @@ import { normaliseBook, getCatalogBookId, formatCompactNumber, resolveSavedWantT
 import { buildDialogGlow } from '../color.js'
 import BookCover from './BookCover.jsx'
 import DateProperty from './DateProperty.jsx'
+import GenrePills from './GenrePills.jsx'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
 import type { Book, RawBookPayload } from '../types.js'
@@ -488,15 +489,7 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
                   )}
                 </div>
 
-                {dialogGenres.length > 0 && (
-                  <div className="dialogGenrePills" aria-label="Genres">
-                    {dialogGenres.map((genre) => (
-                      <span key={genre} className="dialogGenrePill">
-                        {genre}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                {dialogGenres.length > 0 && <GenrePills genres={dialogGenres} />}
 
                 <p className="dialogBlurb">{displayBook.blurb || 'A great read from your library.'}</p>
 
