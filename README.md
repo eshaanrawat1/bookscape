@@ -3,6 +3,9 @@
 A local-first desktop reading tracker. Tauri shell, React frontend, FastAPI
 backend, all running on your own machine — no accounts, no server.
 
+https://github.com/user-attachments/assets/59140fa7-9576-4428-9930-c8c0e3efb3e3
+
+
 ## Structure
 
 - `src-tauri/` — Rust/Tauri desktop shell; launches and supervises the backend
