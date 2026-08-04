@@ -1127,7 +1127,6 @@ svg {
   border-radius: 0.85rem;
   background: var(--muted);
   box-shadow: var(--shadow-warm);
-  outline: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .coverImage img {
@@ -1157,7 +1156,9 @@ svg {
 
 .coverSheen {
   z-index: 3;
+  border-radius: inherit;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), transparent 42%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
 }
 
 .coverProgress {
@@ -1171,7 +1172,6 @@ svg {
 .coverProgress .progressTrack {
   height: 0.44rem;
   background: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(8px);
 }
 
 /* ========================================================================== */
