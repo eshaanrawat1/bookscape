@@ -1116,6 +1116,11 @@ svg {
   background: var(--cover-glow);
   opacity: 0.5;
   filter: blur(26px);
+  /* fade the gradient to zero before it reaches the box edge, so the glow has no
+     silhouette to clip — without this the element's rounded rect shows as a faint
+     outline around the cover (same technique as .heroGlow) */
+  -webkit-mask-image: radial-gradient(closest-side, black 55%, transparent 100%);
+  mask-image: radial-gradient(closest-side, black 55%, transparent 100%);
 }
 
 .coverImage {
