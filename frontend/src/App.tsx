@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Menu, Plus, Trash2, File, Upload, Download, ArrowLeft } from 'lucide-react'
+import { Menu, Plus, File, Upload, Download, ArrowLeft } from 'lucide-react'
 
 // API & Utilities
 import { apiFetch, BOOTSTRAP_RETRIES, BOOTSTRAP_RETRY_DELAY_MS } from './api.js'
@@ -260,6 +260,7 @@ export default function App() {
     toggleBookWantToRead,
     createCollection,
     renameCollection,
+    deleteCollection,
   }
 
   const navigation = {
@@ -286,15 +287,6 @@ export default function App() {
             <button className="iconPillButton" aria-label="Add Book" onClick={() => setShowScraperDialog(true)}>
               <Plus />
             </button>
-            {activeCollection && (
-              <button
-                className="iconPillButton"
-                aria-label={`Delete ${activeCollection.name}`}
-                onClick={() => deleteCollection(activeCollection)}
-              >
-                <Trash2 />
-              </button>
-            )}
           </div>
           <div className="hearthShell">
             <Sidebar

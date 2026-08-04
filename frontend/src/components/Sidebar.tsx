@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Flame, Plus, type LucideIcon } from 'lucide-react'
+import { Flame, Plus, X, type LucideIcon } from 'lucide-react'
 import { collectionIdFromName } from '../utils.js'
 import { mainNav, shelfNav } from '../constants.js'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
+import ConfirmDialog from './ConfirmDialog.jsx'
 import type { Collection } from '../types.js'
 
 interface SidebarProps {
@@ -11,11 +12,19 @@ interface SidebarProps {
 }
 
 function Sidebar({ active, onSelect }: SidebarProps) {
-  const { collections, createCollection: onCreateCollection, renameCollection: onRenameCollection } = useLibraryData()
+  const {
+    collections,
+    createCollection: onCreateCollection,
+    renameCollection: onRenameCollection,
+    deleteCollection: onDeleteCollection,
+  } = useLibraryData()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draftName, setDraftName] = useState('')
   const [collectionError, setCollectionError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<Collection | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const startRename = (collection: Collection) => {
     setEditingId(collection.id)
@@ -48,6 +57,20 @@ function Sidebar({ active, onSelect }: SidebarProps) {
       setCollectionError(err instanceof Error ? err.message : 'Could not rename collection.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await onDeleteCollection(pendingDelete)
+      setPendingDelete(null)
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Could not delete collection.')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -162,13 +185,42 @@ function Sidebar({ active, onSelect }: SidebarProps) {
                     {collection.name}
                   </button>
                 )}
-                <span className="collectionCount">{`(${bookCount})`}</span>
+                <button
+                  type="button"
+                  className="collectionCount"
+                  aria-label={`Delete ${collection.name}`}
+                  title={`Delete ${collection.name}`}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setDeleteError(null)
+                    setPendingDelete(collection)
+                  }}
+                >
+                  <span className="collectionCountValue" aria-hidden="true">{`(${bookCount})`}</span>
+                  <span className="collectionCountIcon" aria-hidden="true"><X /></span>
+                </button>
               </div>
             )
           })}
         </div>
         {collectionError && <p className="collectionError">{collectionError}</p>}
       </section>
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title={`Delete “${pendingDelete.name}”?`}
+          message="This collection will be removed for good. Your books stay in the library — this can't be undone."
+          confirmLabel="Delete collection"
+          busy={deleting}
+          error={deleteError}
+          onConfirm={confirmDelete}
+          onCancel={() => {
+            if (deleting) return
+            setPendingDelete(null)
+            setDeleteError(null)
+          }}
+        />
+      )}
     </aside>
   )
 }

@@ -300,14 +300,60 @@ svg {
   cursor: pointer;
 }
 
+/* Book count that swaps to a delete X on hover. Both layers share one grid
+   cell so the row never reflows during the swap. */
 .collectionCount {
+  display: grid;
   flex: 0 0 auto;
   margin-left: auto;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 0.15rem 0.3rem;
   color: var(--muted-foreground);
-  font-size: inherit;
+  font: inherit;
   font-weight: 500;
   letter-spacing: 0.02em;
   white-space: nowrap;
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.collectionCountValue,
+.collectionCountIcon {
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: center;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.collectionCountIcon {
+  opacity: 0;
+  transform: scale(0.65);
+}
+
+.collectionCountIcon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.collectionCount:hover,
+.collectionCount:focus-visible {
+  color: var(--danger);
+  outline: 0;
+}
+
+.collectionCount:hover .collectionCountValue,
+.collectionCount:focus-visible .collectionCountValue {
+  opacity: 0;
+  transform: scale(0.65);
+}
+
+.collectionCount:hover .collectionCountIcon,
+.collectionCount:focus-visible .collectionCountIcon {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .collectionEditForm {
@@ -2061,6 +2107,38 @@ svg {
 .scraperDialog {
   width: min(44rem, calc(100vw - 2rem)) !important;
   min-height: auto !important;
+}
+
+.confirmDialog {
+  width: min(38rem, calc(100vw - 2rem)) !important;
+  min-height: auto !important;
+  gap: 1rem;
+  padding: 2rem;
+}
+
+.confirmDialog h2 {
+  margin: 0;
+  padding-right: 3rem;
+}
+
+.confirmDialog .dialogDescription {
+  margin: 0;
+}
+
+.primaryButton.dangerButton {
+  background: var(--danger);
+  color: oklch(0.99 0 0);
+}
+
+.primaryButton.dangerButton:hover:not(:disabled) {
+  background: var(--danger-strong);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
 }
 
 .scraperForm {

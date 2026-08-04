@@ -154,6 +154,7 @@ export interface LibraryDataContextValue {
   toggleBookWantToRead: (bookId: string, isSaved: boolean) => Promise<void>
   createCollection: () => Promise<string>
   renameCollection: (collection: Collection, name: string) => Promise<string>
+  deleteCollection: (collection: Collection) => Promise<void>
 }
 
 export interface NavigationContextValue {
