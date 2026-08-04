@@ -38,6 +38,7 @@ from colorthief import ColorThief
 
 from ..db import transaction
 from ..observability import metrics
+from ..urls import is_allowed_cover_url
 from .catalog import upsert_book
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ class Outcome(StrEnum):
     HTTP_STATUS = "http_status"
     DECODE_ERROR = "decode_error"
     EMPTY_IMAGE = "empty_image"
+    BLOCKED_HOST = "blocked_host"
     # Transient — attributable to the network or the host.
     RATE_LIMITED = "rate_limited"
     NETWORK_ERROR = "network_error"
@@ -86,6 +88,9 @@ TERMINAL_OUTCOMES = frozenset({
     Outcome.HTTP_STATUS,
     Outcome.DECODE_ERROR,
     Outcome.EMPTY_IMAGE,
+    # Terminal by nature: a disallowed host will still be disallowed next time,
+    # so retrying only means fetching it again.
+    Outcome.BLOCKED_HOST,
 })
 
 
@@ -112,6 +117,41 @@ class RateLimiter:
 
 # ── Extraction ────────────────────────────────────────────────────────────────
 
+MAX_REDIRECTS = 3
+
+
+def _get_following_allowed_redirects(
+    url: str,
+    session: httpx.Client,
+    headers: dict,
+) -> tuple[httpx.Response | None, str]:
+    """GET `url`, following redirects only while they stay on allowed hosts.
+
+    Returns `(response, "")`, or `(None, reason)` if the chain left the
+    allowlist or ran too long.
+
+    The chain is walked by hand because httpx offers no way to veto an
+    individual redirect, and following them blindly would undo the host check
+    completely: an allowed CDN answering `302 -> http://169.254.169.254/` would
+    be followed inward without anything noticing.
+    """
+    for _ in range(MAX_REDIRECTS):
+        response = session.get(url, headers=headers, timeout=15)
+        if not response.is_redirect:
+            return response, ""
+
+        location = response.headers.get("location", "")
+        if not location:
+            return response, ""
+        # Resolved against the current URL so a relative Location is checked as
+        # the absolute URL it will actually become.
+        url = str(response.url.join(location))
+        if not is_allowed_cover_url(url):
+            return None, f"redirected to a disallowed host: {url[:200]}"
+
+    return None, f"more than {MAX_REDIRECTS} redirects"
+
+
 def extract_color(image_url: str, session: httpx.Client) -> tuple[str, Outcome, str]:
     """Download one cover and reduce it to a single dominant color.
 
@@ -123,15 +163,23 @@ def extract_color(image_url: str, session: httpx.Client) -> tuple[str, Outcome, 
     if not image_url:
         return "", Outcome.EMPTY_IMAGE, "book has no cover image url"
 
+    # Checked here rather than at write time because a URL can enter `books`
+    # from the scraper, an Obsidian pull, or a row written by an older build
+    # that predates any check at all. This is the one place they converge.
+    if not is_allowed_cover_url(image_url):
+        return "", Outcome.BLOCKED_HOST, "cover host is not an allowed image source"
+
     headers = {
         "User-Agent": random.choice(USER_AGENTS),
         "Referer": "https://www.goodreads.com/",
     }
 
     try:
-        response = session.get(image_url, headers=headers, timeout=15)
+        response, blocked = _get_following_allowed_redirects(image_url, session, headers)
     except httpx.RequestError as error:
         return "", Outcome.NETWORK_ERROR, f"{type(error).__name__}: {error}"
+    if response is None:
+        return "", Outcome.BLOCKED_HOST, blocked
 
     if response.status_code in RATE_LIMIT_STATUS_CODES:
         return "", Outcome.RATE_LIMITED, f"HTTP {response.status_code}"
@@ -275,7 +323,9 @@ def new_session() -> httpx.Client:
     return httpx.Client(
         headers={"User-Agent": random.choice(USER_AGENTS)},
         timeout=20,
-        follow_redirects=True,
+        # Redirects are walked by _get_following_allowed_redirects() instead, so
+        # each hop can be checked against the allowlist before it is taken.
+        follow_redirects=False,
     )
 
 

@@ -24,6 +24,10 @@ def create_router(root: Path) -> APIRouter:
             raise HTTPException(status_code=409, detail=f"Scanned 0 files at {e} — check the vault is mounted") from e
         except FileNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e)) from e
+        except ValueError as e:
+            # A configured path that fails validation — saved before the rule
+            # existed, or via the env var, which never passes through Settings.
+            raise HTTPException(status_code=400, detail=str(e)) from e
         return {
             "ok": True,
             "dry_run": res.dry_run,
@@ -39,6 +43,8 @@ def create_router(root: Path) -> APIRouter:
             res = run_obsidian_push(root, dry_run=dry_run)
         except FileNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e)) from e
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
         return {
             "ok": True,
             "dry_run": res.dry_run,
