@@ -15,7 +15,11 @@ python backend/scripts/gradient.py              --limit 25
 python backend/scripts/backfill_reading_days.py --apply
 ```
 
-`scraper.py` requires `playwright install chromium` once.
+`scraper.py` needs a Chromium that Playwright can drive, and installs one itself
+on first use if the per-user browser cache is empty or has drifted out of sync
+with the installed `playwright` version. Run `playwright install chromium` by
+hand to front-load that download, or set `BOOKSCAPE_AUTO_INSTALL_BROWSER=0` to
+turn the automatic install off and get the launch error instead.
 
 ---
 

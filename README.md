@@ -19,7 +19,8 @@ https://github.com/user-attachments/assets/59140fa7-9576-4428-9930-c8c0e3efb3e3
 1. Create the virtualenv and install backend deps:
    - `python3 -m venv backend/.venv && source backend/.venv/bin/activate`
    - `pip install -r backend/requirements.txt`
-   - `playwright install chromium`
+   - Optionally `playwright install chromium` — the scraper downloads it on
+     first use if it is missing, so this only front-loads the wait
 2. Install frontend deps:
    - `npm --prefix frontend install`
 3. Run the desktop app (starts Vite and the backend for you):

@@ -9,7 +9,7 @@ interface ScraperDialogProps {
 }
 
 interface PreviewEvent {
-  stage: 'fetching_page' | 'fetching_similar' | 'duplicate' | 'preview' | 'error'
+  stage: 'installing_browser' | 'fetching_page' | 'fetching_similar' | 'duplicate' | 'preview' | 'error'
   message?: string
   book?: RawBookPayload
 }

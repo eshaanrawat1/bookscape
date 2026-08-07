@@ -58,6 +58,7 @@ class ConfirmBookIn(BaseModel):
 
 
 STAGE_MESSAGES = {
+    "installing_browser": "Setting up the browser (one-time download)…",
     "fetching_page": "Fetching book info…",
     "fetching_similar": "Fetching similar books…",
 }
@@ -93,6 +94,7 @@ def create_router(root: Path) -> APIRouter:
                 return StreamingResponse(duplicate_stream(), media_type="application/x-ndjson")
 
         scraper_timeout = int(os.getenv("SCRAPER_TIMEOUT_SECONDS", "180"))
+        install_timeout = int(os.getenv("SCRAPER_BROWSER_INSTALL_TIMEOUT_SECONDS", "900"))
         scripts_dir = root / "backend" / "scripts"
 
         def run_stream():
@@ -122,11 +124,21 @@ def create_router(root: Path) -> APIRouter:
 
             result_book: dict | None = None
             error_message: str | None = None
+            installing = {"flag": False}
             try:
                 for raw_line in proc.stdout:
                     line = raw_line.rstrip("\n")
                     if line.startswith("@@STAGE@@ "):
                         stage = line[len("@@STAGE@@ "):].strip()
+                        if stage == "installing_browser":
+                            # The scraper found no Chromium and is fetching one.
+                            # A ~150MB download does not fit in a budget sized
+                            # for a page load, so restart the clock with room
+                            # for the download *and* the scrape that follows.
+                            installing["flag"] = True
+                            timer.cancel()
+                            timer = threading.Timer(install_timeout + scraper_timeout, _kill)
+                            timer.start()
                         yield json.dumps({
                             "stage": stage,
                             "message": STAGE_MESSAGES.get(stage, stage),
@@ -147,10 +159,12 @@ def create_router(root: Path) -> APIRouter:
                 timer.cancel()
 
             if timed_out["flag"]:
-                yield json.dumps({
-                    "stage": "error",
-                    "message": f"Goodreads timed out after {scraper_timeout}s. Please try again.",
-                }) + "\n"
+                message = (
+                    "Downloading the browser took too long. Check your connection and try again."
+                    if installing["flag"]
+                    else f"Goodreads timed out after {scraper_timeout}s. Please try again."
+                )
+                yield json.dumps({"stage": "error", "message": message}) + "\n"
                 return
             if result_book:
                 yield json.dumps({"stage": "preview", "book": result_book}) + "\n"

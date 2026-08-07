@@ -51,15 +51,17 @@ Output (all written to backend/data/, regardless of cwd):
 
 Install:
     pip install playwright beautifulsoup4 lxml
-    playwright install chromium
+    playwright install chromium   # optional: done automatically on first use
 """
 
 import argparse
 import json
+import os
 import random
 import re
 import signal
 import sqlite3
+import subprocess
 import sys
 import time
 from dataclasses import asdict, dataclass, field
@@ -69,7 +71,7 @@ from pathlib import Path
 from typing import Optional
 
 from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright, Page
+from playwright.sync_api import Error as PlaywrightError, sync_playwright, Page
 
 # This script lives in backend/scripts/; the app package lives alongside it at
 # backend/app/. Put the repo root on sys.path so the crawler can reuse the very
@@ -681,12 +683,85 @@ def already_scraped(uid: str) -> bool:
 
 # ── Browser context helper ────────────────────────────────────────────────────
 
+# Playwright pins one exact Chromium build per package version and keeps it in a
+# per-user cache that lives outside both this repo and the app bundle
+# (~/Library/Caches/ms-playwright on macOS). So the browser can go missing for
+# reasons that have nothing to do with Bookscape: the cache was never populated,
+# a disk cleaner swept it, or `pip install -U playwright` moved the pin to a
+# build nobody has downloaded yet. Repairing that in place beats failing with a
+# command for the user to go run.
+BROWSER_INSTALL_TIMEOUT = 900
+
+# One attempt per process: a genuinely broken install then surfaces as the real
+# launch error rather than looping on a download that will not fix it.
+_browser_install_attempted = False
+
+
+def _is_missing_browser(error: Exception) -> bool:
+    text = str(error)
+    return "Executable doesn't exist" in text or "playwright install" in text
+
+
+def _install_chromium() -> bool:
+    """Download the Chromium build this Playwright pins. True if it worked.
+
+    The installer's output is captured rather than inherited: stdout carries the
+    @@STAGE@@/@@RESULT@@ protocol that backend/app/routes/scraper.py parses, and
+    progress bars in the middle of that are noise.
+    """
+    print("@@STAGE@@ installing_browser", flush=True)
+    print("Chromium is missing — downloading it (one-time, ~150MB)…", flush=True)
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "playwright", "install", "chromium"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=BROWSER_INSTALL_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        print(f"Chromium download timed out after {BROWSER_INSTALL_TIMEOUT}s.", flush=True)
+        return False
+    except OSError as error:
+        print(f"Could not start the Chromium download: {error}", flush=True)
+        return False
+
+    if result.returncode != 0:
+        for line in (result.stdout or "").strip().splitlines()[-5:]:
+            print(f"playwright install: {line}", flush=True)
+        return False
+
+    print("Chromium ready.", flush=True)
+    return True
+
+
 def make_browser_context(playwright, headed: bool = False) -> tuple:
     """
     Launch Chromium and return (browser, context, page).
     Caller is responsible for closing browser when done.
+
+    A missing browser binary is installed and the launch retried, rather than
+    raised — see _install_chromium above for why it goes missing on its own.
+    Set BOOKSCAPE_AUTO_INSTALL_BROWSER=0 to keep the failure instead, which is
+    what an offline or pre-provisioned environment wants.
     """
-    browser = playwright.chromium.launch(headless=not headed)
+    global _browser_install_attempted
+
+    try:
+        browser = playwright.chromium.launch(headless=not headed)
+    except PlaywrightError as error:
+        if (
+            _browser_install_attempted
+            or os.getenv("BOOKSCAPE_AUTO_INSTALL_BROWSER", "1") == "0"
+            or not _is_missing_browser(error)
+        ):
+            raise
+        _browser_install_attempted = True
+        if not _install_chromium():
+            raise
+        browser = playwright.chromium.launch(headless=not headed)
+
     context = browser.new_context(
         user_agent=USER_AGENT,
         viewport={"width": 1280, "height": 900},
