@@ -162,6 +162,15 @@ class DataRepository:
             target = parse_iso_date_string(fields.get("finish_date") or prior.get("finish_date")) or day
             source = "finish"
 
+        # Whether the book was already being tracked decides how a finish is
+        # credited, and the delta below adds a row of its own, so this has to be
+        # read first.
+        tracked_before = finishing and bool(
+            conn.execute(
+                "SELECT 1 FROM reading_days WHERE uid = ? LIMIT 1", (uid,)
+            ).fetchone()
+        )
+
         from_page = int(prior.get("current_page") or 0)
         to_page = int(fields.get("current_page", from_page) or 0)
         self._add_reading_day(conn, uid, target, to_page - from_page, to_page, source=source)
@@ -173,6 +182,16 @@ class DataRepository:
         # so the delta above was zero and the history is short by the whole
         # book. Without this the most common way to finish a book — never
         # touching the page field — would contribute nothing to the heatmap.
+        #
+        # Only for a book with *no* day history, though. Once a book has been
+        # tracked, the shortfall is not missing pages from this session but the
+        # stretch read before the heatmap existed, and crediting that to the
+        # finish date turns an ordinary last day into a false several-hundred
+        # page one. Those pages stay untracked; the backfill script is the place
+        # that reconstructs pre-tracking history, and it says so.
+        if tracked_before:
+            return
+
         total = int(fields.get("total_pages") or prior.get("total_pages") or 0)
         if total <= 0:
             return
