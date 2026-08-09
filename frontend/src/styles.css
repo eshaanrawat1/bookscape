@@ -1286,17 +1286,58 @@ svg {
 }
 
 /* Series line — a subtitle belonging to the title above it, so it cancels most
-   of .dialogCopy's column gap instead of reading as its own block. Selector is
-   .dialogCopy-scoped to outrank `.dialogCopy p`, which would otherwise win on
+   of .dialogCopy's column gap instead of reading as its own block. Scoped to
+   .dialogCopy to outrank `.dialogCopy p`, which would otherwise win on
    specificity and reset the margin and font-size. */
 .dialogCopy .dialogSeries {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
   margin: -0.8rem 0 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
   font-size: 0.95rem;
   font-style: italic;
   line-height: 1.3;
+  text-align: left;
   /* Fading toward transparent rather than picking a lighter colour keeps this
      a step quieter than the author line in both themes. */
   color: color-mix(in oklch, var(--muted-foreground) 72%, transparent);
+}
+
+/* Underlined like .dialogAuthor so the two links in this block read as the same
+   kind of affordance, just weighted differently. */
+.dialogSeriesButton {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklch, var(--muted-foreground) 22%, transparent);
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.16em;
+}
+
+.dialogSeriesButton:hover:not(:disabled) {
+  color: var(--primary);
+}
+
+.dialogSeriesButton:disabled {
+  cursor: default;
+  text-decoration: none;
+}
+
+/* Series list rows carry a leading number, so they extend the author row's
+   four-column grid by one rather than redefining it. */
+.seriesBookRow {
+  grid-template-columns: 2.6rem 3.6rem minmax(0, 1fr) auto auto;
+}
+
+.seriesBookRowNumber {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklch, var(--muted-foreground) 70%, transparent);
+  text-align: right;
 }
 
 .dialogStatsRow {

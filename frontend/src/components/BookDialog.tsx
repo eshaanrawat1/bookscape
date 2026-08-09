@@ -57,7 +57,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exiting = false, cardRef, onClose }: BookDialogProps) {
   const { collections, wantToReadBooks, addBookToCollection, toggleBookWantToRead } = useLibraryData()
-  const { onOpen, onOpenAuthor } = useNavigation()
+  const { onOpen, onOpenAuthor, onOpenSeries } = useNavigation()
   const [view, setView] = useState<'library' | 'tracking'>(() => (
     ['reading', 'done'].includes(book.status) ? 'tracking' : 'library'
   ))
@@ -417,10 +417,18 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
           <div className="dialogCopy">
             <h2>{displayBook.title}</h2>
             {displayBook.series ? (
-              <p className="dialogSeries">
+              <button
+                type="button"
+                className="dialogSeries dialogSeriesButton"
+                onClick={() => onOpenSeries?.(displayBook.series)}
+                disabled={!onOpenSeries}
+                // The number is part of the label but not part of the
+                // destination — the page is the whole series.
+                aria-label={`View the ${displayBook.series} series`}
+              >
                 {displayBook.series}
                 {displayBook.seriesNumber ? ` #${displayBook.seriesNumber}` : ''}
-              </p>
+              </button>
             ) : null}
             {displayBook.author ? (
               <button

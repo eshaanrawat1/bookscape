@@ -284,6 +284,38 @@ def get_books_by_author(root: Path, author: str) -> list[dict]:
     return matched
 
 
+def series_sort_key(book: dict) -> tuple:
+    """Order a series the way a reader would shelve it: by number, ascending.
+
+    `series_number` is text because Goodreads numbers novellas "1.5", so it is
+    parsed here rather than sorted as a string — otherwise "10" would file
+    between "1" and "2". Anything unparseable (an omnibus "1-3", an empty
+    number on a prequel) sorts to the end rather than crashing or landing at
+    zero, where it would displace book one.
+    """
+    raw = str(book.get("series_number") or "").strip()
+    try:
+        return (0, float(raw), str(book.get("title") or "").lower())
+    except ValueError:
+        return (1, 0.0, str(book.get("title") or "").lower())
+
+
+def get_books_by_series(root: Path, series: str) -> list[dict]:
+    query = str(series or "").strip()
+    if not query:
+        return []
+
+    with transaction(root) as conn:
+        rows = conn.execute(
+            "SELECT * FROM books WHERE series = ? COLLATE NOCASE",
+            (query,),
+        ).fetchall()
+        matched = [_row_to_book(conn, row) for row in rows]
+
+    matched.sort(key=series_sort_key)
+    return matched
+
+
 def get_books_by_genre(root: Path, genre: str, limit: int = 100) -> list[dict]:
     query = str(genre or "").strip()
     if not query:

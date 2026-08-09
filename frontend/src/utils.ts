@@ -141,6 +141,20 @@ function authorNameFromView(view: string): string {
   }
 }
 
+function seriesViewId(series: string): string {
+  return `series:${encodeURIComponent(String(series || '').trim())}`
+}
+
+function seriesNameFromView(view: string): string {
+  if (!String(view || '').startsWith('series:')) return ''
+  const raw = String(view).slice('series:'.length)
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return raw
+  }
+}
+
 function genreViewId(genre: string): string {
   return `genre:${encodeURIComponent(String(genre || '').trim())}`
 }
@@ -168,6 +182,8 @@ export {
   resolveSavedWantToReadBook,
   authorViewId,
   authorNameFromView,
+  seriesViewId,
+  seriesNameFromView,
   genreViewId,
   genreNameFromView,
 }

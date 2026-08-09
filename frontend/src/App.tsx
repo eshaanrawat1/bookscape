@@ -12,6 +12,8 @@ import {
   normaliseBook,
   authorViewId,
   authorNameFromView,
+  seriesViewId,
+  seriesNameFromView,
   genreViewId,
   genreNameFromView,
 } from './utils.js'
@@ -34,6 +36,7 @@ import LibraryView from './views/LibraryView.jsx'
 import SearchView from './views/SearchView.jsx'
 import StatsView from './views/StatsView.jsx'
 import AuthorView from './views/AuthorView.jsx'
+import SeriesView from './views/SeriesView.jsx'
 import GenreView from './views/GenreView.jsx'
 import CollectionView from './views/CollectionView.jsx'
 import type { Book, Collection, GenreSection, RawBookPayload, RawList, SyncPullResult, SyncPushResult } from './types.js'
@@ -112,14 +115,17 @@ export default function App() {
     ? collections.find((c) => `collection:${c.id}` === view)
     : null
   const activeAuthorName = authorNameFromView(view)
+  const activeSeriesName = seriesNameFromView(view)
   const activeGenreName = genreNameFromView(view)
   const meta: { title?: string; subtitle?: string; name?: string; description?: string } | undefined = activeCollection
     ? activeCollection
     : view.startsWith('author:')
       ? { title: activeAuthorName || 'Author' }
-      : view.startsWith('genre:')
-        ? { title: activeGenreName || 'Genre' }
-        : viewMeta[view]
+      : view.startsWith('series:')
+        ? { title: activeSeriesName || 'Series' }
+        : view.startsWith('genre:')
+          ? { title: activeGenreName || 'Genre' }
+          : viewMeta[view]
 
   const openBookDialog = (book: Book) =>
     setSelected((prev) => ({ book, isNavigation: prev !== null }))
@@ -135,6 +141,18 @@ export default function App() {
   }
   const goBackFromAuthor = () => {
     setView(previousView && !previousView.startsWith('author:') ? previousView : 'library')
+    setMobileNav(false)
+  }
+  const openSeriesPage = (series: string) => {
+    const cleanSeries = String(series || '').trim()
+    if (!cleanSeries) return
+    setPreviousView((current) => (view.startsWith('series:') ? current : view))
+    setSelected(null)
+    setMobileNav(false)
+    setView(seriesViewId(cleanSeries))
+  }
+  const goBackFromSeries = () => {
+    setView(previousView && !previousView.startsWith('series:') ? previousView : 'library')
     setMobileNav(false)
   }
   const openGenrePage = (genre: string) => {
@@ -266,6 +284,7 @@ export default function App() {
   const navigation = {
     onOpen: openBookDialog,
     onOpenAuthor: openAuthorPage,
+    onOpenSeries: openSeriesPage,
     onOpenGenre: openGenrePage,
     onOpenReadingNow: openBookTracking,
   }
@@ -326,6 +345,12 @@ export default function App() {
                     )}
                     {view.startsWith('author:') && (
                       <button type="button" className="kickerLink" onClick={goBackFromAuthor}>
+                        <ArrowLeft size={14} />
+                        Back
+                      </button>
+                    )}
+                    {view.startsWith('series:') && (
+                      <button type="button" className="kickerLink" onClick={goBackFromSeries}>
                         <ArrowLeft size={14} />
                         Back
                       </button>
@@ -399,6 +424,9 @@ function ViewContent({ view }: { view: string }) {
     default:
       if (view.startsWith('author:')) {
         return <AuthorView author={authorNameFromView(view)} />
+      }
+      if (view.startsWith('series:')) {
+        return <SeriesView series={seriesNameFromView(view)} />
       }
       if (view.startsWith('genre:')) {
         return <GenreView genre={genreNameFromView(view)} />

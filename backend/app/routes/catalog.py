@@ -7,6 +7,7 @@ from ..services.catalog import (
     get_book_with_similar,
     get_books_by_author,
     get_books_by_genre,
+    get_books_by_series,
     get_global_library,
     search_books,
 )
@@ -34,6 +35,11 @@ def create_router(root: Path) -> APIRouter:
     def get_author_books(author: str = Query(..., min_length=1)) -> dict:
         books = get_books_by_author(root, author)
         return {"author": author, "books": books, "count": len(books)}
+
+    @router.get("/series-books")
+    def get_series_books(series: str = Query(..., min_length=1)) -> dict:
+        books = get_books_by_series(root, series)
+        return {"series": series, "books": books, "count": len(books)}
 
     @router.get("/genre-books")
     def get_genre_books(genre: str = Query(..., min_length=1), limit: int = Query(default=100, ge=1, le=200)) -> dict:
