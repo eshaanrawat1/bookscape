@@ -416,6 +416,12 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
           </div>
           <div className="dialogCopy">
             <h2>{displayBook.title}</h2>
+            {displayBook.series ? (
+              <p className="dialogSeries">
+                {displayBook.series}
+                {displayBook.seriesNumber ? ` #${displayBook.seriesNumber}` : ''}
+              </p>
+            ) : null}
             {displayBook.author ? (
               <button
                 type="button"

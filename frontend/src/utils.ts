@@ -95,6 +95,10 @@ function normaliseBook(raw: RawBookPayload): Book {
     tint: '220 30% 45%', // neutral fallback tint — image_url is used for actual cover art
     genre: primaryGenre,
     genres,
+    // /my-books nests the catalog row under linked_catalog_book, the same
+    // reason `color` falls back the same way.
+    series: raw.series || raw.linked_catalog_book?.series || '',
+    seriesNumber: raw.series_number || raw.linked_catalog_book?.series_number || '',
     pages,
     totalPages,
     currentPage,

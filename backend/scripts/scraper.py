@@ -588,8 +588,15 @@ def parse_book(html: str, url: str) -> Optional[tuple]:
         or soup.select_one("h3 a[href*='/series/']")
     )
     if series_tag:
-        raw = series_tag.get_text(strip=True).strip("()")
-        m = re.match(r'^(.+?),?\s+#([\d.]+)$', raw)
+        # Goodreads splits the label into separate text nodes either side of a
+        # React comment separator ("Bloodwing Academy", <!-- -->, " #1"), and
+        # get_text(strip=True) strips each node individually — which would eat
+        # the space between them and yield "Bloodwing Academy#1", defeating the
+        # match below. Join on a space and re-collapse instead.
+        raw = re.sub(r"\s+", " ", series_tag.get_text(" ", strip=True)).strip().strip("()").strip()
+        # The number stays a string: Goodreads numbers novellas "#1.5", and
+        # some series use "#1-3" for omnibus editions.
+        m = re.match(r'^(.+?),?\s*#\s*([\d.]+)$', raw)
         if m:
             series        = m.group(1).strip()
             series_number = m.group(2).strip()

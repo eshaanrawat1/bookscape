@@ -1285,6 +1285,20 @@ svg {
   margin-top: -0.1rem;
 }
 
+/* Series line — a subtitle belonging to the title above it, so it cancels most
+   of .dialogCopy's column gap instead of reading as its own block. Selector is
+   .dialogCopy-scoped to outrank `.dialogCopy p`, which would otherwise win on
+   specificity and reset the margin and font-size. */
+.dialogCopy .dialogSeries {
+  margin: -0.8rem 0 0;
+  font-size: 0.95rem;
+  font-style: italic;
+  line-height: 1.3;
+  /* Fading toward transparent rather than picking a lighter colour keeps this
+     a step quieter than the author line in both themes. */
+  color: color-mix(in oklch, var(--muted-foreground) 72%, transparent);
+}
+
 .dialogStatsRow {
   display: flex;
   align-items: center;

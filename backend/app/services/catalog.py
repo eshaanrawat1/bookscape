@@ -242,6 +242,8 @@ def get_global_library(root: Path) -> list[dict]:
                 "tint": "220 30% 45%",
                 "genre": genre,
                 "genres": b.get("genres", []),
+                "series": b.get("series", ""),
+                "series_number": b.get("series_number", ""),
                 "avg_rating": b.get("avg_rating", 0),
                 "rating_count": b.get("rating_count", 0),
                 "review_count": b.get("review_count", 0),

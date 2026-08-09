@@ -57,6 +57,8 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
                 "author": str(catalog.get("author") or ""),
                 "image_url": str(catalog.get("image_url") or ""),
                 "genres": catalog.get("genres", []),
+                "series": str(catalog.get("series") or ""),
+                "series_number": str(catalog.get("series_number") or ""),
                 "rating": catalog.get("avg_rating") or 0,
                 "description": str(catalog.get("description") or ""),
                 "color": str(catalog.get("color") or ""),

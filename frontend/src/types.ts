@@ -11,9 +11,11 @@ export interface RawBookPayload {
   cover?: string
   image_url?: string
   color?: string
-  linked_catalog_book?: { color?: string } | null
+  linked_catalog_book?: { color?: string; series?: string; series_number?: string } | null
   genre?: string
   genres?: string[]
+  series?: string
+  series_number?: string
   page_count?: number
   total_pages?: number
   reading_total_pages?: number
@@ -43,6 +45,11 @@ export interface Book {
   tint: string
   genre: string
   genres: string[]
+  // Kept as two fields rather than one pre-joined "Name #2" string: the name is
+  // the identity a series is looked up by, and seriesNumber stays text because
+  // Goodreads numbers novellas "1.5" — parsing it to a number would lose that.
+  series: string
+  seriesNumber: string
   pages: number
   totalPages: number
   currentPage: number
