@@ -593,10 +593,23 @@ def parse_book(html: str, url: str) -> Optional[tuple]:
         # get_text(strip=True) strips each node individually — which would eat
         # the space between them and yield "Bloodwing Academy#1", defeating the
         # match below. Join on a space and re-collapse instead.
-        raw = re.sub(r"\s+", " ", series_tag.get_text(" ", strip=True)).strip().strip("()").strip()
-        # The number stays a string: Goodreads numbers novellas "#1.5", and
-        # some series use "#1-3" for omnibus editions.
-        m = re.match(r'^(.+?),?\s*#\s*([\d.]+)$', raw)
+        raw = re.sub(r"\s+", " ", series_tag.get_text(" ", strip=True)).strip()
+        # Older Goodreads markup wraps the whole label in parentheses. Unwrap
+        # only when both ends are present — a bare .strip("()") would also eat
+        # the closing paren off a name that legitimately ends in one, turning
+        # "The Vampire Diaries (Digital First)" into "…(Digital First".
+        if raw.startswith("(") and raw.endswith(")"):
+            raw = raw[1:-1].strip()
+        # The number stays a string, and is matched as any non-space token
+        # rather than digits-only: Goodreads numbers novellas "#1.5" and
+        # omnibus editions "#1-3", and a digits-only pattern would reject the
+        # range, drop through to the else, and file "Night Angel #1-3" as its
+        # own one-book series alongside the real "Night Angel".
+        #
+        # Anchoring the number to the end with \S+ is what keeps a name that
+        # itself contains a "#" intact — the non-greedy name backtracks until
+        # what follows the last "#" is a single space-free token.
+        m = re.match(r'^(.+?),?\s*#\s*(\S+)$', raw)
         if m:
             series        = m.group(1).strip()
             series_number = m.group(2).strip()
