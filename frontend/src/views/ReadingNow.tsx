@@ -95,7 +95,7 @@ function ReadingNow() {
       <Shelf
         title="Up next"
         subtitle="Saved for the right moment."
-        books={wantToRead.slice(0, 6)}
+        books={wantToRead.slice(0, 30)}
         onSeeAll={onOpenWantToRead}
       />
       {collections
