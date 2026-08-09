@@ -88,6 +88,27 @@ svg {
   flex: 0 0 auto;
 }
 
+/* Every horizontal scroller in the app rides the trackpad/wheel alone: no
+   visible bar, no rubber-band chaining out to the pane behind it. Vertical
+   scrollers keep their bars, which is why this is a shared opt-in list rather
+   than a blanket `*` rule. Both properties are needed — `scrollbar-width` is
+   the standard one, the pseudo-element is what the macOS WebView honours when
+   "Show scroll bars: Always" is set in System Settings. */
+.shelfScroll,
+.dialogSimilarScroll,
+.statsFocusScroll,
+.heatmapScroll {
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.shelfScroll::-webkit-scrollbar,
+.dialogSimilarScroll::-webkit-scrollbar,
+.statsFocusScroll::-webkit-scrollbar,
+.heatmapScroll::-webkit-scrollbar {
+  display: none;
+}
+
 /* ========================================================================== */
 /* App Shell & Layout                                                       */
 /* ========================================================================== */
@@ -1022,8 +1043,6 @@ svg {
   gap: 1.6rem;
   overflow-x: auto;
   padding: 0.2rem 0.1rem 1.2rem;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
 }
 
 .shelfScroll .bookCard {
@@ -1538,14 +1557,7 @@ svg {
   gap: 1.2rem;
   overflow-x: auto;
   padding-bottom: 0.5rem;
-  overscroll-behavior-x: contain;
   contain: paint;
-  /* hide scrollbar */
-  scrollbar-width: none;
-}
-
-.dialogSimilarScroll::-webkit-scrollbar {
-  display: none;
 }
 
 .similarCardEmpty {
@@ -2640,8 +2652,6 @@ svg {
      both from being clipped by the scroll container's own bounds. */
   padding: 0.3rem 0.2rem 1.1rem;
   scroll-snap-type: x mandatory;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
 }
 
 .statsFocusScroll:focus-visible {
