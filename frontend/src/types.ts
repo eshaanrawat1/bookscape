@@ -169,5 +169,6 @@ export interface NavigationContextValue {
   onOpenAuthor: (author: string) => void
   onOpenSeries: (series: string) => void
   onOpenGenre: (genre: string) => void
+  onOpenWantToRead: () => void
   onOpenReadingNow: (book: Book) => void
 }

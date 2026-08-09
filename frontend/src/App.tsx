@@ -167,6 +167,13 @@ export default function App() {
     setView(previousView && !previousView.startsWith('genre:') ? previousView : 'library')
     setMobileNav(false)
   }
+  // 'want-to-read' is a sidebar destination rather than a drilldown, so this
+  // doesn't touch previousView — the back arrows belong to the author/series/
+  // genre pages, and landing here should leave their return target alone.
+  const openWantToRead = () => {
+    setView('want-to-read')
+    setMobileNav(false)
+  }
 
   async function createCollection(): Promise<string> {
     const name = nextCollectionName(collections)
@@ -286,6 +293,7 @@ export default function App() {
     onOpenAuthor: openAuthorPage,
     onOpenSeries: openSeriesPage,
     onOpenGenre: openGenrePage,
+    onOpenWantToRead: openWantToRead,
     onOpenReadingNow: openBookTracking,
   }
 

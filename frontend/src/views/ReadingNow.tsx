@@ -88,11 +88,16 @@ function ReadingNowHero({ books, onOpen }: ReadingNowHeroProps) {
 
 function ReadingNow() {
   const { currentlyReading, wantToRead, collections, booksByIds } = useLibraryData()
-  const { onOpenReadingNow } = useNavigation()
+  const { onOpenReadingNow, onOpenWantToRead } = useNavigation()
   return (
     <div className="stack">
       {currentlyReading.length > 0 && <ReadingNowHero books={currentlyReading} onOpen={onOpenReadingNow} />}
-      <Shelf title="Up next" subtitle="Saved for the right moment." books={wantToRead.slice(0, 6)} />
+      <Shelf
+        title="Up next"
+        subtitle="Saved for the right moment."
+        books={wantToRead.slice(0, 6)}
+        onSeeAll={onOpenWantToRead}
+      />
       {collections
         .filter((collection) => (collection.books?.length || collection.bookIds?.length || 0) > 0)
         .map((collection) => (
