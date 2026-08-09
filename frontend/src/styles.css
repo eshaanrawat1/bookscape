@@ -1326,20 +1326,6 @@ svg {
   text-decoration: none;
 }
 
-/* Series list rows carry a leading number, so they extend the author row's
-   four-column grid by one rather than redefining it. */
-.seriesBookRow {
-  grid-template-columns: 2.6rem 3.6rem minmax(0, 1fr) auto auto;
-}
-
-.seriesBookRowNumber {
-  font-family: var(--font-serif);
-  font-size: 1.05rem;
-  font-variant-numeric: tabular-nums;
-  color: color-mix(in oklch, var(--muted-foreground) 70%, transparent);
-  text-align: right;
-}
-
 .dialogStatsRow {
   display: flex;
   align-items: center;
@@ -3209,6 +3195,22 @@ svg {
 .authorBookRow:hover {
   background: color-mix(in oklch, var(--secondary) 55%, white);
   transform: translateX(0.18rem);
+}
+
+/* Series rows extend the author row's grid by a leading number column. Same
+   specificity as .authorBookRow, so this has to sit *after* it — declared
+   earlier it silently loses the cascade and the fifth child wraps to its own
+   row. */
+.seriesBookRow {
+  grid-template-columns: 2.6rem 3.6rem minmax(0, 1fr) auto auto;
+}
+
+.seriesBookRowNumber {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklch, var(--muted-foreground) 70%, transparent);
+  text-align: right;
 }
 
 .authorBookRowCover {
