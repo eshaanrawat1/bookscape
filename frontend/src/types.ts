@@ -84,6 +84,11 @@ export interface GenreSection {
   books: Book[]
 }
 
+export interface RawGenreSection {
+  genre: string
+  books: RawBookPayload[]
+}
+
 // One carousel card: a superlative, the number that earned it, and the book that
 // won. The backend picks these and never repeats a book across cards, so the
 // list is already display-ready and can be shorter than the six specs.

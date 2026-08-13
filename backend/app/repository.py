@@ -103,6 +103,26 @@ class DataRepository:
                 [uid, *values],
             )
 
+            # A book has one length, so a page count set here is also the
+            # catalog's answer for that book — otherwise the tracking panel and
+            # the About tab disagree about the same edition. Mirroring at this
+            # level rather than in the route covers every writer of the field
+            # (the dialog's autosave and an Obsidian pull alike). Zero means
+            # "unset", not an edit, so it never blanks a scraped count; and this
+            # is an UPDATE rather than an upsert so a uid with no catalog row
+            # does not get a stub one invented for it.
+            try:
+                new_total_pages = int(fields.get("total_pages") or 0)
+            except (TypeError, ValueError):
+                new_total_pages = 0
+            if new_total_pages > 0:
+                conn.execute(
+                    "UPDATE books SET page_count = ?, "
+                    "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') "
+                    "WHERE uid = ? AND page_count <> ?",
+                    (new_total_pages, uid, new_total_pages),
+                )
+
             if tracked:
                 self._track_progress(conn, uid, fields, prev, day or date.today().isoformat())
 

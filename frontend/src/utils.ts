@@ -1,5 +1,5 @@
 import { apiFetch } from './api.js'
-import type { Book, Collection, GenreSection, RawBookPayload, RawList } from './types.js'
+import type { Book, Collection, GenreSection, RawBookPayload, RawGenreSection, RawList } from './types.js'
 
 function asArray<T>(value: T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : []
@@ -21,14 +21,22 @@ async function loadBootstrapData(): Promise<BootstrapData> {
     apiFetch<{ books?: RawBookPayload[] }>('/my-books'),
     apiFetch<{ lists?: RawList[] }>('/reading-lists'),
     apiFetch<{ books?: RawBookPayload[] }>('/want-to-read-books'),
-    apiFetch<{ genres?: GenreSection[] }>('/global-library'),
+    apiFetch<{ genres?: RawGenreSection[] }>('/global-library'),
   ])
 
   return {
     books: asArray(myBooksRes?.books),
     lists: asArray(listsRes?.lists),
     wantToReadBooks: asArray(wantToReadRes?.books),
-    globalLibrary: asArray(globalRes?.genres),
+    // Every other list normalises on the way in; the shelves on the Library
+    // page are the one place that used to hand the backend's raw rows straight
+    // to the cards. That left `pages`/`totalPages` undefined on those books, so
+    // opening one and switching to My Reading seeded the tracking panel with
+    // 0/0 instead of the catalog's page count.
+    globalLibrary: asArray(globalRes?.genres).map((section) => ({
+      genre: section.genre,
+      books: asArray(section.books).map(normaliseBook),
+    })),
   }
 }
 
