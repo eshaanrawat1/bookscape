@@ -56,7 +56,7 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exiting = false, cardRef, onClose }: BookDialogProps) {
-  const { collections, wantToReadBooks, addBookToCollection, toggleBookWantToRead } = useLibraryData()
+  const { collections, wantToReadBooks, addBookToCollection, toggleBookWantToRead, refreshLibrary } = useLibraryData()
   const { onOpen, onOpenAuthor, onOpenSeries } = useNavigation()
   const [view, setView] = useState<'library' | 'tracking'>(() => (
     ['reading', 'done'].includes(book.status) ? 'tracking' : 'library'
@@ -258,6 +258,7 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
       }
       setRecord(nextRecord)
       lastSavedRef.current = recordSignature(nextRecord)
+      await refreshLibrary()
       setObsidianMessage('Pulled from vault.')
     } catch (err) {
       setObsidianMessage(err instanceof Error ? err.message : 'Could not pull from vault.')
@@ -292,6 +293,12 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
       const nextSaved: ReadingProgressRecord = { ...baseRecord, ...(data.entry || payload) }
       setRecord(nextSaved)
       lastSavedRef.current = recordSignature(nextSaved)
+      // The app-level book list is what "Reading now" and "Finished" are
+      // derived from, and it is only ever filled by the bootstrap fetch. A
+      // status or page edit here changes which of those a book belongs to, so
+      // without this the carousel keeps showing the pre-edit library until
+      // something else happens to reload it (an Obsidian pull, a restart).
+      await refreshLibrary()
     } catch {
       // Keep the draft visible; autosave will retry on the next edit.
     }

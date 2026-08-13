@@ -280,6 +280,7 @@ export default function App() {
     wantToRead,
     finished,
     booksByIds,
+    refreshLibrary: reloadAppData,
     addBookToCollection,
     removeBookFromCollection,
     toggleBookWantToRead,

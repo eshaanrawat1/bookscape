@@ -156,6 +156,7 @@ export interface LibraryDataContextValue {
   wantToRead: Book[]
   finished: Book[]
   booksByIds: (ids: string[]) => Book[]
+  refreshLibrary: () => Promise<void>
   addBookToCollection: (collectionName: string, bookId: string) => Promise<void>
   removeBookFromCollection: (collectionName: string, bookId: string) => Promise<void>
   toggleBookWantToRead: (bookId: string, isSaved: boolean) => Promise<void>
