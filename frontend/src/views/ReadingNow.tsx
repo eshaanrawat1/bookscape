@@ -1,6 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { toNumberOrZero } from '../utils.js'
 import { buildHeroGlow } from '../color.js'
 import BookCover from '../components/BookCover.jsx'
 import Progress from '../components/Progress.jsx'
@@ -47,7 +46,14 @@ function ReadingNowHero({ books, onOpen }: ReadingNowHeroProps) {
     setCurrentIndex((i) => (i - 1 + books.length) % books.length)
   }
 
-  const pagesLeft = Math.round((toNumberOrZero(book.pages) * (100 - toNumberOrZero(book.progress))) / 100)
+  // Subtracted from the reading row's own two numbers rather than scaled off
+  // the catalog's length. `book.pages` is the edition Goodreads describes and
+  // `book.progress` is measured against the copy in your hands, so multiplying
+  // one by the other mixed two different books: Dracula, 17 pages into a
+  // 703-page copy, claimed 478 pages left instead of 686. Even where the two
+  // counts agree the answer was approximate, since it scaled a length by a
+  // percentage already rounded to a whole number.
+  const pagesLeft = Math.max(0, book.totalPages - book.currentPage)
   const heroGlowColor = buildHeroGlow(book.color || `hsl(${book.tint})`)
 
   return (
@@ -76,7 +82,10 @@ function ReadingNowHero({ books, onOpen }: ReadingNowHeroProps) {
           <div className="progressBlock">
             <div>
               <span>{book.progress}%</span>
-              <span>{pagesLeft} pages left</span>
+              {/* A book with no page count on either row has no remainder to
+                  report, and rendering the subtraction anyway would announce
+                  "0 pages left" on a book you have barely started. */}
+              {book.totalPages > 0 && <span>{pagesLeft} pages left</span>}
             </div>
             <Progress value={book.progress} />
           </div>
