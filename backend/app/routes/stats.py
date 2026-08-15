@@ -6,12 +6,27 @@ from pathlib import Path
 
 from ..repository import DataRepository
 from ..services import heatmap
-from ..services.catalog import resolve_book as load_book
+from ..services.catalog import reading_overlay, resolve_book as load_book
 from ..utils import parse_iso_date, parse_iso_date_string
 
 
+# Books travel in the raw payload shape every other endpoint uses, so the client
+# builds them with the same normaliseBook() as everything else. This route used
+# to hand-assemble the client's Book shape itself — a second definition of what
+# a book is, which drifted: it never carried `pages`, `series` or
+# `seriesNumber`, so a card opened from the stats carousel showed no series link
+# until its /book/{id} fetch landed. These accessors are the only places that
+# need to know the raw field names.
 def _pages(book: dict) -> int:
-    return int(book.get("totalPages") or 0)
+    return int(book.get("reading_total_pages") or 0)
+
+
+def _rating(book: dict) -> float:
+    return float(book.get("avg_rating") or 0)
+
+
+def _rating_count(book: dict) -> int:
+    return int(book.get("rating_count") or 0)
 
 
 # The carousel's cards, in priority order. `rank` sorts candidates best-first and
@@ -67,17 +82,17 @@ def _featured_specs(days_spent) -> list[dict]:
             "key": "acclaimed",
             "label": "Crowd favourite",
             "unit": "average rating",
-            "eligible": lambda b: float(b.get("rating") or 0) > 0,
-            "rank": lambda b: float(b.get("rating") or 0),
-            "value": lambda b: round(float(b.get("rating") or 0), 2),
+            "eligible": lambda b: _rating(b) > 0,
+            "rank": _rating,
+            "value": lambda b: round(_rating(b), 2),
         },
         {
             "key": "obscure",
             "label": "Deepest cut",
             "unit": "ratings on Goodreads",
-            "eligible": lambda b: int(b.get("ratingCount") or 0) > 0,
-            "rank": lambda b: -int(b.get("ratingCount") or 0),
-            "value": lambda b: int(b.get("ratingCount") or 0),
+            "eligible": lambda b: _rating_count(b) > 0,
+            "rank": lambda b: -_rating_count(b),
+            "value": _rating_count,
         },
     ]
 
@@ -115,32 +130,15 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
     router = APIRouter()
 
     def _stats_book_payload(book_id: str, row: dict) -> dict:
+        # Same recipe as /my-books: the catalog half and the reading half of a
+        # book, assembled once. A book on this page is finished by definition,
+        # and the reading row says so on its own — no status to hardcode here.
         catalog = load_book(root, book_id) or {}
-        genres = catalog.get("genres", [])
-        if not isinstance(genres, list):
-            genres = [genres]
-        clean_genres = [str(g).strip() for g in genres if str(g).strip()]
-        total_pages = int(row.get("total_pages") or catalog.get("page_count") or 0)
         return {
+            **catalog,
+            **reading_overlay(row, catalog.get("page_count")),
             "id": book_id,
-            "title": str(catalog.get("title") or "Untitled"),
-            "author": str(catalog.get("author") or ""),
-            "cover": str(catalog.get("image_url") or ""),
-            "color": str(catalog.get("color") or ""),
-            "tint": "220 30% 45%",
-            "genre": clean_genres[0] if clean_genres else "",
-            "genres": clean_genres,
-            "totalPages": total_pages,
-            "currentPage": total_pages,
-            "startDate": str(row.get("start_date") or "").strip(),
-            "finishDate": str(row.get("finish_date") or "").strip(),
-            "rating": float(catalog.get("avg_rating") or 0),
-            "reviewCount": int(catalog.get("review_count") or 0),
-            "ratingCount": int(catalog.get("rating_count") or 0),
-            "progress": 100,
-            "status": "done",
-            "blurb": str(catalog.get("description") or ""),
-            "_raw": {**row, **({"linked_catalog_book": catalog} if catalog else {})},
+            "linked_catalog_book": catalog or None,
         }
 
     @router.get("/stats")
@@ -168,18 +166,18 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
         books_list: list[dict] = []
         genres: set[str] = set()
         for book_id, row in selected.items():
-            fd = parse_iso_date(row.get("finish_date"))
             book = _stats_book_payload(book_id, row)
-            books_list.append({**book, "finishDateObj": fd.isoformat() if fd else ""})
+            books_list.append(book)
             genres.update(book.get("genres", []))
 
-        books_list.sort(key=lambda b: (str(b.get("finishDate") or ""), str(b.get("title") or "")), reverse=True)
+        books_list.sort(key=lambda b: (str(b.get("reading_finish_date") or ""), str(b.get("title") or "")), reverse=True)
 
         def _days_spent(b: dict) -> int:
-            s, f = parse_iso_date(b.get("startDate")), parse_iso_date(b.get("finishDate"))
+            s = parse_iso_date(b.get("reading_start_date"))
+            f = parse_iso_date(b.get("reading_finish_date"))
             return max(1, (f - s).days + 1) if s and f and f >= s else 0
 
-        densest = max(books_list, key=lambda b: int(b.get("totalPages") or 0), default=None)
+        densest = max(books_list, key=_pages, default=None)
         longest = max(books_list, key=_days_spent, default=None)
 
         featured = _featured_books(books_list, _days_spent)
@@ -199,7 +197,7 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
             "period_label": period_label,
             "available_years": sorted(available_years, reverse=True),
             "books_read": len(books_list),
-            "pages_read": sum(int(b.get("totalPages") or 0) for b in books_list),
+            "pages_read": sum(_pages(b) for b in books_list),
             "genres_covered": len(genres),
             "genre_list": sorted(genres),
             "densest_book": densest,

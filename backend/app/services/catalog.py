@@ -48,12 +48,70 @@ def _genres_for_uid(conn, uid: str) -> list[str]:
     return [row["name"] for row in rows]
 
 
-def _row_to_book(conn, row, genres_map: dict[str, list[str]] | None = None) -> dict:
+def _state_for_uid(conn, uid: str) -> dict | None:
+    row = conn.execute("SELECT * FROM user_book_state WHERE uid = ?", (uid,)).fetchone()
+    return dict(row) if row else None
+
+
+def _states_map(conn) -> dict[str, dict]:
+    rows = conn.execute("SELECT * FROM user_book_state").fetchall()
+    return {row["uid"]: dict(row) for row in rows}
+
+
+def reading_overlay(state: dict | None, page_count: object = 0) -> dict:
+    """The reading-row half of a book payload, in the shape the client reads.
+
+    A book is two rows — the catalog row (what the edition *is*) and the
+    user_book_state row (where *you* are in it) — and the card that renders a
+    book wants both. Keeping the overlay in one function, applied at the single
+    point where a catalog row becomes a dict, is what makes progress show up on
+    every page that lists books rather than only the ones whose endpoint
+    remembered to join the reading row. It used to be the latter, which is why
+    a book you were halfway through rendered as an untouched one everywhere
+    except Reading Now.
+
+    The keys are prefixed `reading_` because both rows carry a page count and
+    they mean different things: the reading row's is the edition in your hands,
+    the catalog's `page_count` is whatever was scraped. The client prefers the
+    former, so an untracked book falls back to the latter here — the same rule
+    GET /reading-progress/{id} already applies when it seeds a fresh tracking
+    panel, and the reason opening one lands on "0 of 412" rather than "0 of 0".
+
+    Every book gets the full set, zeroed and "not_started" when there is no
+    reading row, so no consumer has to test for presence.
+    """
+    state = state or {}
+    total_pages = int(state.get("total_pages") or 0)
+    if total_pages <= 0:
+        total_pages = max(0, int(page_count or 0))
+    return {
+        "reading_status": str(state.get("status") or "not_started"),
+        "reading_current_page": int(state.get("current_page") or 0),
+        "reading_total_pages": total_pages,
+        "reading_start_date": str(state.get("start_date") or ""),
+        "reading_finish_date": str(state.get("finish_date") or ""),
+        "liked": bool(state.get("liked")),
+        "want_to_read": bool(state.get("want_to_read")),
+    }
+
+
+def _row_to_book(
+    conn,
+    row,
+    genres_map: dict[str, list[str]] | None = None,
+    states_map: dict[str, dict] | None = None,
+) -> dict:
     book = dict(row)
+    uid = book["uid"]
     book["similar_book_ids"] = _parse_json_list(book.get("similar_book_ids"))
     book["genres"] = (
-        genres_map.get(book["uid"], []) if genres_map is not None else _genres_for_uid(conn, book["uid"])
+        genres_map.get(uid, []) if genres_map is not None else _genres_for_uid(conn, uid)
     )
+    # The maps are the bulk path: callers listing more than one book build them
+    # once up front so attaching genres and reading state stays two queries
+    # rather than two per book.
+    state = states_map.get(uid) if states_map is not None else _state_for_uid(conn, uid)
+    book.update(reading_overlay(state, book.get("page_count")))
     return book
 
 
@@ -67,7 +125,8 @@ def _load_all_books(conn) -> list[dict]:
     genres_map: dict[str, list[str]] = {}
     for row in genre_rows:
         genres_map.setdefault(row["uid"], []).append(row["name"])
-    return [_row_to_book(conn, row, genres_map) for row in book_rows]
+    states = _states_map(conn)
+    return [_row_to_book(conn, row, genres_map, states) for row in book_rows]
 
 
 def _replace_genres(conn, uid: str, genre_names: list) -> None:
@@ -145,7 +204,8 @@ def get_book_with_similar(root: Path, book_id: str) -> dict | None:
         with transaction(root) as conn:
             placeholders = ", ".join(["?"] * len(similar_ids))
             rows = conn.execute(f"SELECT * FROM books WHERE uid IN ({placeholders})", similar_ids).fetchall()
-            by_uid = {row["uid"]: _row_to_book(conn, row) for row in rows}
+            states = _states_map(conn)
+            by_uid = {row["uid"]: _row_to_book(conn, row, states_map=states) for row in rows}
         similar_books = [by_uid[sid] for sid in similar_ids if sid in by_uid]
 
     result = dict(book)
@@ -232,28 +292,12 @@ def get_global_library(root: Path) -> list[dict]:
     for genre in top_genres:
         genre_books = by_genre[genre]
         genre_books.sort(key=lambda x: int(x.get("rating_count", 0) or 0), reverse=True)
-        mapped = [
-            {
-                "id": b.get("uid", ""),
-                "title": b.get("title", "Untitled"),
-                "author": b.get("author", ""),
-                "cover": b.get("image_url", ""),
-                "color": b.get("color", ""),
-                "tint": "220 30% 45%",
-                "genre": genre,
-                "genres": b.get("genres", []),
-                "series": b.get("series", ""),
-                "series_number": b.get("series_number", ""),
-                "avg_rating": b.get("avg_rating", 0),
-                "rating_count": b.get("rating_count", 0),
-                "review_count": b.get("review_count", 0),
-                "book_rating": b.get("avg_rating", 0),
-                "description": b.get("description", ""),
-                "total_pages": b.get("page_count", 0),
-                "status": "not_started",
-            }
-            for b in genre_books[:30]
-        ]
+        # Only the genre is overridden — a book filed under several should read
+        # as belonging to the shelf it is sitting on. Everything else is passed
+        # through as-is: this used to hand-pick a dozen keys and hardcode
+        # "not_started", which is how the Library page became the one place a
+        # book you were halfway through rendered as an untouched one.
+        mapped = [{**b, "genre": genre} for b in genre_books[:30]]
         library.append({"genre": genre, "books": mapped})
 
     return library
@@ -310,7 +354,8 @@ def get_books_by_series(root: Path, series: str) -> list[dict]:
             "SELECT * FROM books WHERE series = ? COLLATE NOCASE",
             (query,),
         ).fetchall()
-        matched = [_row_to_book(conn, row) for row in rows]
+        states = _states_map(conn)
+        matched = [_row_to_book(conn, row, states_map=states) for row in rows]
 
     matched.sort(key=series_sort_key)
     return matched
@@ -330,6 +375,7 @@ def get_books_by_genre(root: Path, genre: str, limit: int = 100) -> list[dict]:
             "ORDER BY books.rating_count DESC LIMIT ?",
             (query, limit),
         ).fetchall()
-        matched = [_row_to_book(conn, row) for row in rows]
+        states = _states_map(conn)
+        matched = [_row_to_book(conn, row, states_map=states) for row in rows]
 
     return matched

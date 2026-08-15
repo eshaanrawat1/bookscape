@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import BookCover from './BookCover.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
-import { formatCompactNumber } from '../utils.js'
+import { formatCompactNumber, normaliseBook } from '../utils.js'
 import type { FeaturedStat } from '../types.js'
 
 interface StatsCarouselProps {
@@ -92,36 +92,39 @@ function StatsCarousel({ featured }: StatsCarouselProps) {
       </div>
 
       <div className="statsFocusScroll" ref={scrollRef} tabIndex={0} role="group" aria-label="Standout books">
-        {featured.map((stat) => (
-          <article className="statsFocusCard" key={stat.key}>
-            <button
-              type="button"
-              className="statsFocusCover"
-              onClick={() => onOpen(stat.book)}
-              aria-label={`${stat.label}: ${stat.book.title}, ${formatValue(stat)} ${stat.unit}`}
-            >
-              <BookCover book={stat.book} />
-            </button>
-            <div className="statsFocusBody">
-              <p className="statsFocusLabel">{stat.label}</p>
-              <strong className="statsFocusValue">{formatValue(stat)}</strong>
-              <p className="statsFocusUnit">{stat.unit}</p>
-              <button type="button" className="statsFocusTitle" onClick={() => onOpen(stat.book)}>
-                {stat.book.title}
+        {featured.map((stat) => {
+          const book = normaliseBook(stat.book)
+          return (
+            <article className="statsFocusCard" key={stat.key}>
+              <button
+                type="button"
+                className="statsFocusCover"
+                onClick={() => onOpen(book)}
+                aria-label={`${stat.label}: ${book.title}, ${formatValue(stat)} ${stat.unit}`}
+              >
+                <BookCover book={book} />
               </button>
-              {stat.book.author ? (
-                <button
-                  type="button"
-                  className="statsFocusAuthor"
-                  onClick={() => onOpenAuthor?.(stat.book.author)}
-                  disabled={!onOpenAuthor}
-                >
-                  {stat.book.author}
+              <div className="statsFocusBody">
+                <p className="statsFocusLabel">{stat.label}</p>
+                <strong className="statsFocusValue">{formatValue(stat)}</strong>
+                <p className="statsFocusUnit">{stat.unit}</p>
+                <button type="button" className="statsFocusTitle" onClick={() => onOpen(book)}>
+                  {book.title}
                 </button>
-              ) : null}
-            </div>
-          </article>
-        ))}
+                {book.author ? (
+                  <button
+                    type="button"
+                    className="statsFocusAuthor"
+                    onClick={() => onOpenAuthor?.(book.author)}
+                    disabled={!onOpenAuthor}
+                  >
+                    {book.author}
+                  </button>
+                ) : null}
+              </div>
+            </article>
+          )
+        })}
       </div>
     </section>
   )

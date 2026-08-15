@@ -100,12 +100,16 @@ export interface RawGenreSection {
 // One carousel card: a superlative, the number that earned it, and the book that
 // won. The backend picks these and never repeats a book across cards, so the
 // list is already display-ready and can be shorter than the six specs.
+//
+// `book` is a raw payload like every other endpoint's, not a Book: the card runs
+// it through normaliseBook() so this page builds a book exactly the way the rest
+// of the app does, rather than trusting a second hand-rolled shape.
 export interface FeaturedStat {
   key: string
   label: string
   value: number
   unit: string
-  book: Book
+  book: RawBookPayload
 }
 
 export interface StatsSummary {
@@ -114,8 +118,8 @@ export interface StatsSummary {
   pages_read: number
   genres_covered: number
   genre_list: string[]
-  densest_book: Book | null
-  most_time_spent: Book | null
+  densest_book: RawBookPayload | null
+  most_time_spent: RawBookPayload | null
   most_time_spent_days: number
   featured: FeaturedStat[]
 }

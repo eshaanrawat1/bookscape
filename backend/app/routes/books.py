@@ -5,7 +5,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from ..repository import DataRepository
-from ..services.catalog import resolve_book
+from ..services.catalog import reading_overlay, resolve_book
 
 
 class ReadingProgressIn(BaseModel):
@@ -54,26 +54,17 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
             if status not in {"reading", "done"}:
                 continue
             catalog = resolve_book(root, book_id) or {}
+            # The catalog half and the reading half of a book are assembled the
+            # same way here as on every other endpoint, so a book carries the
+            # same fields whichever page asked for it. This route used to
+            # hand-pick a subset, which is why a book opened from a shelf had
+            # no rating or page count until linked_catalog_book was consulted.
             books.append({
+                **catalog,
+                **reading_overlay({**row, "status": status}, catalog.get("page_count")),
                 "id": str(book_id),
-                "title": str(catalog.get("title") or ""),
-                "author": str(catalog.get("author") or ""),
-                "image_url": str(catalog.get("image_url") or ""),
-                "genres": catalog.get("genres", []),
-                "series": str(catalog.get("series") or ""),
-                "series_number": str(catalog.get("series_number") or ""),
-                "rating": catalog.get("avg_rating") or 0,
-                "description": str(catalog.get("description") or ""),
-                "color": str(catalog.get("color") or ""),
-                "reading_status": status,
-                "reading_current_page": int(row.get("current_page") or 0),
-                "reading_total_pages": int(row.get("total_pages") or 0),
-                "reading_finish_date": row.get("finish_date", ""),
-                "reading_start_date": row.get("start_date", ""),
                 "linked_catalog_book": catalog or None,
                 "notes": row.get("notes", ""),
-                "liked": row.get("liked", False),
-                "want_to_read": row.get("want_to_read", False),
             })
         books.sort(
             key=lambda b: (str(b.get("reading_finish_date") or ""), str(b.get("reading_start_date") or ""), str(b.get("title") or "")),
