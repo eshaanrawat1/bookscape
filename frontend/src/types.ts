@@ -11,7 +11,15 @@ export interface RawBookPayload {
   cover?: string
   image_url?: string
   color?: string
-  linked_catalog_book?: { color?: string; series?: string; series_number?: string } | null
+  linked_catalog_book?: {
+    color?: string
+    series?: string
+    series_number?: string
+    avg_rating?: number | string
+    rating_count?: number | string
+    review_count?: number | string
+    page_count?: number
+  } | null
   genre?: string
   genres?: string[]
   series?: string

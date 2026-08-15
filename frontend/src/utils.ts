@@ -89,10 +89,16 @@ function normaliseBook(raw: RawBookPayload): Book {
   const status = raw.reading_status || raw.status || 'not_started'
   const genres = Array.isArray(raw.genres) ? raw.genres.filter(Boolean) : []
   const primaryGenre = raw.genre || genres[0] || ''
-  const rating = parseFloat(String(raw.avg_rating ?? raw.book_rating ?? '')) || 0
-  const pages = raw.page_count || raw.total_pages || raw.reading_total_pages || totalPages
-  const reviewCount = parseInt(String(raw.review_count ?? 0), 10) || 0
-  const ratingCount = parseInt(String(raw.rating_count ?? 0), 10) || 0
+  // /my-books is built around the reading row and carries none of the catalog's
+  // review stats at the top level — only nested under `linked_catalog_book`, the
+  // same reason `color` and `series` fall back the way they do. Without these
+  // fallbacks a finished or in-progress book opened its About tab with no
+  // rating and no review count, while the very same book showed both in Library.
+  const catalog = raw.linked_catalog_book || {}
+  const rating = parseFloat(String(raw.avg_rating ?? raw.book_rating ?? catalog.avg_rating ?? '')) || 0
+  const pages = raw.page_count || raw.total_pages || raw.reading_total_pages || totalPages || catalog.page_count || 0
+  const reviewCount = parseInt(String(raw.review_count ?? catalog.review_count ?? 0), 10) || 0
+  const ratingCount = parseInt(String(raw.rating_count ?? catalog.rating_count ?? 0), 10) || 0
 
   return {
     id: raw.id || raw.uid || '',

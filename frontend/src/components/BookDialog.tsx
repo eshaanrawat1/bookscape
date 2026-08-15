@@ -49,6 +49,16 @@ const recordSignature = (record: ReadingProgressRecord): string => JSON.stringif
   notes: String(record.notes || '').trim(),
 })
 
+// "Did this payload actually say something?" — a 0 rating, an empty blurb and an
+// empty genre list are all normaliseBook's stand-ins for a missing field, not
+// values worth preferring over one that was fetched.
+const hasValue = (value: unknown): boolean => {
+  if (Array.isArray(value)) return value.length > 0
+  if (typeof value === 'number') return Number.isFinite(value) && value !== 0
+  if (typeof value === 'string') return value.trim() !== ''
+  return value !== null && value !== undefined
+}
+
 const STATUS_LABELS: Record<string, string> = {
   done: 'Finished',
   reading: 'Reading',
@@ -154,7 +164,20 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
     return () => { cancelled = true }
   }, [bookId])
 
-  const displayBook = fullBook ? { ...fullBook, ...book, similar_books: fullBook.similar_books || book.similar_books || [] } : book
+  // The card's own payload wins — it carries the live reading state the catalog
+  // row knows nothing about — but only where it actually has a value. A plain
+  // `{ ...fullBook, ...book }` let a sparse list payload's zeros and empty
+  // strings overwrite what the /book/{id} fetch just supplied, blanking the
+  // About tab's stats for books opened from a reading shelf.
+  const displayBook = fullBook
+    ? {
+        ...fullBook,
+        ...(Object.fromEntries(
+          Object.entries(book).filter(([key, value]) => hasValue(value) || !hasValue(fullBook[key as keyof Book])),
+        ) as Partial<Book>),
+        similar_books: fullBook.similar_books || book.similar_books || [],
+      } as Book
+    : book
   const similarBooks = displayBook.similar_books || []
   const dialogGenres = (displayBook.genres && displayBook.genres.length > 0)
     ? displayBook.genres.slice(0, 5)
