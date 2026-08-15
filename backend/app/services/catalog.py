@@ -278,7 +278,7 @@ def get_global_library(root: Path) -> list[dict]:
     if not all_books:
         return []
 
-    top_genres = ["Romantasy", "Romance", "Fantasy", "Dark Academia", "Contemporary", "Fiction", "High Fantasy", "Mystery"]
+    top_genres = ["Romantasy", "Romance", "Fantasy", "Young Adult", "Classics", "High Fantasy", "Dark Academia", "Science Fiction", "Historical Fiction", "Mystery", "Thriller", "Nonfiction", "Philosophy", "Self Help", "Psychology", "History"]
     top_genres_set = set(top_genres)
 
     by_genre: dict[str, list[dict]] = {g: [] for g in top_genres}
