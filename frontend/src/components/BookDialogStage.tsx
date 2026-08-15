@@ -4,7 +4,6 @@ import type { Book } from '../types.js'
 
 export interface Selected {
   book: Book
-  preferLiveStatus?: boolean
   isNavigation?: boolean
 }
 
@@ -166,7 +165,6 @@ function BookDialogStage({ selected, onClose }: BookDialogStageProps) {
           <BookDialog
             key={outgoing.book.id}
             book={outgoing.book}
-            preferLiveStatus={outgoing.preferLiveStatus}
             onClose={onClose}
             exiting
           />
@@ -174,7 +172,6 @@ function BookDialogStage({ selected, onClose }: BookDialogStageProps) {
         <BookDialog
           key={selected.book.id}
           book={selected.book}
-          preferLiveStatus={selected.preferLiveStatus}
           isNavigation={selected.isNavigation}
           cardRef={cardRef}
           onClose={onClose}

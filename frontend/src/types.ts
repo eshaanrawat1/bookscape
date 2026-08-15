@@ -173,6 +173,11 @@ export interface LibraryDataContextValue {
   wantToRead: Book[]
   finished: Book[]
   booksByIds: (ids: string[]) => Book[]
+  // Bumped every time the app-level lists are reloaded. Views that fetch their
+  // own books (the author, series and genre drilldowns, and search) watch it so
+  // an edit made in the dialog reaches them too — the context lists refresh
+  // themselves, but those pages own their results and would otherwise go stale.
+  dataVersion: number
   refreshLibrary: () => Promise<void>
   addBookToCollection: (collectionName: string, bookId: string) => Promise<void>
   removeBookFromCollection: (collectionName: string, bookId: string) => Promise<void>
@@ -188,5 +193,4 @@ export interface NavigationContextValue {
   onOpenSeries: (series: string) => void
   onOpenGenre: (genre: string) => void
   onOpenWantToRead: () => void
-  onOpenReadingNow: (book: Book) => void
 }

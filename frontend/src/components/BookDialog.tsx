@@ -15,7 +15,6 @@ import type { Book, RawBookPayload } from '../types.js'
 
 interface BookDialogProps {
   book: Book
-  preferLiveStatus?: boolean
   isNavigation?: boolean
   exiting?: boolean
   cardRef?: Ref<HTMLElement>
@@ -65,7 +64,7 @@ const STATUS_LABELS: Record<string, string> = {
   not_started: 'Not started',
 }
 
-function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exiting = false, cardRef, onClose }: BookDialogProps) {
+function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onClose }: BookDialogProps) {
   const { collections, wantToReadBooks, addBookToCollection, toggleBookWantToRead, refreshLibrary } = useLibraryData()
   const { onOpen, onOpenAuthor, onOpenSeries } = useNavigation()
   const [view, setView] = useState<'library' | 'tracking'>(() => (
@@ -211,6 +210,11 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
       return () => { cancelled = true }
     }
 
+    // The fetched entry is authoritative — it and the card that opened this
+    // dialog are the same user_book_state row, so the panel reads the same no
+    // matter which page the book was opened from. `baseRecord` only fills the
+    // gap before it lands, and supplies the page count for a book nobody has
+    // tracked yet.
     apiFetch<ReadingProgressResponse>(`/reading-progress/${bookId}`)
       .then((data) => {
         if (cancelled) return
@@ -220,9 +224,6 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
           ...next,
           total_pages: Number(next.total_pages) || baseRecord.total_pages,
         }
-        if (preferLiveStatus) {
-          nextRecord.status = baseRecord.status
-        }
         setRecord(nextRecord)
         lastSavedRef.current = recordSignature(nextRecord)
         setHydrated(true)
@@ -230,9 +231,6 @@ function BookDialog({ book, preferLiveStatus = false, isNavigation = false, exit
       .catch(() => {
         if (!cancelled) {
           const nextRecord = { ...baseRecord }
-          if (preferLiveStatus) {
-            nextRecord.status = baseRecord.status
-          }
           setRecord(nextRecord)
           lastSavedRef.current = recordSignature(nextRecord)
           setHydrated(true)

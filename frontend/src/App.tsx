@@ -52,6 +52,7 @@ export default function App() {
   const [collections, setCollections] = useState<Collection[]>([])
   const [wantToReadBooks, setWantToReadBooks] = useState<Book[]>([])
   const [globalLibrary, setGlobalLibrary] = useState<GenreSection[]>([])
+  const [dataVersion, setDataVersion] = useState(0)
   const [loading, setLoading] = useState(true)
   const [vaultBusy, setVaultBusy] = useState<'push' | 'pull' | null>(null)
   const [vaultError, setVaultError] = useState<string | null>(null)
@@ -101,6 +102,9 @@ export default function App() {
     setCollections(mapReadingLists(data.lists))
     setWantToReadBooks(data.wantToReadBooks.map(normaliseBook))
     setGlobalLibrary(data.globalLibrary)
+    // Views that fetch their own books watch this rather than these lists, so
+    // one reload refreshes the whole app rather than only the shelves.
+    setDataVersion((version) => version + 1)
   }
 
   // Derived views from live books
@@ -129,7 +133,6 @@ export default function App() {
 
   const openBookDialog = (book: Book) =>
     setSelected((prev) => ({ book, isNavigation: prev !== null }))
-  const openBookTracking = (book: Book) => setSelected({ book, preferLiveStatus: true })
 
   const openAuthorPage = (author: string) => {
     const cleanAuthor = String(author || '').trim()
@@ -280,6 +283,7 @@ export default function App() {
     wantToRead,
     finished,
     booksByIds,
+    dataVersion,
     refreshLibrary: reloadAppData,
     addBookToCollection,
     removeBookFromCollection,
@@ -295,7 +299,6 @@ export default function App() {
     onOpenSeries: openSeriesPage,
     onOpenGenre: openGenrePage,
     onOpenWantToRead: openWantToRead,
-    onOpenReadingNow: openBookTracking,
   }
 
   return (
