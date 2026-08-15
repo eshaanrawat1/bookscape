@@ -1796,12 +1796,16 @@ svg {
   color: color-mix(in oklch, var(--muted-foreground) 62%, transparent);
 }
 
+/* Long notes scroll inside the field — letting the textarea grow with its
+   content stretched the whole card, so cap it and keep the card's height fixed. */
 .trackingPropValue textarea {
-  resize: vertical;
-  min-height: 16rem;
+  resize: none;
+  height: 16rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   line-height: 1.65;
   font-family: inherit;
-  field-sizing: content;
 }
 
 /* Dates use our own picker rather than `<input type="date">` — WebKit's field
