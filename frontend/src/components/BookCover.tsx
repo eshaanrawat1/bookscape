@@ -8,7 +8,7 @@ interface BookCoverProps {
 }
 
 function BookCover({ book, glow = false }: BookCoverProps) {
-  const coverGlowColor = buildHeroGlow(book.color || `hsl(${book.tint})`)
+  const coverGlowColor = buildHeroGlow(book.color)
   const [loaded, setLoaded] = useState(false)
   const prevCoverRef = useRef(book.cover)
 

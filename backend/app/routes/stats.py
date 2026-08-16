@@ -182,19 +182,9 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
 
         featured = _featured_books(books_list, _days_spent)
 
-        if year is not None and month is not None:
-            period_label = date(year, month, 1).strftime("%B %Y")
-        elif year is not None:
-            period_label = str(year)
-        elif month is not None:
-            period_label = date(2000, month, 1).strftime("%B")
-        else:
-            period_label = "All time"
-
         return {
             "year": year,
             "month": month,
-            "period_label": period_label,
             "available_years": sorted(available_years, reverse=True),
             "books_read": len(books_list),
             "pages_read": sum(_pages(b) for b in books_list),

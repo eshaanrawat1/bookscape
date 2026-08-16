@@ -32,10 +32,10 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
             "notes": str(record.get("notes") or ""),
         }
 
-    def _empty_entry(book_id: str, status: str = "not_started", total_pages: int = 0) -> dict:
+    def _empty_entry(book_id: str, total_pages: int = 0) -> dict:
         return {
             "book_id": book_id,
-            "status": status,
+            "status": "not_started",
             "current_page": 0,
             "total_pages": total_pages,
             "start_date": "",

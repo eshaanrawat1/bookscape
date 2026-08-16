@@ -47,7 +47,7 @@ function AuthorHero({ books, onOpen }: AuthorHeroProps) {
     setCurrentIndex((i) => (i - 1 + books.length) % books.length)
   }
 
-  const heroGlowColor = buildHeroGlow(book.color || `hsl(${book.tint})`)
+  const heroGlowColor = buildHeroGlow(book.color)
 
   return (
     <section className="heroCard paperGrain">

@@ -405,7 +405,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
       <article
         ref={cardRef}
         className={articleClassName}
-        style={{ '--dialog-glow': buildDialogGlow(displayBook.color || `hsl(${displayBook.tint})`) } as CSSProperties}
+        style={{ '--dialog-glow': buildDialogGlow(displayBook.color) } as CSSProperties}
         onClick={(event) => event.stopPropagation()}
       >
         <button className="dialogIconButton dialogClose" onClick={onClose} aria-label="Close details">

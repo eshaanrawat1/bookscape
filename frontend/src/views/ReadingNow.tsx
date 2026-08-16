@@ -54,7 +54,7 @@ function ReadingNowHero({ books, onOpen }: ReadingNowHeroProps) {
   // counts agree the answer was approximate, since it scaled a length by a
   // percentage already rounded to a whole number.
   const pagesLeft = Math.max(0, book.totalPages - book.currentPage)
-  const heroGlowColor = buildHeroGlow(book.color || `hsl(${book.tint})`)
+  const heroGlowColor = buildHeroGlow(book.color)
 
   return (
     <section className="heroCard paperGrain">

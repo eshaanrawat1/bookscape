@@ -13,12 +13,11 @@ BOOK_STATE_COLUMNS = {
     "total_pages",
     "start_date",
     "finish_date",
-    "liked",
     "want_to_read",
     "notes",
     "obsidian_filename",
 }
-BOOK_STATE_BOOL_COLUMNS = {"liked", "want_to_read"}
+BOOK_STATE_BOOL_COLUMNS = {"want_to_read"}
 
 
 class DataRepository:

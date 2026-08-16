@@ -90,7 +90,6 @@ def reading_overlay(state: dict | None, page_count: object = 0) -> dict:
         "reading_total_pages": total_pages,
         "reading_start_date": str(state.get("start_date") or ""),
         "reading_finish_date": str(state.get("finish_date") or ""),
-        "liked": bool(state.get("liked")),
         "want_to_read": bool(state.get("want_to_read")),
     }
 
@@ -231,7 +230,7 @@ def search_books(root: Path, query: str, limit: int = 10) -> list[dict]:
         author_lower = str(point.get("author", "")).strip().lower()
         genres = point.get("genres", [])
         genres_text = " ".join(str(g) for g in genres) if isinstance(genres, list) else str(genres or "")
-        text_lower = f"{title_lower} {author_lower} {point.get('genre', '')} {genres_text} {point.get('description', '')}".lower()
+        text_lower = f"{title_lower} {author_lower} {genres_text} {point.get('description', '')}".lower()
 
         if title_lower.startswith(q):
             lex_score = 5

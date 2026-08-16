@@ -50,7 +50,12 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   ]
 }
 
-function buildHeroGlow(color?: string | null, fallback = 'oklch(0.62 0.14 250)'): string {
+// The fallback is what a book with no sampled cover color glows: a neutral
+// blue. It lives here rather than being stamped onto every Book, which is what
+// the old `tint` field was — one constant copied onto every row in the app.
+const NEUTRAL_GLOW = 'hsl(220 30% 45%)'
+
+function buildHeroGlow(color?: string | null, fallback = NEUTRAL_GLOW): string {
   const raw = String(color || '').trim()
   const rgbMatch = raw.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*[\d.]+\s*)?\)$/i)
   if (rgbMatch) {
@@ -73,7 +78,7 @@ function buildHeroGlow(color?: string | null, fallback = 'oklch(0.62 0.14 250)')
   return fallback
 }
 
-function buildDialogGlow(color?: string | null, fallback = 'oklch(0.62 0.14 250)'): string {
+function buildDialogGlow(color?: string | null, fallback = NEUTRAL_GLOW): string {
   const raw = String(color || '').trim()
   const rgbMatch = raw.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*[\d.]+\s*)?\)$/i)
   if (rgbMatch) {

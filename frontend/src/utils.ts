@@ -95,7 +95,7 @@ function normaliseBook(raw: RawBookPayload): Book {
   // fallbacks a finished or in-progress book opened its About tab with no
   // rating and no review count, while the very same book showed both in Library.
   const catalog = raw.linked_catalog_book || {}
-  const rating = parseFloat(String(raw.avg_rating ?? raw.book_rating ?? catalog.avg_rating ?? '')) || 0
+  const rating = parseFloat(String(raw.avg_rating ?? catalog.avg_rating ?? '')) || 0
   const pages = raw.page_count || raw.total_pages || raw.reading_total_pages || totalPages || catalog.page_count || 0
   const reviewCount = parseInt(String(raw.review_count ?? catalog.review_count ?? 0), 10) || 0
   const ratingCount = parseInt(String(raw.rating_count ?? catalog.rating_count ?? 0), 10) || 0
@@ -104,9 +104,8 @@ function normaliseBook(raw: RawBookPayload): Book {
     id: raw.id || raw.uid || '',
     title: raw.title || 'Untitled',
     author: raw.author || '',
-    cover: raw.cover || raw.image_url || '',
+    cover: raw.image_url || '',
     color: raw.color || raw.linked_catalog_book?.color || '',
-    tint: '220 30% 45%', // neutral fallback tint — image_url is used for actual cover art
     genre: primaryGenre,
     genres,
     // /my-books nests the catalog row under linked_catalog_book, the same
@@ -190,7 +189,6 @@ export {
   mapReadingLists,
   nextCollectionName,
   formatCompactNumber,
-  toNumberOrZero,
   normaliseBook,
   getCatalogBookId,
   resolveSavedWantToReadBook,

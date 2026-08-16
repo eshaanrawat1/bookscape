@@ -47,7 +47,6 @@ class CoverWorker:
     def __init__(self, root: Path) -> None:
         self._root = root
         self._wake = threading.Event()
-        self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._limiter = covers.RateLimiter()
 
@@ -75,19 +74,15 @@ class CoverWorker:
         """Wake the worker now — a book was just added."""
         self._wake.set()
 
-    def stop(self) -> None:
-        self._stop.set()
-        self._wake.set()
-
     def _sleep(self, seconds: float) -> None:
-        """Interruptible pause. Returns early when poked or stopped."""
+        """Interruptible pause. Returns early when poked."""
         self._wake.wait(seconds)
         self._wake.clear()
 
     def _run(self) -> None:
         session = covers.new_session()
         try:
-            while not self._stop.is_set():
+            while True:
                 try:
                     result = covers.process_one(self._root, session, self._limiter)
                 except Exception:
