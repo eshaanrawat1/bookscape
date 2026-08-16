@@ -49,7 +49,6 @@ CREATE TABLE IF NOT EXISTS user_book_state (
   total_pages       INTEGER NOT NULL DEFAULT 0,
   start_date        TEXT NOT NULL DEFAULT '',
   finish_date       TEXT NOT NULL DEFAULT '',
-  liked             INTEGER NOT NULL DEFAULT 0 CHECK (liked IN (0,1)),
   want_to_read      INTEGER NOT NULL DEFAULT 0 CHECK (want_to_read IN (0,1)),
   notes             TEXT NOT NULL DEFAULT '',
   obsidian_filename TEXT,
