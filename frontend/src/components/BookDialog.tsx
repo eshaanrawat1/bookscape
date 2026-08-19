@@ -656,6 +656,32 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
 
                   <label className="trackingProp">
                     <span className="trackingPropLabel">
+                      <Star aria-hidden="true" />
+                      <span>My Rating</span>
+                    </span>
+                    <span className="trackingPropValue">
+                      <input
+                        type="number"
+                        min="0"
+                        max="5"
+                        step="0.01"
+                        className="trackingPageInput trackingRatingInput"
+                        placeholder="Empty"
+                        // Only the *number* 0 — what the server sends for a book
+                        // you have not rated — falls back to the placeholder.
+                        // Typing stores a string, so the "0" on the way to "0.5"
+                        // is not `=== 0` and stays on screen; testing
+                        // `Number(x) > 0` instead would blank the field the
+                        // instant you typed the leading zero.
+                        value={draft.my_rating === 0 ? '' : draft.my_rating}
+                        onChange={(event) => updateField('my_rating', event.target.value)}
+                      />
+                      <span className="trackingRatingScale">/ 5</span>
+                    </span>
+                  </label>
+
+                  <label className="trackingProp">
+                    <span className="trackingPropLabel">
                       <Hash aria-hidden="true" />
                       <span>Total Pages</span>
                     </span>
@@ -734,32 +760,6 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
                       />
                     </span>
                   </div>
-
-                  <label className="trackingProp">
-                    <span className="trackingPropLabel">
-                      <Star aria-hidden="true" />
-                      <span>My Rating</span>
-                    </span>
-                    <span className="trackingPropValue">
-                      <input
-                        type="number"
-                        min="0"
-                        max="5"
-                        step="0.01"
-                        className="trackingPageInput trackingRatingInput"
-                        placeholder="Empty"
-                        // Only the *number* 0 — what the server sends for a book
-                        // you have not rated — falls back to the placeholder.
-                        // Typing stores a string, so the "0" on the way to "0.5"
-                        // is not `=== 0` and stays on screen; testing
-                        // `Number(x) > 0` instead would blank the field the
-                        // instant you typed the leading zero.
-                        value={draft.my_rating === 0 ? '' : draft.my_rating}
-                        onChange={(event) => updateField('my_rating', event.target.value)}
-                      />
-                      <span className="trackingRatingScale">/ 5</span>
-                    </span>
-                  </label>
 
                   <label className="trackingProp notes">
                     <span className="trackingPropLabel">
