@@ -1,4 +1,4 @@
-export type ReadingStatus = 'not_started' | 'reading' | 'done'
+export type ReadingStatus = 'not_started' | 'reading' | 'done' | 'dnf'
 
 // Raw payload shapes vary across endpoints (/my-books, /global-library, /search,
 // /author-books, /genre-books, /book/{id}); normaliseBook() is the single place

@@ -44,7 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_bg_uid_pos ON book_genres(uid, position);
 CREATE TABLE IF NOT EXISTS user_book_state (
   uid               TEXT PRIMARY KEY REFERENCES books(uid) ON DELETE CASCADE,
   status            TEXT NOT NULL DEFAULT 'not_started'
-                       CHECK (status IN ('not_started','reading','done')),
+                       CHECK (status IN ('not_started','reading','done','dnf')),
   current_page      INTEGER NOT NULL DEFAULT 0,
   total_pages       INTEGER NOT NULL DEFAULT 0,
   start_date        TEXT NOT NULL DEFAULT '',

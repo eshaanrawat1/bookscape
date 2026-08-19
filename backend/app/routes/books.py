@@ -7,6 +7,15 @@ from pydantic import BaseModel
 from ..repository import DataRepository
 from ..services.catalog import reading_overlay, resolve_book
 
+# A book the user has picked up, in any sense — the set /my-books is built from.
+# 'not_started' is the absence of a shelf, not a shelf of its own, so it is the
+# one status excluded: those books live in the catalog and are reachable through
+# Library and search. 'dnf' has to be in here even though it gets no shelf of its
+# own, because this list is the whole client-side `books` array — leaving it out
+# would make abandoning a book look like deleting it.
+TRACKED_STATUSES = {"reading", "done", "dnf"}
+VALID_STATUSES = {"not_started", *TRACKED_STATUSES}
+
 
 class ReadingProgressIn(BaseModel):
     status: str = "not_started"
@@ -51,7 +60,7 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
         books: list[dict] = []
         for book_id, row in repo.list_book_states().items():
             status = str(row.get("status") or "not_started").strip().lower()
-            if status not in {"reading", "done"}:
+            if status not in TRACKED_STATUSES:
                 continue
             catalog = resolve_book(root, book_id) or {}
             # The catalog half and the reading half of a book are assembled the
@@ -95,7 +104,7 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
         if not resolve_book(root, book_id) and repo.get_book_state(book_id) is None:
             raise HTTPException(status_code=404, detail="book not found")
         status = (payload.status or "").strip().lower()
-        if status not in {"not_started", "reading", "done"}:
+        if status not in VALID_STATUSES:
             raise HTTPException(status_code=400, detail="invalid status")
         total_pages = max(0, int(payload.total_pages or 0))
         current_page = min(max(0, int(payload.current_page or 0)), total_pages or 999_999)

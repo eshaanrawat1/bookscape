@@ -28,6 +28,9 @@
   --status-reading: oklch(0.72 0.16 72);
   --status-not-started: oklch(0.69 0.05 85);
   --status-finished: #7dbf85;
+  /* Deliberately short of --danger's chroma: abandoning a book is a choice, not
+     an error, so DNF reads as a muted rose rather than a warning. */
+  --status-dnf: oklch(0.66 0.07 20);
   /* Reading-heatmap ramp: one hue, light -> dark, on the app's warm primary.
      --heat-0 is "no reading" and sits outside the ramp as a neutral, so an
      empty day never reads as a light one. Steps were solved for, not picked:
@@ -2069,6 +2072,10 @@ svg {
   background: color-mix(in oklch, var(--status-finished) 34%, transparent);
 }
 
+.trackingStatusButton[data-status='dnf'] {
+  background: color-mix(in oklch, var(--status-dnf) 30%, transparent);
+}
+
 .trackingStatusButton:hover {
   filter: brightness(0.97);
 }
@@ -2137,6 +2144,11 @@ svg {
 .trackingStatusDot.reading {
   background: var(--status-reading);
   box-shadow: 0 0 0 4px color-mix(in oklch, var(--status-reading) 18%, transparent);
+}
+
+.trackingStatusDot.dnf {
+  background: var(--status-dnf);
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--status-dnf) 18%, transparent);
 }
 
 .trackingStatusDot.notStarted {

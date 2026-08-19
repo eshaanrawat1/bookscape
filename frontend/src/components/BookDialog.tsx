@@ -61,14 +61,20 @@ const hasValue = (value: unknown): boolean => {
 const STATUS_LABELS: Record<string, string> = {
   done: 'Finished',
   reading: 'Reading',
+  dnf: 'DNF',
   not_started: 'Not started',
 }
+
+// The statuses that mean a book has been picked up, mirroring TRACKED_STATUSES
+// on the server: these are the books /my-books returns, and the ones whose
+// dialog should open on the tracking panel rather than the library blurb.
+const TRACKED_STATUSES = ['reading', 'done', 'dnf']
 
 function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onClose }: BookDialogProps) {
   const { collections, wantToReadBooks, addBookToCollection, toggleBookWantToRead, refreshLibrary } = useLibraryData()
   const { onOpen, onOpenAuthor, onOpenSeries } = useNavigation()
   const [view, setView] = useState<'library' | 'tracking'>(() => (
-    ['reading', 'done'].includes(book.status) ? 'tracking' : 'library'
+    TRACKED_STATUSES.includes(book.status) ? 'tracking' : 'library'
   ))
   const panelViewportRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -248,7 +254,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
     : 0
   const [obsidianBusy, setObsidianBusy] = useState<'push' | 'pull' | null>(null)
   const [obsidianMessage, setObsidianMessage] = useState('')
-  const canSyncObsidian = Boolean(bookId) && (draft.status === 'reading' || draft.status === 'done')
+  const canSyncObsidian = Boolean(bookId) && TRACKED_STATUSES.includes(draft.status)
 
   const pushToVault = async () => {
     if (!bookId || obsidianBusy) return
@@ -292,6 +298,11 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
     setRecord((current) => ({
       ...(current || baseRecord),
       [field]: value,
+      // The server drops the finish date of an abandoned book, so mirroring it
+      // here is only about the gap: autosave is debounced, and without this the
+      // date sits visible in the panel for a second before the round-trip
+      // wipes it, reading as a save that failed.
+      ...(field === 'status' && value === 'dnf' ? { finish_date: '' } : {}),
     }))
   }
 
@@ -361,6 +372,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
   const statusDotClass = ({
     done: 'trackingStatusDot done',
     reading: 'trackingStatusDot reading',
+    dnf: 'trackingStatusDot dnf',
     not_started: 'trackingStatusDot notStarted',
   } as Record<string, string>)[draft.status] || 'trackingStatusDot'
 
@@ -609,6 +621,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
                             {[
                               ['done', 'Finished'],
                               ['reading', 'Reading'],
+                              ['dnf', 'DNF'],
                               ['not_started', 'Not started'],
                             ].map(([value, label]) => (
                               <button

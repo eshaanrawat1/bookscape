@@ -10,7 +10,7 @@ from ..catalog import resolve_book
 from .naming import safe_filename
 from .vault import resolve_vault_path
 
-EXPORTABLE_STATUSES = {"reading", "done"}
+EXPORTABLE_STATUSES = {"reading", "done", "dnf"}
 
 
 class FilenameCollisionError(Exception):

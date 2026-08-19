@@ -5,6 +5,7 @@ from pathlib import Path
 
 from ...repository import DataRepository
 from ..catalog import resolve_book, upsert_book
+from .export import EXPORTABLE_STATUSES
 from .naming import safe_filename
 from .parser import parse_book
 from .vault import resolve_vault_path
@@ -29,8 +30,8 @@ def _apply_parsed_book(root: Path, book: dict, *, dry_run: bool) -> str:
     """Upsert catalog + reading state for a parsed book dict.
     Returns a rejection reason string, or '' if applied (or would be, for a dry run)."""
     status = str(book.get("status") or "").strip().lower()
-    if status not in {"reading", "done"}:
-        return f"status '{status or 'unknown'}' is not reading/done"
+    if status not in EXPORTABLE_STATUSES:
+        return f"status '{status or 'unknown'}' is not {'/'.join(sorted(EXPORTABLE_STATUSES))}"
 
     uid = str(book.get("uid") or "").strip()
     if not uid:

@@ -70,6 +70,15 @@ class DataRepository:
         if not fields:
             return self.get_book_state(uid) or {}
 
+        # A finish date on an abandoned book is a contradiction, and a leaky one:
+        # the stats year picker is built from every finish_date in the table, not
+        # only the done ones, so a stray date would add a year whose book list is
+        # empty. Cleared here rather than in the route because the Obsidian pull
+        # writes state directly, and a vault note can carry a completed_date
+        # alongside status: dnf.
+        if str(fields.get("status") or "").strip().lower() == "dnf":
+            fields["finish_date"] = ""
+
         columns = list(fields.keys())
         values = [int(v) if k in BOOK_STATE_BOOL_COLUMNS else v for k, v in fields.items()]
         col_list = ", ".join(["uid", *columns])
