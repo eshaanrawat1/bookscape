@@ -27,6 +27,10 @@ interface ReadingProgressRecord {
   total_pages: number | string
   start_date: string
   finish_date: string
+  // A string mid-edit (the input hands its raw text straight to updateField),
+  // a number once the server's normalised value lands. The rating row leans on
+  // that distinction to tell "typed a leading 0" from "unrated".
+  my_rating: number | string
   notes: string
 }
 
@@ -36,7 +40,7 @@ interface ReadingProgressResponse {
 
 // The saved-state fingerprint used to decide whether an edit is worth
 // persisting. Both sides of that comparison must be built from exactly these
-// six normalised fields — the server's `entry` also carries a `book_id`, and
+// seven normalised fields — the server's `entry` also carries a `book_id`, and
 // stringifying the raw record let it leak into one side only, so the check
 // never matched and an unedited PUT fired on every dialog open.
 const recordSignature = (record: ReadingProgressRecord): string => JSON.stringify({
@@ -45,6 +49,10 @@ const recordSignature = (record: ReadingProgressRecord): string => JSON.stringif
   total_pages: Number(record.total_pages) || 0,
   start_date: String(record.start_date || '').trim(),
   finish_date: String(record.finish_date || '').trim(),
+  // Rounded to the two decimals the server stores, so a saved rating's
+  // fingerprint matches the one rebuilt from the PUT response and the autosave
+  // settles instead of re-firing on what it reads as a fresh edit.
+  my_rating: Math.round((Number(record.my_rating) || 0) * 100) / 100,
   notes: String(record.notes || '').trim(),
 })
 
@@ -203,6 +211,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
     total_pages: book.totalPages || book.pages || 0,
     start_date: book.startDate || '',
     finish_date: book.finishDate || '',
+    my_rating: 0,
     notes: '',
   }
 
@@ -315,6 +324,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
         total_pages: Math.max(0, parseInt(String(nextRecord.total_pages), 10) || 0),
         start_date: String(nextRecord.start_date || '').trim(),
         finish_date: String(nextRecord.finish_date || '').trim(),
+        my_rating: Math.min(5, Math.max(0, Number(nextRecord.my_rating) || 0)),
         notes: String(nextRecord.notes || '').trim(),
       }
       const data = await apiFetch<ReadingProgressResponse>(`/reading-progress/${bookId}`, {
@@ -724,6 +734,32 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
                       />
                     </span>
                   </div>
+
+                  <label className="trackingProp">
+                    <span className="trackingPropLabel">
+                      <Star aria-hidden="true" />
+                      <span>My Rating</span>
+                    </span>
+                    <span className="trackingPropValue">
+                      <input
+                        type="number"
+                        min="0"
+                        max="5"
+                        step="0.01"
+                        className="trackingPageInput trackingRatingInput"
+                        placeholder="Empty"
+                        // Only the *number* 0 — what the server sends for a book
+                        // you have not rated — falls back to the placeholder.
+                        // Typing stores a string, so the "0" on the way to "0.5"
+                        // is not `=== 0` and stays on screen; testing
+                        // `Number(x) > 0` instead would blank the field the
+                        // instant you typed the leading zero.
+                        value={draft.my_rating === 0 ? '' : draft.my_rating}
+                        onChange={(event) => updateField('my_rating', event.target.value)}
+                      />
+                      <span className="trackingRatingScale">/ 5</span>
+                    </span>
+                  </label>
 
                   <label className="trackingProp notes">
                     <span className="trackingPropLabel">

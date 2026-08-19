@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ...db import transaction
 from ...repository import DataRepository
+from ...utils import clamp_my_rating
 from ..catalog import resolve_book
 from .naming import safe_filename
 from .vault import resolve_vault_path
@@ -45,6 +46,9 @@ def render_frontmatter(book: dict, state: dict) -> str:
         _bare_or_valued("start_date", state.get("start_date") or ""),
         _bare_or_valued("completed_date", state.get("finish_date") or ""),
         f"image: {book.get('image_url') or ''}",
+        # Two ratings, and the names have to keep them apart: `rating_value` is
+        # the catalog's crowd average, `my_rating` is yours.
+        f"my_rating: {clamp_my_rating(state.get('my_rating'))}",
         f"rating_value: {book.get('avg_rating') or 0}",
         f"rating_count: {int(book.get('rating_count') or 0)}",
         f"review_count: {int(book.get('review_count') or 0)}",

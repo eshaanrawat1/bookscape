@@ -55,15 +55,23 @@ def _apply_parsed_book(root: Path, book: dict, *, dry_run: bool) -> str:
     # in the Obsidian markdown format, so Pull never touches them.
     # Notes round-trip like every other field here: Push writes SQL -> file,
     # Pull writes file -> SQL, last sync direction wins (same as status/dates).
-    DataRepository(root).upsert_book_state(
-        uid,
-        status=status,
-        current_page=book.get("current_page", 0),
-        total_pages=book.get("total_pages", 0),
-        start_date=book.get("start_date", ""),
-        finish_date=book.get("finish_date", ""),
-        notes=book.get("notes", ""),
-    )
+    state_fields = {
+        "status": status,
+        "current_page": book.get("current_page", 0),
+        "total_pages": book.get("total_pages", 0),
+        "start_date": book.get("start_date", ""),
+        "finish_date": book.get("finish_date", ""),
+        "notes": book.get("notes", ""),
+    }
+    # my_rating is the one field a note is allowed to stay silent about, and
+    # upsert_book_state only writes the keys it is handed — so omitting it
+    # leaves the stored rating alone. Every note written before this field
+    # existed lacks the key, and without this a vault-level Pull would clear
+    # every rating in the library on its first run.
+    if book.get("my_rating") is not None:
+        state_fields["my_rating"] = book["my_rating"]
+
+    DataRepository(root).upsert_book_state(uid, **state_fields)
     return ""
 
 

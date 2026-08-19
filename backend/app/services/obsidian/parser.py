@@ -5,7 +5,7 @@ import unicodedata
 from pathlib import Path
 import yaml
 
-from ...utils import parse_iso_date_string
+from ...utils import clamp_my_rating, parse_iso_date_string
 
 
 def _normalize_name(value: object) -> str:
@@ -79,6 +79,11 @@ def parse_book(path: Path) -> dict | None:
         "start_date":       parse_iso_date_string(fm.get("start_date")),
         "finish_date":      parse_iso_date_string(fm.get("completed_date")),
         "image_url":        str(fm.get("image") or "").strip(),
+        # None, not 0, when the key is absent — every note written before
+        # my_rating existed lacks it, and a missing key has to read as "this
+        # file has nothing to say" rather than "rate this book zero". Pull
+        # skips the field entirely in that case; see _apply_parsed_book.
+        "my_rating":        clamp_my_rating(fm["my_rating"]) if fm.get("my_rating") is not None else None,
         "rating":           float(fm.get("rating_value") or 0),
         "rating_count":     int(fm.get("rating_count") or 0),
         "review_count":     int(fm.get("review_count") or 0),

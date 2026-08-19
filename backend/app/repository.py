@@ -14,6 +14,7 @@ BOOK_STATE_COLUMNS = {
     "start_date",
     "finish_date",
     "want_to_read",
+    "my_rating",
     "notes",
     "obsidian_filename",
 }

@@ -50,6 +50,11 @@ CREATE TABLE IF NOT EXISTS user_book_state (
   start_date        TEXT NOT NULL DEFAULT '',
   finish_date       TEXT NOT NULL DEFAULT '',
   want_to_read      INTEGER NOT NULL DEFAULT 0 CHECK (want_to_read IN (0,1)),
+  -- Your own score out of 5, distinct from books.avg_rating (the scraped crowd
+  -- average). 0 is "not rated yet" rather than a literal zero, matching every
+  -- display site's `rating > 0` gate — a book you actively hated is a 0.01.
+  my_rating         REAL NOT NULL DEFAULT 0
+                       CHECK (my_rating >= 0 AND my_rating <= 5),
   notes             TEXT NOT NULL DEFAULT '',
   obsidian_filename TEXT,
   updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
@@ -150,10 +155,35 @@ def transaction(root: Path) -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
+def _add_missing_columns(conn: sqlite3.Connection) -> None:
+    """Bring an existing database up to SCHEMA_SQL's column list.
+
+    SCHEMA_SQL is all CREATE TABLE IF NOT EXISTS, so it describes a *fresh*
+    database and says nothing to one that already exists — a column added to it
+    reaches new installs only. Each entry here is the ALTER that catches the
+    existing file up, guarded by a table_info read so a restart is a no-op.
+
+    Only plain column adds belong here. A change to an existing column (the
+    status CHECK gaining 'dnf', say) needs a table rebuild, which is a migration
+    with a backup, not a startup step.
+    """
+    for table, column, ddl in (
+        (
+            "user_book_state",
+            "my_rating",
+            "REAL NOT NULL DEFAULT 0 CHECK (my_rating >= 0 AND my_rating <= 5)",
+        ),
+    ):
+        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if column not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+
+
 def init_app_db(root: Path) -> None:
     conn = get_connection(root)
     try:
         conn.executescript(SCHEMA_SQL)
+        _add_missing_columns(conn)
         conn.commit()
     finally:
         conn.close()

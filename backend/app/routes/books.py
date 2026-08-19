@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from ..repository import DataRepository
 from ..services.catalog import reading_overlay, resolve_book
+from ..utils import clamp_my_rating
 
 # A book the user has picked up, in any sense — the set /my-books is built from.
 # 'not_started' is the absence of a shelf, not a shelf of its own, so it is the
@@ -23,6 +24,7 @@ class ReadingProgressIn(BaseModel):
     total_pages: int = 0
     start_date: str = ""
     finish_date: str = ""
+    my_rating: float = 0
     notes: str = ""
 
 
@@ -38,6 +40,7 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
             "total_pages": int(record.get("total_pages") or 0),
             "start_date": str(record.get("start_date") or ""),
             "finish_date": str(record.get("finish_date") or ""),
+            "my_rating": clamp_my_rating(record.get("my_rating")),
             "notes": str(record.get("notes") or ""),
         }
 
@@ -49,6 +52,7 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
             "total_pages": total_pages,
             "start_date": "",
             "finish_date": "",
+            "my_rating": 0.0,
             "notes": "",
         }
 
@@ -115,6 +119,7 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
             current_page=current_page,
             start_date=(payload.start_date or "").strip(),
             finish_date=(payload.finish_date or "").strip(),
+            my_rating=clamp_my_rating(payload.my_rating),
             notes=payload.notes or "",
         )
         return {"book_id": book_id, "entry": _book_entry(entry, book_id)}

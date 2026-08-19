@@ -2169,6 +2169,22 @@ svg {
   margin: 0;
 }
 
+/* The rating is the one value field with something after it, so it opts out of
+   the `width: 100%` every other property input carries — that would strand the
+   "/ 5" against the far edge of the row and wrap it onto two lines. Qualified
+   with the parent to outweigh `.trackingPropValue input`, which is the rule it
+   is overriding and would otherwise win on specificity. */
+.trackingPropValue input.trackingRatingInput {
+  width: 4rem;
+  flex: none;
+}
+
+.trackingRatingScale {
+  color: color-mix(in oklch, var(--muted-foreground) 78%, transparent);
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
 /* ========================================================================== */
 /* Scraper / Settings Dialog                                                */
 /* ========================================================================== */
