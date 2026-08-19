@@ -77,7 +77,7 @@ function SeriesBookRow({ book, onOpen }: SeriesBookRowProps) {
           {book.rating > 0 ? (
             <>
               <Star fill="currentColor" />
-              <span>{book.rating.toFixed(1)}</span>
+              <span>{book.rating.toFixed(2)}</span>
             </>
           ) : null}
         </span>

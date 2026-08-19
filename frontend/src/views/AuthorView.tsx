@@ -74,7 +74,7 @@ function AuthorHero({ books, onOpen }: AuthorHeroProps) {
             {book.rating > 0 && (
               <span className="dialogStatItem">
                 <Star />
-                <span>{book.rating.toFixed(1)}{book.ratingCount > 0 ? ` (${formatCompactNumber(book.ratingCount)})` : ''}</span>
+                <span>{book.rating.toFixed(2)}{book.ratingCount > 0 ? ` (${formatCompactNumber(book.ratingCount)})` : ''}</span>
               </span>
             )}
             {book.reviewCount > 0 && (
@@ -158,7 +158,7 @@ function AuthorBookRow({ book, onOpen }: AuthorBookRowProps) {
           {book.rating > 0 ? (
             <>
               <Star fill="currentColor" />
-              <span>{book.rating.toFixed(1)}</span>
+              <span>{book.rating.toFixed(2)}</span>
             </>
           ) : null}
         </span>

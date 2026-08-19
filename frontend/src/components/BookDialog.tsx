@@ -514,7 +514,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
                   {displayBook.rating > 0 && (
                     <span className="dialogStatItem">
                       <Star />
-                      <span>{displayBook.rating.toFixed(1)}{displayBook.ratingCount > 0 ? ` (${formatCompactNumber(displayBook.ratingCount)})` : ''}</span>
+                      <span>{displayBook.rating.toFixed(2)}{displayBook.ratingCount > 0 ? ` (${formatCompactNumber(displayBook.ratingCount)})` : ''}</span>
                     </span>
                   )}
                   {displayBook.reviewCount > 0 && (
