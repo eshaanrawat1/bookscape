@@ -182,9 +182,22 @@ function genreNameFromView(view: string): string {
   }
 }
 
+// Shared by the search view and the command palette. The backend clamps limit
+// to 50 (backend/app/routes/catalog.py), and searches the whole catalog rather
+// than only owned books.
+async function searchBooks(query: string, limit: number): Promise<Book[]> {
+  const clean = String(query || '').trim()
+  if (!clean) return []
+  const data = await apiFetch<{ results?: RawBookPayload[] }>(
+    `/search?q=${encodeURIComponent(clean)}&limit=${limit}`,
+  )
+  return (data.results || []).map(normaliseBook)
+}
+
 export {
   sleep,
   loadBootstrapData,
+  searchBooks,
   collectionIdFromName,
   mapReadingLists,
   nextCollectionName,

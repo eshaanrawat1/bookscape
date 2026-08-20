@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { X, FolderOpen, RefreshCcw } from 'lucide-react'
 import { apiFetch } from '../api.js'
+import useModalLayer from '../hooks/useModalLayer.js'
 
 interface SettingsDialogProps {
   onClose: () => void
@@ -11,6 +12,9 @@ function SettingsDialog({ onClose }: SettingsDialogProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Blocks the app hotkeys — the path field holds unsaved input.
+  useModalLayer({ onEscape: saving ? undefined : onClose, blocksHotkeys: true })
 
   useEffect(() => {
     let cancelled = false

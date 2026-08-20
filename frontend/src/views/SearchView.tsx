@@ -4,6 +4,7 @@ import BookCover from '../components/BookCover.jsx'
 import BookGrid from '../components/BookGrid.jsx'
 import { formatCompactNumber } from '../utils.js'
 import useSearch from '../hooks/useSearch.js'
+import useListNavigation from '../hooks/useListNavigation.js'
 import { useNavigation } from '../context/NavigationContext.jsx'
 import type { Book } from '../types.js'
 
@@ -130,6 +131,16 @@ function SearchHeader({
     inputRef?.current?.select?.()
   }, [])
 
+  // -1 so nothing is highlighted until the user actually arrows into the list —
+  // a bare Enter has always meant "search the full catalog" and still does.
+  const { activeIndex, setActiveIndex, handleKeyDown } = useListNavigation(
+    showPreview ? previewResults.length : 0,
+    {
+      initialIndex: -1,
+      onSelect: (index) => onOpen?.(previewResults[index]),
+    },
+  )
+
   const clearSearch = () => {
     onDraftChange('')
     inputRef.current?.focus?.()
@@ -144,10 +155,13 @@ function SearchHeader({
           type="search"
           value={draft}
           onChange={(event) => onDraftChange(event.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder=""
           aria-label="Search books"
           aria-expanded={showPreview}
           aria-autocomplete="list"
+          aria-controls="searchPreviewPanel"
+          aria-activedescendant={activeIndex >= 0 ? `searchPreviewItem-${activeIndex}` : undefined}
         />
         {draft.trim() ? (
           <button
@@ -164,6 +178,8 @@ function SearchHeader({
         <SearchPreviewDropdown
           results={previewResults}
           loading={previewLoading}
+          activeIndex={activeIndex}
+          onHover={setActiveIndex}
           onOpen={onOpen}
           onSubmit={onSubmit}
         />
@@ -175,20 +191,33 @@ function SearchHeader({
 interface SearchPreviewDropdownProps {
   results: Book[]
   loading: boolean
+  activeIndex: number
+  onHover: (index: number) => void
   onOpen?: (book: Book) => void
   onSubmit: (event: FormEvent) => void
 }
 
-function SearchPreviewDropdown({ results, loading, onOpen, onSubmit }: SearchPreviewDropdownProps) {
+function SearchPreviewDropdown({
+  results,
+  loading,
+  activeIndex,
+  onHover,
+  onOpen,
+  onSubmit,
+}: SearchPreviewDropdownProps) {
   return (
-    <div className="searchPreviewPanel" role="listbox" aria-label="Search suggestions">
+    <div className="searchPreviewPanel" id="searchPreviewPanel" role="listbox" aria-label="Search suggestions">
       {loading && results.length === 0 ? <div className="searchPreviewStatus">Searching books...</div> : null}
-      {results.map((book) => (
+      {results.map((book, index) => (
         <button
           key={book.id}
           type="button"
-          className="searchPreviewItem"
+          id={`searchPreviewItem-${index}`}
+          role="option"
+          aria-selected={index === activeIndex}
+          className={index === activeIndex ? 'searchPreviewItem active' : 'searchPreviewItem'}
           onMouseDown={(event) => event.preventDefault()}
+          onMouseMove={() => onHover(index)}
           onClick={() => onOpen?.(book)}
         >
           <div className="searchPreviewCover">

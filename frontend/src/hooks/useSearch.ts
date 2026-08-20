@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { apiFetch } from '../api.js'
-import { normaliseBook } from '../utils.js'
+import { searchBooks } from '../utils.js'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
-import type { Book, RawBookPayload } from '../types.js'
+import type { Book } from '../types.js'
 
 const RESULT_LIMIT = 24
+const PREVIEW_LIMIT = 5
 
 function useSearch() {
   const { dataVersion } = useLibraryData()
@@ -31,9 +31,9 @@ function useSearch() {
     let cancelled = false
     const timer = window.setTimeout(async () => {
       try {
-        const data = await apiFetch<{ results?: RawBookPayload[] }>(`/search?q=${encodeURIComponent(nextQuery)}&limit=5`)
+        const results = await searchBooks(nextQuery, PREVIEW_LIMIT)
         if (cancelled) return
-        setPreviewResults((data.results || []).map(normaliseBook))
+        setPreviewResults(results)
       } catch {
         if (cancelled) return
         setPreviewResults([])
@@ -58,9 +58,9 @@ function useSearch() {
     if (!submitted) return undefined
 
     let cancelled = false
-    apiFetch<{ results?: RawBookPayload[] }>(`/search?q=${encodeURIComponent(submitted)}&limit=${RESULT_LIMIT}`)
-      .then((data) => {
-        if (!cancelled) setResults((data.results || []).map(normaliseBook))
+    searchBooks(submitted, RESULT_LIMIT)
+      .then((books) => {
+        if (!cancelled) setResults(books)
       })
       .catch(() => {})
 
@@ -81,8 +81,7 @@ function useSearch() {
     setLoading(true)
     setError(null)
     try {
-      const data = await apiFetch<{ results?: RawBookPayload[] }>(`/search?q=${encodeURIComponent(nextQuery)}&limit=${RESULT_LIMIT}`)
-      setResults((data.results || []).map(normaliseBook))
+      setResults(await searchBooks(nextQuery, RESULT_LIMIT))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not search books.')
       setResults([])

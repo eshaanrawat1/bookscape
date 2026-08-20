@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { ChevronRight } from 'lucide-react'
+import useModalLayer from '../hooks/useModalLayer.js'
 
 interface AccordionOption {
   value: string
@@ -20,6 +21,8 @@ function AccordionFilter({ label, value, emptyLabel, options, onChange }: Accord
   const selected = options.find((option) => String(option.value) === String(value)) || null
   const displayLabel = selected?.label || emptyLabel
 
+  useModalLayer({ enabled: open, onEscape: () => setOpen(false) })
+
   useEffect(() => {
     if (!open) return undefined
     const handlePointerDown = (event: PointerEvent) => {
@@ -27,17 +30,8 @@ function AccordionFilter({ label, value, emptyLabel, options, onChange }: Accord
         setOpen(false)
       }
     }
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false)
-      }
-    }
     document.addEventListener('pointerdown', handlePointerDown)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
   }, [open])
 
   return (

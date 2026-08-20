@@ -1,3 +1,5 @@
+import type { LucideIcon } from 'lucide-react'
+
 export type ReadingStatus = 'not_started' | 'reading' | 'done' | 'dnf'
 
 // Raw payload shapes vary across endpoints (/my-books, /global-library, /search,
@@ -190,4 +192,33 @@ export interface NavigationContextValue {
   onOpenSeries: (series: string) => void
   onOpenGenre: (genre: string) => void
   onOpenWantToRead: () => void
+  // Generic jump to any view id — 'library', 'collection:foo', 'genre:Sci-Fi'.
+  // Descendants otherwise have no way to reach App's `view` state.
+  goTo: (viewId: string) => void
+}
+
+export type CommandGroup = 'Navigate' | 'Actions' | 'Collections'
+
+export interface Command {
+  id: string
+  label: string
+  group: CommandGroup
+  icon: LucideIcon
+  // Rendered right-aligned on the row, e.g. '⌘1'.
+  hint?: string
+  // Extra text folded into fuzzy matching but never shown.
+  keywords?: string
+  run: () => void | Promise<void>
+}
+
+export interface CommandDeps {
+  collections: Collection[]
+  vaultBusy: 'push' | 'pull' | null
+  goTo: (viewId: string) => void
+  onAddBook: () => void
+  onNewCollection: () => void | Promise<void>
+  onRefresh: () => void | Promise<void>
+  onVaultSettings: () => void
+  onPush: () => void | Promise<void>
+  onPull: () => void | Promise<void>
 }

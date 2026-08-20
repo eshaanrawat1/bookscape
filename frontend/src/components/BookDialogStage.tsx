@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import BookDialog from './BookDialog.jsx'
+import useModalLayer from '../hooks/useModalLayer.js'
 import type { Book } from '../types.js'
 
 export interface Selected {
@@ -40,6 +41,11 @@ function BookDialogStage({ selected, onClose }: BookDialogStageProps) {
   const [priorSelected, setPriorSelected] = useState(selected)
   const [outgoing, setOutgoing] = useState<Selected | null>(null)
   const [stageHeight, setStageHeight] = useState<number | null>(null)
+
+  // Escape is owned here rather than in BookDialog because this is where
+  // onClose lives, and a card-to-card crossfade briefly has two BookDialogs
+  // mounted. No blocksHotkeys: browsing a book shouldn't mute ⌘K or ⌘1–6.
+  useModalLayer({ onEscape: onClose })
 
   const cardRef = useRef<HTMLElement | null>(null)
   const cardHeightRef = useRef(0)

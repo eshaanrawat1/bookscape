@@ -37,6 +37,24 @@ const shelfNav: NavItem[] = [
   { id: 'finished', label: 'Finished', icon: CheckCircle2 },
 ]
 
+const isMac = typeof navigator !== 'undefined'
+  && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '')
+
+function shortcutLabel(key: string): string {
+  return isMac ? `⌘${key}` : `Ctrl+${key}`
+}
+
+// ⌘1–⌘6 follow the sidebar top to bottom, so the numbering and the hints
+// rendered next to each row stay in sync with whatever order these two lists
+// happen to be in.
+const navOrder: string[] = [...mainNav, ...shelfNav].map((item) => item.id)
+
+function navShortcut(viewId: string): string | null {
+  const index = navOrder.indexOf(viewId)
+  if (index === -1 || index >= 9) return null
+  return shortcutLabel(String(index + 1))
+}
+
 const monthOptions: SelectOption[] = [
   { value: '1', label: 'January' },
   { value: '2', label: 'February' },
@@ -52,4 +70,4 @@ const monthOptions: SelectOption[] = [
   { value: '12', label: 'December' },
 ]
 
-export { viewMeta, mainNav, shelfNav, monthOptions }
+export { viewMeta, mainNav, shelfNav, monthOptions, isMac, shortcutLabel, navOrder, navShortcut }

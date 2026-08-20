@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import useModalLayer from '../hooks/useModalLayer.js'
 
 interface DatePropertyProps {
   value: string
@@ -89,6 +90,10 @@ function DateProperty({ value, label, onChange }: DatePropertyProps) {
     closePicker()
   }
 
+  // Registered above the book dialog's own layer while the picker is open, so
+  // Escape dismisses the picker rather than the whole dialog behind it.
+  useModalLayer({ enabled: open, onEscape: () => closePicker() })
+
   useEffect(() => {
     if (!open) return undefined
     function handlePointerDown(event: PointerEvent) {
@@ -119,11 +124,8 @@ function DateProperty({ value, label, onChange }: DatePropertyProps) {
   }, [open, cursorISO])
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      closePicker()
-      return
-    }
+    // Escape is handled by the modal layer above, which stops the key before
+    // it ever reaches React's synthetic event system.
     // Arrow keys belong to the day grid; leave them alone while the month
     // arrows or Clear/Today have focus so those stay tabbable as normal.
     if (!(event.target as HTMLElement).closest('.datePickerDay')) return

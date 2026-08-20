@@ -17,17 +17,22 @@ import {
   genreViewId,
   genreNameFromView,
 } from './utils.js'
-import { viewMeta } from './constants.js'
+import { viewMeta, shortcutLabel } from './constants.js'
+import { buildCommands } from './commands.js'
 
 // Context
 import { LibraryDataContext, useLibraryData } from './context/LibraryDataContext.jsx'
 import { NavigationContext } from './context/NavigationContext.jsx'
+
+// Hooks
+import useAppHotkeys from './hooks/useAppHotkeys.js'
 
 // Components
 import Sidebar from './components/Sidebar.jsx'
 import BookDialogStage, { type Selected } from './components/BookDialogStage.jsx'
 import ScraperDialog from './components/ScraperDialog.jsx'
 import SettingsDialog from './components/SettingsDialog.jsx'
+import CommandPalette from './components/CommandPalette.jsx'
 import BookGrid from './components/BookGrid.jsx'
 
 // Views
@@ -58,6 +63,7 @@ export default function App() {
   const [vaultError, setVaultError] = useState<string | null>(null)
   const [showScraperDialog, setShowScraperDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
+  const [showPalette, setShowPalette] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -177,6 +183,29 @@ export default function App() {
     setView('want-to-read')
     setMobileNav(false)
   }
+
+  // The generic jump used by the sidebar, the ⌘1–⌘6 chords and every palette
+  // navigate command. Like the sidebar it is a top-level destination rather
+  // than a drilldown, so it leaves previousView alone; it does dismiss whatever
+  // is open on top, since arriving at a new view behind a dialog reads as the
+  // shortcut having done nothing.
+  const goTo = (viewId: string) => {
+    setShowPalette(false)
+    setSelected(null)
+    setMobileNav(false)
+    setView(viewId)
+  }
+
+  const openScraperDialog = () => {
+    setShowPalette(false)
+    setShowScraperDialog(true)
+  }
+
+  useAppHotkeys({
+    onTogglePalette: () => setShowPalette((open) => !open),
+    onAddBook: openScraperDialog,
+    onNavigate: goTo,
+  })
 
   async function createCollection(): Promise<string> {
     const name = nextCollectionName(collections)
@@ -299,7 +328,24 @@ export default function App() {
     onOpenSeries: openSeriesPage,
     onOpenGenre: openGenrePage,
     onOpenWantToRead: openWantToRead,
+    goTo,
   }
+
+  // Only assembled while the palette is on screen — several entries close over
+  // vault state that changes underneath it.
+  const commands = showPalette
+    ? buildCommands({
+      collections,
+      vaultBusy,
+      goTo,
+      onAddBook: openScraperDialog,
+      onNewCollection: async () => { await createCollection() },
+      onRefresh: reloadAppData,
+      onVaultSettings: () => setShowSettingsDialog(true),
+      onPush: pushToVault,
+      onPull: pullFromVault,
+    })
+    : []
 
   return (
     <LibraryDataContext.Provider value={libraryData}>
@@ -315,29 +361,22 @@ export default function App() {
             <button className="iconPillButton" aria-label="Pull from Vault" onClick={pullFromVault} disabled={vaultBusy !== null}>
               <Download className={vaultBusy === 'pull' ? 'syncIcon spinning' : 'syncIcon'} />
             </button>
-            <button className="iconPillButton" aria-label="Add Book" onClick={() => setShowScraperDialog(true)}>
+            <button
+              className="iconPillButton"
+              aria-label="Add Book"
+              title={`Add Book (${shortcutLabel('N')})`}
+              onClick={openScraperDialog}
+            >
               <Plus />
             </button>
           </div>
           <div className="hearthShell">
-            <Sidebar
-              active={view}
-              onSelect={(nextView) => {
-                setView(nextView)
-                setMobileNav(false)
-              }}
-            />
+            <Sidebar active={view} onSelect={goTo} />
 
             {mobileNav && (
               <div className="mobileScrim" onClick={() => setMobileNav(false)}>
                 <div className="mobileDrawer" onClick={(event) => event.stopPropagation()}>
-                  <Sidebar
-                    active={view}
-                    onSelect={(nextView) => {
-                      setView(nextView)
-                      setMobileNav(false)
-                    }}
-                  />
+                  <Sidebar active={view} onSelect={goTo} />
                 </div>
               </div>
             )}
@@ -403,6 +442,10 @@ export default function App() {
           )}
           {showSettingsDialog && (
             <SettingsDialog onClose={() => setShowSettingsDialog(false)} />
+          )}
+          {/* Last, so it registers above the other dialogs on the escape stack. */}
+          {showPalette && (
+            <CommandPalette commands={commands} onClose={() => setShowPalette(false)} />
           )}
         </div>
       </NavigationContext.Provider>

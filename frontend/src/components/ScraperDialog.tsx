@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X, RefreshCcw, ChevronRight } from 'lucide-react'
 import { apiFetch, apiFetchStream } from '../api.js'
+import useModalLayer from '../hooks/useModalLayer.js'
 import type { RawBookPayload } from '../types.js'
 
 interface ScraperDialogProps {
@@ -42,6 +43,10 @@ function ScraperDialog({ onClose, onSuccess }: ScraperDialogProps) {
   const [stage, setStage] = useState<Stage>({ kind: 'idle' })
 
   const busy = stage.kind === 'fetching' || stage.kind === 'saving'
+
+  // Blocks the app hotkeys: there is an unsaved URL in here, and a scrape may
+  // be in flight. Escape is held back mid-scrape for the same reason.
+  useModalLayer({ onEscape: busy ? undefined : onClose, blocksHotkeys: true })
 
   const runPreview = async (targetUrl: string, force: boolean) => {
     setStage({ kind: 'fetching', message: 'Connecting to Goodreads…' })

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import useModalLayer from '../hooks/useModalLayer.js'
 
 interface ConfirmDialogProps {
   title: string
@@ -21,13 +21,9 @@ function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !busy) onCancel()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [busy, onCancel])
+  // Escape still gets swallowed while the delete is in flight — it just does
+  // nothing, rather than falling through to whatever is behind this.
+  useModalLayer({ onEscape: busy ? undefined : onCancel, blocksHotkeys: true })
 
   return (
     <div className="dialogScrim" onClick={() => { if (!busy) onCancel() }}>
