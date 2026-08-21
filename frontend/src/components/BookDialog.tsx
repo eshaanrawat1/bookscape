@@ -11,6 +11,7 @@ import DateProperty from './DateProperty.jsx'
 import GenrePills from './GenrePills.jsx'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
 import type { Book, RawBookPayload } from '../types.js'
 
 interface BookDialogProps {
@@ -81,6 +82,7 @@ const TRACKED_STATUSES = ['reading', 'done', 'dnf']
 function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onClose }: BookDialogProps) {
   const { collections, wantToReadBooks, addBookToCollection, toggleBookWantToRead, refreshLibrary } = useLibraryData()
   const { onOpen, onOpenAuthor, onOpenSeries } = useNavigation()
+  const { showToast } = useToast()
   const [view, setView] = useState<'library' | 'tracking'>(() => (
     TRACKED_STATUSES.includes(book.status) ? 'tracking' : 'library'
   ))
@@ -153,7 +155,6 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
   const savedWantToReadBook = resolveSavedWantToReadBook(book, wantToReadBooks)
   const [fullBook, setFullBook] = useState<Book | null>(null)
   const [collectionMenuOpen, setCollectionMenuOpen] = useState(false)
-  const [actionMessage, setActionMessage] = useState('')
   const [savingCollection, setSavingCollection] = useState('')
   const [savingToRead, setSavingToRead] = useState(false)
 
@@ -262,18 +263,25 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
     ? Math.min(100, Math.max(0, Math.round((trackedCurrentPage / trackedTotalPages) * 100)))
     : 0
   const [obsidianBusy, setObsidianBusy] = useState<'push' | 'pull' | null>(null)
-  const [obsidianMessage, setObsidianMessage] = useState('')
   const canSyncObsidian = Boolean(bookId) && TRACKED_STATUSES.includes(draft.status)
+
+  // Toasts from this dialog name the book. They outlive the dialog by design —
+  // the whole point of moving them out — so by the time one is read there may be
+  // nothing on screen to say which book it meant, and App's whole-library vault
+  // buttons raise near-identical messages into the same corner.
+  const vaultToastKey = `vault:${bookId}`
 
   const pushToVault = async () => {
     if (!bookId || obsidianBusy) return
     setObsidianBusy('push')
-    setObsidianMessage('')
     try {
       await apiFetch(`/sync/obsidian/push/${bookId}`, { method: 'POST' })
-      setObsidianMessage('Pushed to vault.')
+      showToast(`Pushed “${displayBook.title}” to the vault.`, { key: vaultToastKey })
     } catch (err) {
-      setObsidianMessage(err instanceof Error ? err.message : 'Could not push to vault.')
+      showToast(err instanceof Error ? err.message : 'Could not push to vault.', {
+        tone: 'error',
+        key: vaultToastKey,
+      })
     } finally {
       setObsidianBusy(null)
     }
@@ -282,7 +290,6 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
   const pullFromVault = async () => {
     if (!bookId || obsidianBusy) return
     setObsidianBusy('pull')
-    setObsidianMessage('')
     try {
       await apiFetch(`/sync/obsidian/pull/${bookId}`, { method: 'POST' })
       const refreshed = await apiFetch<ReadingProgressResponse>(`/reading-progress/${bookId}`)
@@ -295,9 +302,12 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
       setRecord(nextRecord)
       lastSavedRef.current = recordSignature(nextRecord)
       await refreshLibrary()
-      setObsidianMessage('Pulled from vault.')
+      showToast(`Pulled “${displayBook.title}” from the vault.`, { key: vaultToastKey })
     } catch (err) {
-      setObsidianMessage(err instanceof Error ? err.message : 'Could not pull from vault.')
+      showToast(err instanceof Error ? err.message : 'Could not pull from vault.', {
+        tone: 'error',
+        key: vaultToastKey,
+      })
     } finally {
       setObsidianBusy(null)
     }
@@ -389,13 +399,23 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
   const handleSave = async () => {
     if (!bookId || savingToRead) return
     setSavingToRead(true)
-    setActionMessage('')
     try {
       const nextSaved = !isSavedToWantToRead
       await toggleBookWantToRead(isSavedToWantToRead ? savedWantToReadKey : bookId, isSavedToWantToRead)
-      setActionMessage(nextSaved ? 'Saved to Want to read.' : 'Removed from Want to read.')
+      showToast(
+        nextSaved
+          ? `Saved “${displayBook.title}” to Want to read.`
+          : `Removed “${displayBook.title}” from Want to read.`,
+        // Keyed on the book, so flipping the heart on and off leaves one toast
+        // showing where the book actually ended up rather than a stack arguing
+        // with itself.
+        { key: `want-to-read:${bookId}` },
+      )
     } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : 'Could not save this book.')
+      showToast(err instanceof Error ? err.message : 'Could not save this book.', {
+        tone: 'error',
+        key: `want-to-read:${bookId}`,
+      })
     } finally {
       setSavingToRead(false)
     }
@@ -404,13 +424,15 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
   const handleAddToCollection = async (collectionName: string) => {
     if (!bookId || !collectionName || savingCollection === collectionName) return
     setSavingCollection(collectionName)
-    setActionMessage('')
     try {
       await addBookToCollection(collectionName, bookId)
       setCollectionMenuOpen(false)
-      setActionMessage(`Added to ${collectionName}.`)
+      showToast(`Added “${displayBook.title}” to ${collectionName}.`, { key: `collection:${bookId}` })
     } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : 'Could not add this book.')
+      showToast(err instanceof Error ? err.message : 'Could not add this book.', {
+        tone: 'error',
+        key: `collection:${bookId}`,
+      })
     } finally {
       setSavingCollection('')
     }
@@ -460,7 +482,6 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
                     <Download />
                   </button>
                 </div>
-                {obsidianMessage && <p className="dialogActionMessage">{obsidianMessage}</p>}
               </div>
             )}
           </div>
@@ -600,8 +621,6 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
                       <Heart fill={isSavedToWantToRead ? 'currentColor' : 'none'} />
                     </button>
                   </div>
-
-                  {actionMessage && <p className="dialogActionMessage">{actionMessage}</p>}
                 </div>
               </>
             ) : (

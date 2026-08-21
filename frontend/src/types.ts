@@ -186,6 +186,30 @@ export interface LibraryDataContextValue {
   deleteCollection: (collection: Collection) => Promise<void>
 }
 
+// Confirmations and action errors, shown in one fixed corner stack rather than
+// inline in whatever dialog fired them — a message about a save that closes
+// with the dialog is a message nobody reads.
+export type ToastTone = 'info' | 'error'
+
+export interface Toast {
+  id: number
+  message: string
+  tone: ToastTone
+}
+
+export interface ToastOptions {
+  tone?: ToastTone
+  // Toasts sharing a key replace one another instead of stacking. Every action
+  // that can be repeated on the same target passes one — without it, flipping a
+  // book in and out of Want to read four times leaves four toasts on screen
+  // saying contradictory things.
+  key?: string
+}
+
+export interface ToastContextValue {
+  showToast: (message: string, options?: ToastOptions) => void
+}
+
 export interface NavigationContextValue {
   onOpen: (book: Book) => void
   onOpenAuthor: (author: string) => void

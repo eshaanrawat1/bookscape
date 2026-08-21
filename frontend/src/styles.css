@@ -1508,12 +1508,6 @@ svg {
   font-size: 0.95rem;
 }
 
-.dialogActionMessage {
-  margin: 0;
-  color: var(--muted-foreground);
-  font-size: 1rem;
-}
-
 @keyframes dialogPopoverIn {
   from {
     opacity: 0;
@@ -2027,11 +2021,6 @@ svg {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-}
-
-.trackingVault .dialogActionMessage {
-  margin: 0;
-  text-align: center;
 }
 
 .trackingStatusControl {
@@ -3495,6 +3484,134 @@ svg {
   height: 1.3rem;
   color: color-mix(in oklch, var(--muted-foreground) 82%, transparent);
   flex: 0 0 auto;
+}
+
+/* Toasts --------------------------------------------------------------------- */
+
+.toastHost {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.6rem;
+  /* Above every dialog, the command palette and the tracking status popover —
+     the highest z-index anywhere else in this file is 40. A toast fired from a
+     dialog that then covers it would be worse than the inline message it
+     replaces. */
+  z-index: 60;
+  /* The host spans a corner of the viewport whether or not it holds anything,
+     so it must never eat clicks meant for the page behind it. Each toast turns
+     pointer events back on for itself. */
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  max-width: min(24rem, calc(100vw - 3rem));
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  background: var(--card);
+  box-shadow: var(--shadow-panel);
+  padding: 0.75rem 0.75rem 0.75rem 0.95rem;
+  pointer-events: auto;
+  animation: toastIn 0.22s ease-out;
+}
+
+/* A left edge rather than a tinted fill: these sit over the app's warm paper
+   and a full-bleed danger wash reads as an error page, not a note about one. */
+.toastError {
+  border-left: 3px solid var(--danger);
+}
+
+.toastInfo {
+  border-left: 3px solid color-mix(in oklch, var(--primary) 70%, transparent);
+}
+
+.toast.exiting {
+  animation: toastOut 0.18s ease-in forwards;
+}
+
+.toastMessage {
+  margin: 0;
+  flex: 1 1 auto;
+  color: var(--foreground);
+  font-size: 1rem;
+  line-height: 1.4;
+  /* Server errors carry paths and other unbroken strings that would otherwise
+     push the dismiss button off the edge. */
+  overflow-wrap: anywhere;
+}
+
+.toastDismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--muted-foreground);
+  padding: 0.15rem;
+  cursor: pointer;
+}
+
+.toastDismiss:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.toastDismiss svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.6rem) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toastOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(0.4rem) scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .toast.exiting {
+    animation: none;
+  }
+}
+
+@media (max-width: 620px) {
+  /* Full width at the bottom, clear of the mobile menu button in the top bar. */
+  .toastHost {
+    right: 1rem;
+    left: 1rem;
+    bottom: 1rem;
+    align-items: stretch;
+  }
+
+  .toast {
+    max-width: none;
+  }
 }
 
 @media (max-width: 640px) {

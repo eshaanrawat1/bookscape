@@ -23,6 +23,7 @@ import { buildCommands } from './commands.js'
 // Context
 import { LibraryDataContext, useLibraryData } from './context/LibraryDataContext.jsx'
 import { NavigationContext } from './context/NavigationContext.jsx'
+import { useToast } from './context/ToastContext.jsx'
 
 // Hooks
 import useAppHotkeys from './hooks/useAppHotkeys.js'
@@ -47,6 +48,7 @@ import CollectionView from './views/CollectionView.jsx'
 import type { Book, Collection, GenreSection, RawBookPayload, RawList, SyncPullResult, SyncPushResult } from './types.js'
 
 export default function App() {
+  const { showToast } = useToast()
   const [view, setView] = useState('reading-now')
   const [previousView, setPreviousView] = useState('reading-now')
   const [mobileNav, setMobileNav] = useState(false)
@@ -60,7 +62,6 @@ export default function App() {
   const [dataVersion, setDataVersion] = useState(0)
   const [loading, setLoading] = useState(true)
   const [vaultBusy, setVaultBusy] = useState<'push' | 'pull' | null>(null)
-  const [vaultError, setVaultError] = useState<string | null>(null)
   const [showScraperDialog, setShowScraperDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
   const [showPalette, setShowPalette] = useState(false)
@@ -277,14 +278,21 @@ export default function App() {
     await reloadAppData()
   }
 
+  // Both vault actions say "your library" where the per-book buttons in the
+  // book dialog name the book. They land in the same corner now, and "Pushed to
+  // vault." from two places that sync very different amounts of data was the
+  // one genuine ambiguity in moving these out of their own surfaces.
   async function pushToVault() {
     if (vaultBusy) return
     setVaultBusy('push')
-    setVaultError(null)
     try {
       await apiFetch<SyncPushResult>('/sync/obsidian/push', { method: 'POST' })
+      showToast('Pushed your library to the vault.', { key: 'vault:library' })
     } catch (err) {
-      setVaultError(err instanceof Error ? err.message : 'Could not push to Obsidian vault.')
+      showToast(err instanceof Error ? err.message : 'Could not push to Obsidian vault.', {
+        tone: 'error',
+        key: 'vault:library',
+      })
     } finally {
       setVaultBusy(null)
     }
@@ -293,12 +301,15 @@ export default function App() {
   async function pullFromVault() {
     if (vaultBusy) return
     setVaultBusy('pull')
-    setVaultError(null)
     try {
       await apiFetch<SyncPullResult>('/sync/obsidian', { method: 'POST' })
       await reloadAppData()
+      showToast('Pulled your library from the vault.', { key: 'vault:library' })
     } catch (err) {
-      setVaultError(err instanceof Error ? err.message : 'Could not pull from Obsidian vault.')
+      showToast(err instanceof Error ? err.message : 'Could not pull from Obsidian vault.', {
+        tone: 'error',
+        key: 'vault:library',
+      })
     } finally {
       setVaultBusy(null)
     }
@@ -410,9 +421,6 @@ export default function App() {
                     <p>{meta?.subtitle || meta?.description}</p>
                   </div>
                 </div>
-                {vaultError && (
-                  <p className="topBarNotice syncErrorNotice">{vaultError}</p>
-                )}
               </header>
 
               <div className="mainContent">
