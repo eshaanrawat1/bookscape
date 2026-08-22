@@ -378,3 +378,82 @@ def get_books_by_genre(root: Path, genre: str, limit: int = 100) -> list[dict]:
         matched = [_row_to_book(conn, row, states_map=states) for row in rows]
 
     return matched
+
+
+def get_series_progress(root: Path) -> list[dict]:
+    """Every series you are partway through, with your position in it.
+
+    "Partway through" is two conditions, and both matter. At least one book read
+    or being read, so a series you merely own titles from is not a series you
+    started. And at least one book neither finished nor abandoned, so a series
+    you have settled every book in drops off the shelf the moment the last one
+    lands rather than lingering as a finished thing to keep looking at.
+
+    A one-book "series" is skipped outright: it is a series in the catalog's
+    sense but it has no reading order to be partway through, and the shelf reads
+    as noise with them in.
+
+    Only `next_book` is expanded into a full book payload. Counting statuses
+    needs the raw rows and nothing more, and this walks every book in the
+    catalog that belongs to a series — running the per-book genre lookup over
+    all 639 of them to render one cover apiece would be several hundred queries
+    for data no caller reads.
+    """
+    with transaction(root) as conn:
+        rows = conn.execute("SELECT * FROM books WHERE TRIM(series) <> ''").fetchall()
+        states = _states_map(conn)
+
+        # Grouped case-insensitively to match the lookup on the other side:
+        # /series-books resolves a name with COLLATE NOCASE, so a series split
+        # across two capitalisations here would send you to a page listing both.
+        groups: dict[str, list[dict]] = {}
+        for row in rows:
+            book = dict(row)
+            name = str(book.get("series") or "").strip()
+            groups.setdefault(name.casefold(), []).append(book)
+
+        progress = []
+        for books in groups.values():
+            books.sort(key=series_sort_key)
+            statuses = [
+                str((states.get(book["uid"]) or {}).get("status") or "not_started")
+                for book in books
+            ]
+            total = len(books)
+            if total < 2:
+                continue
+            read = statuses.count("done")
+            reading = statuses.count("reading")
+            dnf = statuses.count("dnf")
+            if read + reading == 0 or read + dnf == total:
+                continue
+
+            # The book in your hands is what you are next on; failing that, the
+            # first one in reading order you have not settled either way. A book
+            # you put down stays put down — next-up skips it rather than sending
+            # you back to the one you already decided against.
+            paired = list(zip(books, statuses))
+            next_book = next((book for book, status in paired if status == "reading"), None)
+            if next_book is None:
+                next_book = next((book for book, status in paired if status == "not_started"), None)
+
+            progress.append({
+                "series": str(books[0].get("series") or "").strip(),
+                "total": total,
+                "read": read,
+                "reading": reading,
+                "dnf": dnf,
+                "next_book": _row_to_book(conn, next_book) if next_book else None,
+            })
+
+    # A series you are actively reading comes first — this shelf sits on Reading
+    # Now, where the book open on your nightstand outranks the one you are
+    # merely closest to finishing. Everything else sorts by how little is left.
+    progress.sort(
+        key=lambda entry: (
+            0 if entry["reading"] else 1,
+            entry["total"] - entry["read"] - entry["dnf"],
+            entry["series"].lower(),
+        )
+    )
+    return progress

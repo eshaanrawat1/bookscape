@@ -3,9 +3,11 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { buildHeroGlow } from '../color.js'
 import BookCover from '../components/BookCover.jsx'
 import Progress from '../components/Progress.jsx'
+import SeriesShelf from '../components/SeriesShelf.jsx'
 import Shelf from '../components/Shelf.jsx'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
+import useSeriesProgress from '../hooks/useSeriesProgress.js'
 import type { Book } from '../types.js'
 
 interface ReadingNowHeroProps {
@@ -98,9 +100,14 @@ function ReadingNowHero({ books, onOpen }: ReadingNowHeroProps) {
 function ReadingNow() {
   const { currentlyReading, wantToRead, collections, booksByIds } = useLibraryData()
   const { onOpen, onOpenWantToRead } = useNavigation()
+  const seriesInProgress = useSeriesProgress()
   return (
     <div className="stack">
       {currentlyReading.length > 0 && <ReadingNowHero books={currentlyReading} onOpen={onOpen} />}
+      {/* Above "Up next", which is a saved-for-later list: a series you are
+          already inside of is a stronger claim on what to read next than a book
+          you once bookmarked. */}
+      <SeriesShelf series={seriesInProgress} />
       <Shelf
         title="Up next"
         subtitle="Saved for the right moment."

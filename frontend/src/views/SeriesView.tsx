@@ -2,10 +2,33 @@ import { ChevronRight, Star } from 'lucide-react'
 import BookCover from '../components/BookCover.jsx'
 import useSeriesBooks from '../hooks/useSeriesBooks.js'
 import { useNavigation } from '../context/NavigationContext.jsx'
-import type { Book } from '../types.js'
+import type { Book, ReadingStatus } from '../types.js'
 
 interface SeriesViewProps {
   series: string
+}
+
+// Where you are in the series, which is what the rows mark. The same question
+// get_series_progress() answers on the server for the Reading Now shelf, decided
+// locally here because this page already holds every book with its reading
+// status attached.
+function summariseSeries(books: Book[]) {
+  // The book in your hands, else the first in reading order you have not
+  // settled either way — a book you put down is a decision, not a gap.
+  const nextUp =
+    books.find((book) => book.status === 'reading') ||
+    books.find((book) => book.status === 'not_started') ||
+    null
+  return {
+    nextUp,
+    started: books.some((book) => book.status !== 'not_started'),
+  }
+}
+
+const ROW_MARKERS: Partial<Record<ReadingStatus, string>> = {
+  done: 'Read',
+  reading: 'Reading',
+  dnf: 'DNF',
 }
 
 function SeriesView({ series }: SeriesViewProps) {
@@ -13,6 +36,7 @@ function SeriesView({ series }: SeriesViewProps) {
   const { onOpen } = useNavigation()
 
   const numbered = books.filter((book) => book.seriesNumber).length
+  const summary = summariseSeries(books)
 
   return (
     <div className="stack authorPage">
@@ -37,7 +61,16 @@ function SeriesView({ series }: SeriesViewProps) {
           </div>
           <ul className="authorBookList">
             {books.map((book) => (
-              <SeriesBookRow key={book.id} book={book} onOpen={onOpen} />
+              <SeriesBookRow
+                key={book.id}
+                book={book}
+                // "Up next" is a claim about where you are in the series, so
+                // it needs a place to be next from. On a series you have never
+                // opened it would land on book one of all 343 of them and mean
+                // nothing more than "series start".
+                isNextUp={summary.started && book.id === summary.nextUp?.id}
+                onOpen={onOpen}
+              />
             ))}
           </ul>
         </section>
@@ -53,10 +86,15 @@ function SeriesView({ series }: SeriesViewProps) {
 
 interface SeriesBookRowProps {
   book: Book
+  isNextUp: boolean
   onOpen: (book: Book) => void
 }
 
-function SeriesBookRow({ book, onOpen }: SeriesBookRowProps) {
+function SeriesBookRow({ book, isNextUp, onOpen }: SeriesBookRowProps) {
+  // "Up next" only ever lands on an untouched book: a book you are reading says
+  // so itself, and saying both would be one label too many for one row.
+  const marker = ROW_MARKERS[book.status] || (isNextUp ? 'Up next' : '')
+
   return (
     <li>
       <button type="button" className="authorBookRow seriesBookRow" onClick={() => onOpen(book)}>
@@ -73,6 +111,23 @@ function SeriesBookRow({ book, onOpen }: SeriesBookRowProps) {
           <strong>{book.title}</strong>
           {book.author ? <span>{book.author}</span> : null}
         </div>
+        {/* The slot is rendered even when empty, for the same reason the number
+            column is: an untouched book in the middle of a series would
+            otherwise pull the rating and chevron left past its neighbours. */}
+        <span
+          className={`seriesRowMarker ${markerToneClass(book.status, isNextUp)}`}
+          // Labelled rather than read from its own text: narrow widths drop the
+          // word and keep only the coloured dot, and a dot on its own says
+          // nothing to a screen reader.
+          aria-label={marker || undefined}
+        >
+          {marker ? (
+            <>
+              <span className="seriesRowMarkerDot" />
+              <span className="seriesRowMarkerLabel">{marker}</span>
+            </>
+          ) : null}
+        </span>
         <span className="authorBookRowRating">
           {book.rating > 0 ? (
             <>
@@ -85,6 +140,13 @@ function SeriesBookRow({ book, onOpen }: SeriesBookRowProps) {
       </button>
     </li>
   )
+}
+
+function markerToneClass(status: ReadingStatus, isNextUp: boolean): string {
+  if (status === 'done') return 'isRead'
+  if (status === 'reading') return 'isReading'
+  if (status === 'dnf') return 'isDnf'
+  return isNextUp ? 'isNextUp' : 'isEmpty'
 }
 
 export default SeriesView

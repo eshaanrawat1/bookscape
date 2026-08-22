@@ -146,6 +146,22 @@ export interface ReadingHeatmap {
   streak: { current: number; longest: number }
 }
 
+// One series you have started and not finished, as /series-progress reports it.
+// `read`/`reading`/`dnf` count books in that state; the rest of `total` are ones
+// you have not picked up. `next_book` is the one to read next — the book you are
+// currently in if there is one, otherwise the first unread in reading order. A
+// series with nothing left to read next is not in progress and never reaches
+// this list, so in practice it is always present; the type keeps it nullable
+// rather than have the shelf trust a guarantee it cannot see.
+export interface SeriesProgress {
+  series: string
+  total: number
+  read: number
+  reading: number
+  dnf: number
+  next_book: RawBookPayload | null
+}
+
 export interface SyncPullResult {
   ok: boolean
   dry_run: boolean

@@ -3416,12 +3416,17 @@ svg {
   transform: translateX(0.18rem);
 }
 
-/* Series rows extend the author row's grid by a leading number column. Same
-   specificity as .authorBookRow, so this has to sit *after* it — declared
-   earlier it silently loses the cascade and the fifth child wraps to its own
-   row. */
+/* Series rows extend the author row's grid by a leading number column and a
+   fixed-width status marker. Same specificity as .authorBookRow, so this has to
+   sit *after* it — declared earlier it silently loses the cascade and the last
+   child wraps to its own row.
+
+   The marker column is a fixed width rather than `auto` so the rating and
+   chevron hold one line down the list: "Reading" and "Up next" are different
+   widths, and an auto column would step the right-hand side of every row in and
+   out as you read through the series. */
 .seriesBookRow {
-  grid-template-columns: 2.6rem 3.6rem minmax(0, 1fr) auto auto;
+  grid-template-columns: 2.6rem 3.6rem minmax(0, 1fr) 6.2rem auto auto;
 }
 
 .seriesBookRowNumber {
@@ -3484,6 +3489,137 @@ svg {
   height: 1.3rem;
   color: color-mix(in oklch, var(--muted-foreground) 82%, transparent);
   flex: 0 0 auto;
+}
+
+/* Series progress ------------------------------------------------------------ */
+
+.progressRing {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+}
+
+/* The app-wide `svg { width: 1.15em }` rule outranks an SVG's own width and
+   height attributes — CSS beats presentation attributes — so a ring asked for
+   at 52px painted at ~20 in the corner of its box. Sized here instead, where
+   the cascade can see it. */
+.progressRing svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.progressRingTrack,
+.progressRingValue {
+  fill: none;
+}
+
+.progressRingTrack {
+  stroke: var(--muted);
+}
+
+.progressRingValue {
+  stroke: var(--status-finished);
+  stroke-linecap: round;
+  /* The dash length is what animates, so a book marked read closes the arc
+     rather than snapping it to its new size. */
+  transition: stroke-dasharray 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.progressRingLabel {
+  position: relative;
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--foreground);
+}
+
+.seriesRowMarker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.42rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+}
+
+.seriesRowMarkerDot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: currentColor;
+  flex: 0 0 auto;
+}
+
+.seriesRowMarker.isRead {
+  color: color-mix(in oklch, var(--status-finished) 78%, var(--foreground));
+}
+
+.seriesRowMarker.isReading {
+  color: color-mix(in oklch, var(--status-reading) 82%, var(--foreground));
+}
+
+.seriesRowMarker.isDnf {
+  color: color-mix(in oklch, var(--status-dnf) 82%, var(--foreground));
+}
+
+.seriesRowMarker.isNextUp {
+  color: color-mix(in oklch, var(--muted-foreground) 88%, var(--foreground));
+}
+
+/* The "Series in progress" shelf on Reading Now. The card borrows .bookCard's
+   box so it scrolls and hovers exactly like the book cards beside it, and only
+   replaces what a series has instead of an author line. */
+.seriesCard .coverWrap {
+  position: relative;
+}
+
+.seriesCardNoCover {
+  aspect-ratio: 2 / 3;
+  width: 100%;
+  border-radius: 0.85rem;
+  background: var(--muted);
+  box-shadow: var(--shadow-warm);
+}
+
+.seriesCardFlag {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.7rem;
+  z-index: 4;
+  border-radius: 999px;
+  padding: 0.24rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--foreground);
+  /* Sits over cover art of any colour, so it carries its own ground rather
+     than tinting whatever is underneath. */
+  background: color-mix(in oklch, var(--card) 88%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 12px rgba(var(--shadow-tint), 0.22);
+}
+
+.seriesCardFlag.isReading {
+  color: color-mix(in oklch, var(--status-reading) 74%, var(--foreground));
+}
+
+.seriesCardMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.24rem;
+  color: var(--muted-foreground);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Toasts --------------------------------------------------------------------- */
@@ -3617,6 +3753,20 @@ svg {
 @media (max-width: 640px) {
   .authorBookRowCover {
     width: 2.9rem;
+  }
+
+  /* The marker drops to its dot here. Six columns do not fit a phone, and the
+     word is the widest of them by far — the colour still separates read from
+     reading from abandoned, and the label survives for screen readers on the
+     wrapper's aria-label. The column stays a fixed 1rem rather than `auto` so
+     an untouched book's empty slot lines up with its neighbours' dots. */
+  .seriesBookRow {
+    grid-template-columns: 2.2rem 2.9rem minmax(0, 1fr) 1rem auto auto;
+    gap: 0.7rem;
+  }
+
+  .seriesRowMarkerLabel {
+    display: none;
   }
 }
 
