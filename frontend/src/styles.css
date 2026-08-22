@@ -3422,11 +3422,14 @@ svg {
    child wraps to its own row.
 
    The marker column is a fixed width rather than `auto` so the rating and
-   chevron hold one line down the list: "Reading" and "Up next" are different
-   widths, and an auto column would step the right-hand side of every row in and
-   out as you read through the series. */
+   chevron hold one line down the list: "Read" and "Not started" are very
+   different widths, and an auto column would step the right-hand side of every
+   row in and out as you read through the series. The labels do not wrap, so a
+   column too narrow spills them over the title rather than folding them: 7.2rem
+   is the longest of them, "Not started" at 6.79rem measured in Plus Jakarta
+   Sans 600, plus a little room for how another face in the stack might set it. */
 .seriesBookRow {
-  grid-template-columns: 2.6rem 3.6rem minmax(0, 1fr) 6.2rem auto auto;
+  grid-template-columns: 2.6rem 3.6rem minmax(0, 1fr) 7.2rem auto auto;
 }
 
 .seriesBookRowNumber {
@@ -3572,6 +3575,14 @@ svg {
 
 .seriesRowMarker.isNextUp {
   color: color-mix(in oklch, var(--muted-foreground) 88%, var(--foreground));
+}
+
+/* The quietest of the five, and deliberately quieter than "up next": on a
+   series you have not opened every row carries this, and at the weight the
+   others use it would read as a column of alarms about books you simply have
+   not got to. */
+.seriesRowMarker.isNotStarted {
+  color: color-mix(in oklch, var(--muted-foreground) 60%, transparent);
 }
 
 /* The "Series in progress" shelf on Reading Now. The card borrows .bookCard's

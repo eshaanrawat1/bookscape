@@ -25,10 +25,11 @@ function summariseSeries(books: Book[]) {
   }
 }
 
-const ROW_MARKERS: Partial<Record<ReadingStatus, string>> = {
+const ROW_MARKERS: Record<ReadingStatus, string> = {
   done: 'Read',
   reading: 'Reading',
   dnf: 'DNF',
+  not_started: 'Not started',
 }
 
 function SeriesView({ series }: SeriesViewProps) {
@@ -91,9 +92,10 @@ interface SeriesBookRowProps {
 }
 
 function SeriesBookRow({ book, isNextUp, onOpen }: SeriesBookRowProps) {
-  // "Up next" only ever lands on an untouched book: a book you are reading says
-  // so itself, and saying both would be one label too many for one row.
-  const marker = ROW_MARKERS[book.status] || (isNextUp ? 'Up next' : '')
+  // "Up next" is the one label that replaces rather than adds: it only ever
+  // lands on an untouched book, since a book you are already reading says so
+  // itself and saying both would be one label too many for one row.
+  const marker = book.status === 'not_started' && isNextUp ? 'Up next' : ROW_MARKERS[book.status]
 
   return (
     <li>
@@ -111,22 +113,15 @@ function SeriesBookRow({ book, isNextUp, onOpen }: SeriesBookRowProps) {
           <strong>{book.title}</strong>
           {book.author ? <span>{book.author}</span> : null}
         </div>
-        {/* The slot is rendered even when empty, for the same reason the number
-            column is: an untouched book in the middle of a series would
-            otherwise pull the rating and chevron left past its neighbours. */}
         <span
           className={`seriesRowMarker ${markerToneClass(book.status, isNextUp)}`}
           // Labelled rather than read from its own text: narrow widths drop the
           // word and keep only the coloured dot, and a dot on its own says
           // nothing to a screen reader.
-          aria-label={marker || undefined}
+          aria-label={marker}
         >
-          {marker ? (
-            <>
-              <span className="seriesRowMarkerDot" />
-              <span className="seriesRowMarkerLabel">{marker}</span>
-            </>
-          ) : null}
+          <span className="seriesRowMarkerDot" />
+          <span className="seriesRowMarkerLabel">{marker}</span>
         </span>
         <span className="authorBookRowRating">
           {book.rating > 0 ? (
@@ -146,7 +141,7 @@ function markerToneClass(status: ReadingStatus, isNextUp: boolean): string {
   if (status === 'done') return 'isRead'
   if (status === 'reading') return 'isReading'
   if (status === 'dnf') return 'isDnf'
-  return isNextUp ? 'isNextUp' : 'isEmpty'
+  return isNextUp ? 'isNextUp' : 'isNotStarted'
 }
 
 export default SeriesView
