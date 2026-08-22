@@ -1007,6 +1007,9 @@ svg {
   font-family: var(--font-serif);
   font-weight: 500;
   font-size: 2rem;
+  /* Body's 1.5 leaves close to a rem of leading under a 2rem line, which reads
+     as a gap between the title and its subtitle rather than as part of either. */
+  line-height: 1.15;
   letter-spacing: -0.015em;
   color: var(--foreground);
 }

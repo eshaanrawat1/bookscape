@@ -120,7 +120,7 @@ function ReadingNow() {
           <Shelf
             key={collection.id}
             title={collection.name}
-            subtitle="Collection"
+            subtitle="Kept together on purpose."
             books={collection.books?.length ? collection.books : booksByIds(collection.bookIds)}
           />
         ))}
