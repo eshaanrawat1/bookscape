@@ -11,9 +11,9 @@ from ..utils import clamp_my_rating
 # A book the user has picked up, in any sense — the set /my-books is built from.
 # 'not_started' is the absence of a shelf, not a shelf of its own, so it is the
 # one status excluded: those books live in the catalog and are reachable through
-# Library and search. 'dnf' has to be in here even though it gets no shelf of its
-# own, because this list is the whole client-side `books` array — leaving it out
-# would make abandoning a book look like deleting it.
+# Library and search. 'dnf' is in here both for its own shelf and because this
+# list is the whole client-side `books` array — leaving it out would make
+# abandoning a book look like deleting it.
 TRACKED_STATUSES = {"reading", "done", "dnf"}
 VALID_STATUSES = {"not_started", *TRACKED_STATUSES}
 

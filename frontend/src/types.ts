@@ -187,6 +187,7 @@ export interface LibraryDataContextValue {
   currentlyReading: Book[]
   wantToRead: Book[]
   finished: Book[]
+  dnf: Book[]
   booksByIds: (ids: string[]) => Book[]
   // Bumped every time the app-level lists are reloaded. Views that fetch their
   // own books (the author, series and genre drilldowns, and search) watch it so

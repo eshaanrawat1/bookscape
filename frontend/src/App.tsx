@@ -121,6 +121,7 @@ export default function App() {
   const currentlyReading = books.filter((b) => b.status === 'reading')
   const wantToRead = wantToReadBooks
   const finished = books.filter((b) => b.status === 'done')
+  const dnf = books.filter((b) => b.status === 'dnf')
 
   const activeCollection = view.startsWith('collection:')
     ? collections.find((c) => `collection:${c.id}` === view)
@@ -185,7 +186,7 @@ export default function App() {
     setMobileNav(false)
   }
 
-  // The generic jump used by the sidebar, the ⌘1–⌘6 chords and every palette
+  // The generic jump used by the sidebar, the ⌘1–⌘7 chords and every palette
   // navigate command. Like the sidebar it is a top-level destination rather
   // than a drilldown, so it leaves previousView alone; it does dismiss whatever
   // is open on top, since arriving at a new view behind a dialog reads as the
@@ -322,6 +323,7 @@ export default function App() {
     currentlyReading,
     wantToRead,
     finished,
+    dnf,
     booksByIds,
     dataVersion,
     refreshLibrary: reloadAppData,
@@ -462,7 +464,7 @@ export default function App() {
 }
 
 function ViewContent({ view }: { view: string }) {
-  const { collections, wantToRead, finished } = useLibraryData()
+  const { collections, wantToRead, finished, dnf } = useLibraryData()
   const activeCollection = view.startsWith('collection:')
     ? collections.find((c) => `collection:${c.id}` === view)
     : null
@@ -484,6 +486,8 @@ function ViewContent({ view }: { view: string }) {
       return <BookGrid books={wantToRead} />
     case 'finished':
       return <BookGrid books={finished} />
+    case 'dnf':
+      return <BookGrid books={dnf} />
     default:
       if (view.startsWith('author:')) {
         return <AuthorView author={authorNameFromView(view)} />
