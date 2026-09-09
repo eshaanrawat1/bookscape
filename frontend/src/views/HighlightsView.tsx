@@ -146,6 +146,11 @@ function HighlightsView() {
   )
 }
 
+// How far the note field grows before it starts scrolling. The backend caps the
+// stored text at 5000 characters; this is the layout's own guard, so a pasted
+// wall of text cannot push the highlights below it off the page.
+const NOTE_MAX_LINES = 5
+
 function countLabel(count: number): string {
   return `${count} ${count === 1 ? 'highlight' : 'highlights'}`
 }
@@ -189,9 +194,11 @@ function HighlightCard({ highlight, onSaveNote, onSaveEdit, onDelete }: Highligh
   const [note, setNote] = useState(highlight.note)
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState(false)
-  // The note grows with what you type; the edit field above it keeps a fixed
-  // box and a resize handle, since a highlight can run to a full passage.
-  const noteRef = useAutoGrowTextarea(note)
+  // The note grows with what you type, up to five lines, after which it
+  // scrolls — a note long enough to push the rest of the page out of view is
+  // not a note. The edit field above it keeps a fixed box and a resize handle
+  // instead, since a highlight can run to a full passage.
+  const noteRef = useAutoGrowTextarea(note, { maxLines: NOTE_MAX_LINES })
   const [draftText, setDraftText] = useState(highlight.text)
   const [draftPage, setDraftPage] = useState(highlight.page > 0 ? String(highlight.page) : '')
 

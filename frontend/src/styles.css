@@ -4219,13 +4219,14 @@ svg {
 
 /* Grows with the note rather than scrolling inside a fixed box: a note is a
    sentence or two, and a scrollbar on two lines reads as broken. The height is
-   set from JS by useAutoGrowTextarea, which needs both properties below —
-   `overflow: hidden` so scrollHeight measures the content, `resize: none` so a
-   dragged height is not overwritten on the next keystroke. */
+   set from JS by useAutoGrowTextarea, which also owns overflow-y — it brings
+   the scrollbar back at the five-line cap, so none is declared here.
+   `resize: none` keeps a hand-dragged height from being overwritten on the
+   next keystroke. */
 .highlightNoteInput {
   width: 100%;
   min-height: 3.6rem;
-  overflow: hidden;
+  overflow-x: hidden;
   resize: none;
   border: 1px solid transparent;
   border-radius: 0.9rem;
