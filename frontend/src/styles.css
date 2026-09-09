@@ -4115,7 +4115,13 @@ svg {
   font-size: 1.02rem;
 }
 
-.highlightDeleteButton {
+.highlightCardActions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.highlightCardButton {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -4129,14 +4135,86 @@ svg {
   transition: color 160ms ease, background 160ms ease;
 }
 
+.highlightCardButton:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+/* Destructive, so it reaches for the danger tint where Edit stays neutral. */
 .highlightDeleteButton:hover {
   background: color-mix(in oklch, var(--danger-strong) 10%, transparent);
   color: var(--danger-strong);
 }
 
-.highlightDeleteButton svg {
+.highlightCardButton svg {
   width: 1.25rem;
   height: 1.25rem;
+}
+
+/* Edit mode: the quote becomes the field it is read from, so the card keeps
+   its size and the text does not jump as you switch in and out. */
+.highlightEditInput {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: var(--background);
+  padding: 1.1rem 1.2rem;
+  color: var(--foreground);
+  font-family: var(--font-serif);
+  font-size: 1.32rem;
+  line-height: 1.6;
+  outline: 0;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.highlightEditInput:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 16%, transparent);
+}
+
+.highlightEditRow {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.highlightEditPage {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--muted-foreground);
+  font-size: 1.02rem;
+}
+
+.highlightEditPage input {
+  width: 7rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: var(--background);
+  padding: 0.5rem 0.8rem;
+  color: var(--foreground);
+  font-size: 1.05rem;
+  text-align: center;
+  outline: 0;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.highlightEditPage input:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 16%, transparent);
+}
+
+.highlightEditActions {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.highlightEditActions .primaryButton,
+.highlightEditActions .secondaryButton {
+  min-height: 2.9rem;
+  padding: 0 1.4rem;
+  font-size: 1.02rem;
 }
 
 /* Grows with the note rather than scrolling inside a fixed box: a note is a

@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import BookCover from '../components/BookCover.jsx'
 import BrandMark from '../components/BrandMark.jsx'
 import HighlightDialog from '../components/HighlightDialog.jsx'
@@ -100,6 +100,20 @@ function HighlightsView() {
                     })
                   }
                 }}
+                onSaveEdit={async (fields) => {
+                  try {
+                    await updateHighlight(highlight.id, fields)
+                    return true
+                  } catch (err) {
+                    showToast(err instanceof Error ? err.message : 'Could not save the highlight.', {
+                      tone: 'error',
+                      key: `highlight:${highlight.id}`,
+                    })
+                    // Reported false so the card stays in edit mode on the text
+                    // that failed rather than reverting it out from under you.
+                    return false
+                  }
+                }}
                 onDelete={async () => {
                   try {
                     await deleteHighlight(highlight.id)
@@ -165,12 +179,36 @@ function BookRow({ group, active, onSelect }: BookRowProps) {
 interface HighlightCardProps {
   highlight: Highlight
   onSaveNote: (note: string) => Promise<void>
+  // Resolves true when the write landed; false leaves the card in edit mode.
+  onSaveEdit: (fields: { text: string; page: number }) => Promise<boolean>
   onDelete: () => Promise<void>
 }
 
-function HighlightCard({ highlight, onSaveNote, onDelete }: HighlightCardProps) {
+function HighlightCard({ highlight, onSaveNote, onSaveEdit, onDelete }: HighlightCardProps) {
   const [note, setNote] = useState(highlight.note)
   const [busy, setBusy] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draftText, setDraftText] = useState(highlight.text)
+  const [draftPage, setDraftPage] = useState(highlight.page > 0 ? String(highlight.page) : '')
+
+  // Reopened from whatever is stored rather than from the last draft, so
+  // cancelling an edit and starting again begins from the saved text.
+  const startEditing = () => {
+    setDraftText(highlight.text)
+    setDraftPage(highlight.page > 0 ? String(highlight.page) : '')
+    setEditing(true)
+  }
+
+  const saveEdit = async () => {
+    const text = draftText.trim()
+    if (!text || busy) return
+    setBusy(true)
+    try {
+      if (await onSaveEdit({ text, page: Number(draftPage) || 0 })) setEditing(false)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   // Saved on blur rather than on every keystroke, and only when the text has
   // actually moved — tabbing through a card should not write to the database.
@@ -198,20 +236,71 @@ function HighlightCard({ highlight, onSaveNote, onDelete }: HighlightCardProps) 
     formatDayLabel(highlight.createdAt),
   ].filter(Boolean).join('  ·  ')
 
+  if (editing) {
+    return (
+      <article className="highlightCard">
+        <textarea
+          className="highlightEditInput"
+          value={draftText}
+          rows={5}
+          autoFocus
+          disabled={busy}
+          aria-label="Highlight text"
+          onChange={(event) => setDraftText(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') setEditing(false)
+          }}
+        />
+        <div className="highlightMetaRow highlightEditRow">
+          <label className="highlightEditPage">
+            <span>Page</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={draftPage}
+              disabled={busy}
+              placeholder="0"
+              onChange={(event) => setDraftPage(event.target.value.replace(/\D/g, '').slice(0, 6))}
+            />
+          </label>
+          <div className="highlightEditActions">
+            <button type="button" className="secondaryButton" onClick={() => setEditing(false)} disabled={busy}>
+              Cancel
+            </button>
+            <button type="button" className="primaryButton" onClick={saveEdit} disabled={busy || !draftText.trim()}>
+              {busy ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </article>
+    )
+  }
+
   return (
     <article className="highlightCard">
       <blockquote className="highlightQuote">{highlight.text}</blockquote>
       <div className="highlightMetaRow">
         <span className="highlightMeta">{meta}</span>
-        <button
-          type="button"
-          className="highlightDeleteButton"
-          onClick={onDelete}
-          aria-label="Delete highlight"
-        >
-          <Trash2 />
-          Delete
-        </button>
+        <div className="highlightCardActions">
+          <button
+            type="button"
+            className="highlightCardButton"
+            onClick={startEditing}
+            aria-label="Edit highlight"
+          >
+            <Pencil />
+            Edit
+          </button>
+          <button
+            type="button"
+            className="highlightCardButton highlightDeleteButton"
+            onClick={onDelete}
+            aria-label="Delete highlight"
+          >
+            <Trash2 />
+            Delete
+          </button>
+        </div>
       </div>
       <textarea
         className="highlightNoteInput"
