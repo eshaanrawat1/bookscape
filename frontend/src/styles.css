@@ -1488,7 +1488,14 @@ svg {
   font-size: 1.3rem;
   line-height: 1.55;
   color: var(--foreground);
-  max-height: calc(6 * 1.55em);
+  /* Six lines exactly. The height has to come from the line-height that actually
+     wins the cascade, which is the 1.5 on `.dialogCopy p` — that selector
+     outranks this one, so multiplying this rule's own 1.55 gave 6.2 lines and
+     left a sliver of the seventh showing above the bottom edge. `lh` is the
+     computed line-height whatever wins; the em value is the fallback for
+     engines without it. */
+  max-height: calc(6 * 1.5em);
+  max-height: calc(6 * 1lh);
   overflow-y: auto;
   padding-right: 0.35rem;
   scrollbar-gutter: stable;
