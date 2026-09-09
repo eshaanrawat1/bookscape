@@ -4,13 +4,47 @@ import Progress from './Progress.jsx'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
 
+// Which way the widget is folded is chrome, not library data, so it lives in
+// localStorage next to the recent searches rather than behind the API. Reads
+// and writes are guarded — a webview with storage disabled should cost you the
+// remembered fold, not the sidebar.
+const STORAGE_KEY = 'bookscape.goalWidgetOpen'
+
+// Anything other than a stored "false" opens: a missing key is a first run, and
+// a first run should show the goal rather than hide it.
+function readOpen(): boolean {
+  try {
+    return window.localStorage.getItem(STORAGE_KEY) !== 'false'
+  } catch {
+    return true
+  }
+}
+
+function writeOpen(open: boolean) {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, String(open))
+  } catch {
+    /* storage is full or unavailable — the fold still works for this session */
+  }
+}
+
 // The goal in the corner of the sidebar, so it is on every page. The header row
 // folds it away; what is left below the header still does the one thing.
 function ReadingGoalWidget() {
   const { readingGoal } = useLibraryData()
   const { onEditReadingGoal } = useNavigation()
   const { year, target, booksRead, loading } = readingGoal
-  const [open, setOpen] = useState(true)
+  // Lazy initialiser, so the remembered fold survives the unmount that the
+  // loading early-return below puts this component through on every load.
+  const [open, setOpen] = useState(readOpen)
+
+  const toggle = () => {
+    setOpen((value) => {
+      const next = !value
+      writeOpen(next)
+      return next
+    })
+  }
 
   if (loading) return null
 
@@ -22,7 +56,7 @@ function ReadingGoalWidget() {
       <button
         type="button"
         className="goalWidgetToggle"
-        onClick={() => setOpen((value) => !value)}
+        onClick={toggle}
         aria-expanded={open}
         aria-label={open ? 'Hide reading goal' : 'Show reading goal'}
       >
