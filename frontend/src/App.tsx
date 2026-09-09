@@ -43,6 +43,7 @@ import ReadingNow from './views/ReadingNow.jsx'
 import LibraryView from './views/LibraryView.jsx'
 import SearchView from './views/SearchView.jsx'
 import StatsView from './views/StatsView.jsx'
+import HighlightsView from './views/HighlightsView.jsx'
 import AuthorView from './views/AuthorView.jsx'
 import SeriesView from './views/SeriesView.jsx'
 import GenreView from './views/GenreView.jsx'
@@ -524,6 +525,8 @@ function ViewContent({ view }: { view: string }) {
       return <SearchView />
     case 'stats':
       return <StatsView />
+    case 'highlights':
+      return <HighlightsView />
     case 'want-to-read':
       return <BookGrid books={wantToRead} />
     case 'finished':

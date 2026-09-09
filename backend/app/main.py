@@ -12,9 +12,11 @@ from .observability import configure_logging
 from .repository import DataRepository
 from .services.catalog import has_data
 from .services.cover_worker import start_worker
+from .services.highlights import HighlightStore
 from .services.reading import ReadingListStore
 from .routes.catalog import create_router as create_catalog_router
 from .routes.books import create_router as create_books_router
+from .routes.highlights import create_router as create_highlights_router
 from .routes.lists import create_router as create_lists_router
 from .routes.stats import create_router as create_stats_router
 from .routes.sync import create_router as create_sync_router
@@ -24,7 +26,7 @@ from .routes.settings import create_router as create_settings_router
 
 # App setup
 ROOT = Path(__file__).resolve().parents[2]
-BACKEND_API_VERSION = 5
+BACKEND_API_VERSION = 6
 
 # Origins the app itself is served from: the custom protocol the packaged
 # webview uses (per-platform), plus the Vite dev server. Anything else is a page
@@ -66,11 +68,13 @@ app.add_middleware(
 
 repo = DataRepository(ROOT)
 lists = ReadingListStore(ROOT)
+highlights = HighlightStore(ROOT)
 
 # Create and include routers
 api_router = create_catalog_router(ROOT)
 api_router.include_router(create_books_router(ROOT, repo))
 api_router.include_router(create_lists_router(ROOT, repo, lists))
+api_router.include_router(create_highlights_router(ROOT, highlights))
 api_router.include_router(create_stats_router(ROOT, repo))
 api_router.include_router(create_sync_router(ROOT))
 api_router.include_router(create_scraper_router(ROOT))

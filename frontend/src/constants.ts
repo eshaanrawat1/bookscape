@@ -1,4 +1,4 @@
-import { Library, Search, BarChart3, BookOpen, Bookmark, CheckCircle2, BookX, type LucideIcon } from 'lucide-react'
+import { Library, Search, BarChart3, Highlighter, BookOpen, Bookmark, CheckCircle2, BookX, type LucideIcon } from 'lucide-react'
 
 interface ViewMetaEntry {
   title: string
@@ -21,6 +21,7 @@ const viewMeta: Record<string, ViewMetaEntry> = {
   library: { title: 'Library', subtitle: 'Everything on your shelves.' },
   search: { title: 'Search', subtitle: 'Find a book by title or author.' },
   stats: { title: 'Statistics', subtitle: 'A quick read on your finished books.' },
+  highlights: { title: 'Highlights', subtitle: 'Passages worth keeping.' },
   'want-to-read': { title: 'Want to Read', subtitle: 'Saved for a rainy day.' },
   finished: { title: 'Finished', subtitle: "Books you've loved and closed." },
   dnf: { title: 'Did Not Finish', subtitle: 'Set down before the last page.' },
@@ -30,6 +31,7 @@ const mainNav: NavItem[] = [
   { id: 'library', label: 'Library', icon: Library },
   { id: 'search', label: 'Search', icon: Search },
   { id: 'stats', label: 'Statistics', icon: BarChart3 },
+  { id: 'highlights', label: 'Highlights', icon: Highlighter },
 ]
 
 const shelfNav: NavItem[] = [

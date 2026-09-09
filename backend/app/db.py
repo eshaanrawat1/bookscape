@@ -108,6 +108,27 @@ CREATE TABLE IF NOT EXISTS collection_books (
 );
 CREATE INDEX IF NOT EXISTS idx_cb_uid ON collection_books(uid);
 
+-- A snippet copied out of a book, with the page it came from and an optional
+-- note of your own about it. Distinct from user_book_state.notes, which is one
+-- free-text field per book: these are many per book, each anchored to a page.
+--
+-- `page` is 0 for "no page recorded" rather than nullable, matching my_rating's
+-- reading of 0 — a highlight's page is either known or it isn't, and no book
+-- has a page zero to confuse it with.
+--
+-- Bookscape-only, like collections and want_to_read: highlights never reach the
+-- Obsidian vault in either direction.
+CREATE TABLE IF NOT EXISTS highlights (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  uid        TEXT NOT NULL REFERENCES books(uid) ON DELETE CASCADE,
+  text       TEXT NOT NULL,
+  page       INTEGER NOT NULL DEFAULT 0,
+  note       TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_highlights_uid ON highlights(uid, created_at);
+
 CREATE TABLE IF NOT EXISTS app_settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL DEFAULT ''

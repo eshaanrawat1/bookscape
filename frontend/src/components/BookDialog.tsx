@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef, type Ref } from 'react'
 import {
-  X, Star, MessageSquareText, FileText, Plus, Heart, ChevronDown, Upload, Download,
+  X, Star, MessageSquareText, FileText, Plus, Heart, Highlighter, ChevronDown, Upload, Download,
   LoaderCircle, Hash, Sigma, Calendar, CalendarCheck, TextAlignStart,
 } from 'lucide-react'
 import { apiFetch } from '../api.js'
@@ -8,6 +8,7 @@ import { normaliseBook, getCatalogBookId, formatCompactNumber, resolveSavedWantT
 import BookCover from './BookCover.jsx'
 import DateProperty from './DateProperty.jsx'
 import GenrePills from './GenrePills.jsx'
+import HighlightDialog from './HighlightDialog.jsx'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
@@ -156,6 +157,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
   const [collectionMenuOpen, setCollectionMenuOpen] = useState(false)
   const [savingCollection, setSavingCollection] = useState('')
   const [savingToRead, setSavingToRead] = useState(false)
+  const [highlighting, setHighlighting] = useState(false)
 
   const bookId = [
     book?._raw?.id,
@@ -617,6 +619,17 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
                     >
                       <Heart fill={isSavedToWantToRead ? 'currentColor' : 'none'} />
                     </button>
+
+                    <button
+                      type="button"
+                      className="dialogIconButton dialogHighlightButton"
+                      onClick={() => setHighlighting(true)}
+                      disabled={!bookId}
+                      aria-label="Add a highlight"
+                      title="Add a highlight"
+                    >
+                      <Highlighter />
+                    </button>
                   </div>
                 </div>
               </>
@@ -818,6 +831,10 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
               )}
             </div>
           </div>
+        )}
+
+        {highlighting && (
+          <HighlightDialog book={displayBook} onClose={() => setHighlighting(false)} />
         )}
       </article>
   )

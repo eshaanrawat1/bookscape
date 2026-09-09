@@ -44,6 +44,17 @@ function collectionIdFromName(name: string): string {
   return encodeURIComponent(name)
 }
 
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+// 'Nov 3, 2021' from either a plain date or a full timestamp. Sliced rather than
+// passed through Date, which would read a bare '2021-11-03' as UTC midnight and
+// show the day before to anyone west of Greenwich.
+function formatDayLabel(iso: string): string {
+  const [y, m, d] = String(iso || '').slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return ''
+  return `${MONTH_LABELS[m - 1]} ${d}, ${y}`
+}
+
 function mapReadingLists(rawLists: RawList[]): Collection[] {
   return rawLists.map((list) => ({
     id: collectionIdFromName(list.name),
@@ -200,6 +211,7 @@ export {
   loadBootstrapData,
   searchBooks,
   collectionIdFromName,
+  formatDayLabel,
   mapReadingLists,
   nextCollectionName,
   formatCompactNumber,

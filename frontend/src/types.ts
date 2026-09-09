@@ -94,6 +94,46 @@ export interface GenreSection {
   books: Book[]
 }
 
+// A snippet copied out of a book. `page` is 0 for "no page recorded" — no book
+// has a page zero, so nothing has to distinguish a missing page from a real one
+// — and `note` is your own commentary on the snippet, distinct from the single
+// per-book notes field the reading panel writes.
+export interface RawHighlight {
+  id: number
+  book_id: string
+  text: string
+  page: number
+  note: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Highlight {
+  id: number
+  bookId: string
+  text: string
+  page: number
+  note: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface RawHighlightGroup {
+  book_id: string
+  book: RawBookPayload | null
+  count: number
+  highlights: RawHighlight[]
+}
+
+// One book's highlights, newest first. The backend drops any group whose
+// catalog row has gone, so `book` is always present by the time it reaches here.
+export interface HighlightGroup {
+  bookId: string
+  book: Book
+  count: number
+  highlights: Highlight[]
+}
+
 export interface RawGenreSection {
   genre: string
   books: RawBookPayload[]
