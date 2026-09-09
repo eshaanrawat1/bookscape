@@ -100,7 +100,8 @@ svg {
 .shelfScroll,
 .dialogSimilarScroll,
 .statsFocusScroll,
-.heatmapScroll {
+.heatmapScroll,
+.goalSlots {
   overscroll-behavior-x: contain;
   scrollbar-width: none;
 }
@@ -108,7 +109,8 @@ svg {
 .shelfScroll::-webkit-scrollbar,
 .dialogSimilarScroll::-webkit-scrollbar,
 .statsFocusScroll::-webkit-scrollbar,
-.heatmapScroll::-webkit-scrollbar {
+.heatmapScroll::-webkit-scrollbar,
+.goalSlots::-webkit-scrollbar {
   display: none;
 }
 
@@ -949,6 +951,320 @@ svg {
   -webkit-line-clamp: 5;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* ========================================================================== */
+/* Reading Goal                                                             */
+/* ========================================================================== */
+
+/* No card and no shadow: a heading with a meter beside it, sitting on the page
+   the way the shelf headings below it do. */
+.goalCard {
+  display: flex;
+  flex-direction: column;
+  gap: 1.8rem;
+}
+
+/* No goal set: one row, no progress bar. An empty meter reading 0% would
+   report failure at something that was never started. */
+.goalCard.goalCardEmpty {
+  flex-direction: row;
+  align-items: center;
+  gap: 1.3rem;
+}
+
+.goalTop {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 30rem);
+  align-items: center;
+  gap: 1.3rem;
+}
+
+.goalMark {
+  display: grid;
+  flex: 0 0 auto;
+  width: 3.6rem;
+  height: 3.6rem;
+  place-items: center;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--accent) 65%, var(--card));
+  color: color-mix(in oklch, var(--accent-foreground) 65%, transparent);
+}
+
+.goalMark svg {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+.goalCard h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 2rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  color: var(--foreground);
+}
+
+.goalSetButton {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.goalMeter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  border-radius: 1.1rem;
+  background: color-mix(in oklch, var(--muted) 75%, transparent);
+  padding: 1rem 1.2rem;
+}
+
+.goalMeter .progressTrack {
+  height: 0.5rem;
+  background: color-mix(in oklch, var(--foreground) 10%, transparent);
+}
+
+.goalMeterRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.2rem;
+}
+
+.goalMeterText {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 1.05rem;
+  letter-spacing: 0.005em;
+}
+
+.goalMeterText strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.goalEditButton {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--muted-foreground);
+  font-size: 1.02rem;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+}
+
+.goalEditButton:hover {
+  color: var(--foreground);
+}
+
+/* The year so far, left to right, then a few of the slots still open. A
+   scroller rather than a grid: a good year should not push the shelves below
+   it off the page. */
+.goalSlots {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding: 0.1rem 0.1rem 0.4rem;
+}
+
+.goalSlot {
+  flex: 0 0 6.6rem;
+  width: 6.6rem;
+}
+
+.goalSlotBook {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.goalSlotEmpty {
+  display: grid;
+  aspect-ratio: 2 / 3;
+  place-items: center;
+  border-radius: 0.8rem;
+  background: color-mix(in oklch, var(--muted) 70%, transparent);
+}
+
+.goalSlotEmpty span {
+  color: color-mix(in oklch, var(--muted-foreground) 28%, transparent);
+  font-family: var(--font-serif);
+  font-size: 2rem;
+  font-weight: 400;
+}
+
+/* Sidebar widget                                                            */
+
+.goalWidget {
+  flex: 0 0 auto;
+}
+
+.goalWidgetButton {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 0.7rem;
+  border: 0;
+  border-radius: 1.2rem;
+  background: color-mix(in oklch, var(--card) 45%, transparent);
+  padding: 1rem 1.25rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.goalWidgetButton:hover {
+  background: color-mix(in oklch, var(--card) 85%, transparent);
+}
+
+.goalWidgetTop {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: var(--sidebar-foreground);
+}
+
+.goalWidgetTop svg {
+  width: 1.4rem;
+  height: 1.4rem;
+  color: var(--muted-foreground);
+}
+
+.goalWidgetLabel {
+  font-size: 1.15rem;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+}
+
+.goalWidgetButton .progressTrack {
+  height: 0.45rem;
+  background: color-mix(in oklch, var(--sidebar-foreground) 12%, transparent);
+}
+
+.goalWidgetFoot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.goalWidgetCount {
+  color: var(--muted-foreground);
+  font-size: 1.05rem;
+}
+
+.goalWidgetEdit {
+  color: var(--muted-foreground);
+  font-size: 1rem;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+/* Edit dialog                                                               */
+
+.goalDialog {
+  gap: 1.1rem;
+}
+
+.goalPresetRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.goalNumberInput,
+.goalPreset {
+  min-height: 3.7rem;
+}
+
+.goalNumberInput {
+  flex: 0 0 8.5rem;
+  width: 8.5rem;
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.goalPreset {
+  flex: 0 0 auto;
+  min-width: 5.4rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--background);
+  color: var(--foreground);
+  padding: 0 1.3rem;
+  font-size: 1.12rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.goalPreset:hover:not(:disabled) {
+  border-color: var(--ring);
+}
+
+.goalPreset.active {
+  border-color: var(--primary);
+  background: color-mix(in oklch, var(--primary) 12%, var(--background));
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.goalPreset:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.goalPaceRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--muted-foreground);
+  font-size: 1.1rem;
+}
+
+.goalPaceRow .goalNumberInput {
+  flex: 0 0 6.5rem;
+  width: 6.5rem;
+}
+
+.goalHint {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 1.05rem;
+  line-height: 1.45;
+}
+
+.goalDialogButtons {
+  align-items: center;
+}
+
+.goalRemoveButton {
+  margin-right: auto;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--danger);
+  font-size: 1.08rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.goalRemoveButton:hover:not(:disabled) {
+  color: var(--danger-strong);
+  text-decoration: underline;
+}
+
+.goalRemoveButton:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 /* ========================================================================== */
@@ -3783,8 +4099,18 @@ svg {
   }
 
   .heroInner,
-  .dialogTop {
+  .dialogTop,
+  .goalTop {
     grid-template-columns: 1fr;
+  }
+
+  .goalCard.goalCardEmpty {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .goalSetButton {
+    margin-left: 0;
   }
 
   .heroCover,

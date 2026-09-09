@@ -18,7 +18,7 @@ use tauri::Manager;
 const BACKEND_HOST: &str = "127.0.0.1";
 const BACKEND_PORT: u16 = 9876;
 const HEALTHCHECK_URL: &str = "http://127.0.0.1:9876/health";
-const EXPECTED_BACKEND_API_VERSION: u64 = 4;
+const EXPECTED_BACKEND_API_VERSION: u64 = 5;
 const TOKEN_ENV_VAR: &str = "BOOKSCAPE_API_TOKEN";
 const TOKEN_HEADER: &str = "X-Bookscape-Token";
 const TOKEN_LEN: usize = 43;

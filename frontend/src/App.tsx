@@ -27,12 +27,14 @@ import { useToast } from './context/ToastContext.jsx'
 
 // Hooks
 import useAppHotkeys from './hooks/useAppHotkeys.js'
+import useReadingGoal from './hooks/useReadingGoal.js'
 
 // Components
 import Sidebar from './components/Sidebar.jsx'
 import BookDialogStage, { type Selected } from './components/BookDialogStage.jsx'
 import ScraperDialog from './components/ScraperDialog.jsx'
 import SettingsDialog from './components/SettingsDialog.jsx'
+import ReadingGoalDialog from './components/ReadingGoalDialog.jsx'
 import CommandPalette from './components/CommandPalette.jsx'
 import BookGrid from './components/BookGrid.jsx'
 
@@ -64,6 +66,7 @@ export default function App() {
   const [vaultBusy, setVaultBusy] = useState<'push' | 'pull' | null>(null)
   const [showScraperDialog, setShowScraperDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
+  const [showGoalDialog, setShowGoalDialog] = useState(false)
   const [showPalette, setShowPalette] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -122,6 +125,11 @@ export default function App() {
   const wantToRead = wantToReadBooks
   const finished = books.filter((b) => b.status === 'done')
   const dnf = books.filter((b) => b.status === 'dnf')
+
+  // Progress against the goal is counted from `finished` rather than fetched,
+  // so marking a book done moves the bar on the next render — the same list the
+  // goal card draws its covers from.
+  const readingGoal = useReadingGoal(finished)
 
   const activeCollection = view.startsWith('collection:')
     ? collections.find((c) => `collection:${c.id}` === view)
@@ -324,6 +332,7 @@ export default function App() {
     wantToRead,
     finished,
     dnf,
+    readingGoal,
     booksByIds,
     dataVersion,
     refreshLibrary: reloadAppData,
@@ -341,6 +350,7 @@ export default function App() {
     onOpenSeries: openSeriesPage,
     onOpenGenre: openGenrePage,
     onOpenWantToRead: openWantToRead,
+    onEditReadingGoal: () => setShowGoalDialog(true),
     goTo,
   }
 
@@ -452,6 +462,9 @@ export default function App() {
           )}
           {showSettingsDialog && (
             <SettingsDialog onClose={() => setShowSettingsDialog(false)} />
+          )}
+          {showGoalDialog && (
+            <ReadingGoalDialog onClose={() => setShowGoalDialog(false)} />
           )}
           {/* Last, so it registers above the other dialogs on the escape stack. */}
           {showPalette && (

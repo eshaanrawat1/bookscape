@@ -4,6 +4,7 @@ import { collectionIdFromName } from '../utils.js'
 import { mainNav, shelfNav } from '../constants.js'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import ConfirmDialog from './ConfirmDialog.jsx'
+import ReadingGoalWidget from './ReadingGoalWidget.jsx'
 import type { Collection } from '../types.js'
 
 interface SidebarProps {
@@ -205,6 +206,10 @@ function Sidebar({ active, onSelect }: SidebarProps) {
         </div>
         {collectionError && <p className="collectionError">{collectionError}</p>}
       </section>
+
+      {/* Last child, and the collections section above it is the one that grows
+          — so this sits on the floor of the sidebar whatever the list does. */}
+      <ReadingGoalWidget />
 
       {pendingDelete && (
         <ConfirmDialog

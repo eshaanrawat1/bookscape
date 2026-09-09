@@ -24,7 +24,7 @@ from .routes.settings import create_router as create_settings_router
 
 # App setup
 ROOT = Path(__file__).resolve().parents[2]
-BACKEND_API_VERSION = 4
+BACKEND_API_VERSION = 5
 
 # Origins the app itself is served from: the custom protocol the packaged
 # webview uses (per-platform), plus the Vite dev server. Anything else is a page

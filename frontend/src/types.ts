@@ -162,6 +162,29 @@ export interface SeriesProgress {
   next_book: RawBookPayload | null
 }
 
+// The year's reading goal, as the goal card, the sidebar widget and the edit
+// dialog all read it. `target` is 0 when no goal is set for the year — the one
+// state that means "no goal", so nothing has to distinguish a missing goal from
+// a goal of nothing.
+//
+// `read` is the books that count toward it, drawn from the finished list the app
+// already holds rather than from a second count on the server: the card puts
+// their covers on screen, so a number that disagreed with them would be visibly
+// wrong.
+export interface ReadingGoalState {
+  year: number
+  target: number
+  read: Book[]
+  booksRead: number
+  loading: boolean
+  saving: boolean
+  error: string | null
+  // Rejects rather than swallowing a failed write, so the dialog can stay open
+  // on the number you typed instead of closing over a goal that never saved.
+  save: (target: number) => Promise<void>
+  clear: () => Promise<void>
+}
+
 export interface SyncPullResult {
   ok: boolean
   dry_run: boolean
@@ -188,6 +211,7 @@ export interface LibraryDataContextValue {
   wantToRead: Book[]
   finished: Book[]
   dnf: Book[]
+  readingGoal: ReadingGoalState
   booksByIds: (ids: string[]) => Book[]
   // Bumped every time the app-level lists are reloaded. Views that fetch their
   // own books (the author, series and genre drilldowns, and search) watch it so
@@ -233,6 +257,9 @@ export interface NavigationContextValue {
   onOpenSeries: (series: string) => void
   onOpenGenre: (genre: string) => void
   onOpenWantToRead: () => void
+  // Opens the reading-goal dialog. A dialog rather than a view, like onOpen, so
+  // the card and the sidebar widget can both raise it without either owning it.
+  onEditReadingGoal: () => void
   // Generic jump to any view id — 'library', 'collection:foo', 'genre:Sci-Fi'.
   // Descendants otherwise have no way to reach App's `view` state.
   goTo: (viewId: string) => void
