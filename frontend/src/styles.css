@@ -177,20 +177,21 @@ svg {
   gap: 1.3rem;
 }
 
+/* The mark stands on its own — no disc, no shadow. It keeps the 4.3rem slot the
+   filled badge occupied so the brand row's metrics don't move, and the glyph
+   grows to fill that slot so it reads at the same weight it did inside the
+   badge. */
 .brandMark {
   display: grid;
   width: 4.3rem;
   height: 4.3rem;
   place-items: center;
-  border-radius: 999px;
-  background: var(--primary);
-  color: var(--primary-foreground);
-  box-shadow: 0 8px 18px rgba(125, 74, 26, 0.2);
+  color: var(--primary);
 }
 
 .brandMark svg {
-  width: 2rem;
-  height: 2rem;
+  width: 3.9rem;
+  height: 3.9rem;
 }
 
 .brandName,

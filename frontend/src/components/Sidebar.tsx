@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Flame, Plus, X, type LucideIcon } from 'lucide-react'
+import { Plus, X, type LucideIcon } from 'lucide-react'
 import { collectionIdFromName } from '../utils.js'
 import { mainNav, shelfNav } from '../constants.js'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
+import BrandMark from './BrandMark.jsx'
 import ConfirmDialog from './ConfirmDialog.jsx'
 import ReadingGoalWidget from './ReadingGoalWidget.jsx'
 import type { Collection } from '../types.js'
@@ -93,7 +94,7 @@ function Sidebar({ active, onSelect }: SidebarProps) {
     <aside className="sidebar">
       <div className="brand" data-tauri-drag-region>
         <div className="brandMark">
-          <Flame />
+          <BrandMark />
         </div>
         <div>
           <p className="brandName">Bookscape</p>
