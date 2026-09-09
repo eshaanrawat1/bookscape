@@ -951,23 +951,6 @@ svg {
   overflow: hidden;
 }
 
-.progressBlock {
-  width: min(100%, 46rem);
-  margin-top: 0.25rem;
-}
-
-.progressBlock>div:first-child {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  color: var(--muted-foreground);
-  font-size: 1rem;
-}
-
-.progressBlock .progressTrack {
-  margin-top: 0.7rem;
-}
-
 /* ========================================================================== */
 /* Shelf & Book Card                                                        */
 /* ========================================================================== */
