@@ -7,28 +7,19 @@ import { useCallback, useState } from 'react'
 const STORAGE_KEY = 'bookscape.recentSearches'
 const RECENT_LIMIT = 5
 
-export interface RecentSearch {
-  query: string
-  /** The right-hand caption: an author's name, or 'Author' for an author query. */
-  meta: string
-}
-
-function readStored(): RecentSearch[] {
+function readStored(): string[] {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
-    return parsed
-      .filter((entry): entry is RecentSearch => Boolean(entry) && typeof entry.query === 'string')
-      .map((entry) => ({ query: entry.query, meta: typeof entry.meta === 'string' ? entry.meta : '' }))
-      .slice(0, RECENT_LIMIT)
+    return parsed.filter((entry): entry is string => typeof entry === 'string' && Boolean(entry.trim())).slice(0, RECENT_LIMIT)
   } catch {
     return []
   }
 }
 
-function writeStored(entries: RecentSearch[]) {
+function writeStored(entries: string[]) {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
   } catch {
@@ -37,19 +28,24 @@ function writeStored(entries: RecentSearch[]) {
 }
 
 function useRecentSearches() {
-  const [recents, setRecents] = useState<RecentSearch[]>(readStored)
+  const [recents, setRecents] = useState<string[]>(readStored)
 
   // Matching case-insensitively so "dune" typed after "Dune" moves the existing
   // row to the top instead of stacking a near-duplicate next to it.
-  const addRecent = useCallback((query: string, meta = '') => {
+  const addRecent = useCallback((query: string) => {
     const trimmed = query.trim()
     if (!trimmed) return
     setRecents((current) => {
       const needle = trimmed.toLowerCase()
-      const next = [
-        { query: trimmed, meta },
-        ...current.filter((entry) => entry.query.toLowerCase() !== needle),
-      ].slice(0, RECENT_LIMIT)
+      const next = [trimmed, ...current.filter((entry) => entry.toLowerCase() !== needle)].slice(0, RECENT_LIMIT)
+      writeStored(next)
+      return next
+    })
+  }, [])
+
+  const removeRecent = useCallback((query: string) => {
+    setRecents((current) => {
+      const next = current.filter((entry) => entry !== query)
       writeStored(next)
       return next
     })
@@ -60,7 +56,7 @@ function useRecentSearches() {
     writeStored([])
   }, [])
 
-  return { recents, addRecent, clearRecents }
+  return { recents, addRecent, removeRecent, clearRecents }
 }
 
 export default useRecentSearches

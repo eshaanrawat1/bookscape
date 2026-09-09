@@ -4,7 +4,7 @@ import BookCover from '../components/BookCover.jsx'
 import BookGrid from '../components/BookGrid.jsx'
 import { formatCompactNumber } from '../utils.js'
 import useSearch from '../hooks/useSearch.js'
-import useRecentSearches, { type RecentSearch } from '../hooks/useRecentSearches.js'
+import useRecentSearches from '../hooks/useRecentSearches.js'
 import useListNavigation from '../hooks/useListNavigation.js'
 import { useNavigation } from '../context/NavigationContext.jsx'
 import type { Book } from '../types.js'
@@ -21,7 +21,7 @@ function SearchView() {
     setDraft,
     runSearch,
   } = useSearch()
-  const { recents, addRecent, clearRecents } = useRecentSearches()
+  const { recents, addRecent, removeRecent, clearRecents } = useRecentSearches()
   const { onOpen } = useNavigation()
   const inputRef = useRef<HTMLInputElement>(null)
   const draftQuery = draft.trim()
@@ -29,9 +29,9 @@ function SearchView() {
   const hasSubmittedResults = Boolean(draftQuery && draftQuery === submittedQuery)
   const showPreview = Boolean(draftQuery && draftQuery !== submittedQuery && (previewLoading || previewResults.length > 0))
 
-  const search = async (rawQuery: string, meta?: string) => {
-    const books = await runSearch(rawQuery)
-    addRecent(rawQuery, meta ?? recentMeta(rawQuery, books))
+  const search = async (rawQuery: string) => {
+    addRecent(rawQuery)
+    await runSearch(rawQuery)
   }
 
   const submitSearch = async (event: FormEvent) => {
@@ -43,7 +43,7 @@ function SearchView() {
   // the dialog rather than in the grid, so the row it leaves behind is the book
   // you landed on rather than the half-typed string that found it.
   const openBook = (book: Book) => {
-    addRecent(book.title, book.author)
+    addRecent(book.title)
     onOpen(book)
   }
 
@@ -95,7 +95,8 @@ function SearchView() {
       {!showPreview ? (
         <RecentSearches
           recents={recents}
-          onSelect={(entry) => search(entry.query, entry.meta)}
+          onSelect={search}
+          onRemove={removeRecent}
           onClear={clearRecents}
         />
       ) : null}
@@ -104,12 +105,13 @@ function SearchView() {
 }
 
 interface RecentSearchesProps {
-  recents: RecentSearch[]
-  onSelect: (entry: RecentSearch) => void
+  recents: string[]
+  onSelect: (query: string) => void
+  onRemove: (query: string) => void
   onClear: () => void
 }
 
-function RecentSearches({ recents, onSelect, onClear }: RecentSearchesProps) {
+function RecentSearches({ recents, onSelect, onRemove, onClear }: RecentSearchesProps) {
   if (recents.length === 0) return null
 
   return (
@@ -122,30 +124,26 @@ function RecentSearches({ recents, onSelect, onClear }: RecentSearchesProps) {
       </div>
       <ul className="recentSearchList">
         {recents.map((entry) => (
-          <li key={entry.query}>
+          // The row and its dismiss are siblings rather than nested: one button
+          // inside another is not something the browser will let you click.
+          <li key={entry} className="recentSearchRow">
             <button type="button" className="recentSearchItem" onClick={() => onSelect(entry)}>
               <Clock />
-              <span className="recentSearchQuery">{entry.query}</span>
-              <span className="recentSearchMeta">{entry.meta}</span>
+              <span className="recentSearchQuery">{entry}</span>
+            </button>
+            <button
+              type="button"
+              className="recentSearchRemove"
+              aria-label={`Remove ${entry} from recent searches`}
+              onClick={() => onRemove(entry)}
+            >
+              <X />
             </button>
           </li>
         ))}
       </ul>
     </section>
   )
-}
-
-// The caption on the right of a recent row. A query the catalog only matches on
-// an author — "Brandon Sanderson" — is labelled as one; anything else is
-// captioned with the author of the book it found, which is what makes a bare
-// title like "Dune" readable a week later.
-function recentMeta(rawQuery: string, books: Book[]): string {
-  const needle = rawQuery.trim().toLowerCase()
-  if (!needle) return ''
-  const titleMatch = books.find((book) => book.title?.toLowerCase().includes(needle))
-  const authorMatch = books.find((book) => book.author?.toLowerCase().includes(needle))
-  if (authorMatch && !titleMatch) return 'Author'
-  return (titleMatch ?? authorMatch)?.author ?? ''
 }
 
 interface SearchHeaderProps {

@@ -3732,7 +3732,7 @@ svg {
 .recentSearches {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.9rem;
 }
 
 .recentSearchesHeader {
@@ -3742,7 +3742,7 @@ svg {
   gap: 1rem;
   /* Lined up with the row text below it rather than with the rows' padding, so
      the label sits over the queries and not over the clock icons. */
-  padding: 0 0.9rem 0.35rem;
+  padding: 0 0.9rem;
 }
 
 .recentSearchesHeader h2 {
@@ -3772,32 +3772,45 @@ svg {
 .recentSearchList {
   display: flex;
   flex-direction: column;
+  gap: 0.35rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.recentSearchItem {
-  display: grid;
-  grid-template-columns: 1.35rem minmax(0, 1fr) auto;
+/* The row is the hover target, not the query button inside it: the dismiss has
+   to sit outside that button to be clickable, and the two should still light up
+   as one row. */
+.recentSearchRow {
+  display: flex;
   align-items: center;
-  gap: 0.9rem;
-  width: 100%;
-  border: 0;
+  gap: 0.4rem;
   border-radius: 0.9rem;
-  background: transparent;
-  padding: 0.7rem 0.9rem;
-  color: inherit;
-  cursor: pointer;
-  text-align: left;
+  padding-right: 0.5rem;
   transition: background 150ms ease;
 }
 
-.recentSearchItem:hover {
+.recentSearchRow:hover {
   background: color-mix(in oklch, var(--secondary) 60%, white);
 }
 
-.recentSearchItem:focus-visible {
+.recentSearchItem {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 1rem;
+  border: 0;
+  border-radius: 0.9rem;
+  background: transparent;
+  padding: 0.95rem 0.9rem;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.recentSearchItem:focus-visible,
+.recentSearchRemove:focus-visible {
   outline: 0;
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 18%, transparent);
 }
@@ -3805,6 +3818,7 @@ svg {
 .recentSearchItem svg {
   width: 1.35rem;
   height: 1.35rem;
+  flex: 0 0 auto;
   color: color-mix(in oklch, var(--muted-foreground) 82%, transparent);
 }
 
@@ -3817,12 +3831,33 @@ svg {
   white-space: nowrap;
 }
 
-.recentSearchMeta {
-  overflow: hidden;
+/* Hidden until the row is hovered or the dismiss itself is tabbed to, so a
+   resting list is queries and nothing else. */
+.recentSearchRemove {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
   color: var(--muted-foreground);
-  font-size: 1rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  padding: 0.4rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms ease, color 150ms ease;
+}
+
+.recentSearchRow:hover .recentSearchRemove,
+.recentSearchRemove:focus-visible {
+  opacity: 1;
+}
+
+.recentSearchRemove:hover {
+  color: var(--primary);
+}
+
+.recentSearchRemove svg {
+  display: block;
+  width: 1.15rem;
+  height: 1.15rem;
 }
 
 .searchHeader h2 {
