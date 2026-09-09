@@ -3,9 +3,13 @@ import type { Book } from '../types.js'
 
 interface BookCoverProps {
   book: Book
+  // For long rows that hold a whole year of covers rather than a shelf's worth
+  // (the reading-goal strip), so the cost is what is on screen. Off everywhere
+  // else: a shelf's covers are all wanted at once.
+  lazy?: boolean
 }
 
-function BookCover({ book }: BookCoverProps) {
+function BookCover({ book, lazy = false }: BookCoverProps) {
   const [loaded, setLoaded] = useState(false)
   const prevCoverRef = useRef(book.cover)
 
@@ -31,6 +35,7 @@ function BookCover({ book }: BookCoverProps) {
           src={book.cover}
           alt={`Cover of ${book.title} by ${book.author}`}
           className={loaded ? 'coverLoaded' : ''}
+          loading={lazy ? 'lazy' : undefined}
           onLoad={handleLoad}
           onError={() => setLoaded(true)}
         />

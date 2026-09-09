@@ -6,15 +6,6 @@ import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
 import type { Book } from '../types.js'
 
-// The strip scrolls rather than wraps, so a good year cannot make this taller
-// than the shelves below it. Past this only the most recent covers are kept.
-const MAX_COVERS = 24
-
-// Slots trailing the covers, for the year still open. A handful rather than one
-// per remaining book: the count is stated in words above, so these show that
-// the row continues without turning into a wall of empty boxes.
-const TRAILING_SLOTS = 4
-
 // The year's goal, at the top of Reading Now: a heading, a meter, and the year
 // so far. With no goal set it is one line, since an empty progress bar would
 // report failure at something never started.
@@ -23,13 +14,26 @@ function ReadingGoalCard() {
   const { onEditReadingGoal } = useNavigation()
   const { year, target, read, booksRead, loading } = readingGoal
   const stripRef = useRef<HTMLDivElement | null>(null)
+  const boundaryRef = useRef<HTMLDivElement | null>(null)
 
-  // The strip runs oldest to newest, so its resting position is the right-hand
-  // end: what you have just read, and the slots still open. Left as-is it would
-  // open on January, the least useful view of the year.
+  // The strip runs oldest to newest and can be a whole year long, so it rests
+  // on the boundary between read and unread: the books just finished on the
+  // left, the next open slots on the right. Both ends are worse views — the
+  // start is January, and the far end is nothing but empty boxes.
   useEffect(() => {
     const strip = stripRef.current
-    if (strip) strip.scrollLeft = strip.scrollWidth
+    if (!strip) return
+    const boundary = boundaryRef.current
+    if (!boundary) {
+      // Goal met: no slots left, so the newest covers are the end of the row.
+      strip.scrollLeft = strip.scrollWidth
+      return
+    }
+    // Measured rather than derived from offsetLeft, which is relative to
+    // whichever ancestor happens to be positioned.
+    const offsetInContent =
+      strip.scrollLeft + boundary.getBoundingClientRect().left - strip.getBoundingClientRect().left
+    strip.scrollLeft = Math.max(0, offsetInContent - strip.clientWidth * 0.35)
   }, [booksRead, target])
 
   // Nothing until the target is known: an invitation that swaps to a full
@@ -52,13 +56,10 @@ function ReadingGoalCard() {
 
   const percent = Math.min(100, Math.round((booksRead / target) * 100))
   const remaining = Math.max(0, target - booksRead)
-  const covers = read.slice(-MAX_COVERS)
-  // Numbered from where the reading actually ends, not from the end of the
-  // truncated strip, so the numbers stay true when covers are capped.
-  const slots = Array.from(
-    { length: Math.min(TRAILING_SLOTS, remaining) },
-    (_, index) => booksRead + index + 1,
-  )
+  // The whole year, in order: a cover for every book read, then a numbered slot
+  // for every one still to go, ending at the target. Covers load lazily so a
+  // long row costs what is on screen rather than the full year of images.
+  const slots = Array.from({ length: remaining }, (_, index) => booksRead + index + 1)
 
   return (
     <section className="goalCard">
@@ -80,13 +81,18 @@ function ReadingGoalCard() {
         </div>
       </div>
 
-      {(covers.length > 0 || slots.length > 0) && (
+      {(read.length > 0 || slots.length > 0) && (
         <div className="goalSlots" ref={stripRef}>
-          {covers.map((book) => (
+          {read.map((book) => (
             <GoalCover key={book.id} book={book} />
           ))}
-          {slots.map((number) => (
-            <div key={`slot-${number}`} className="goalSlot goalSlotEmpty" aria-hidden="true">
+          {slots.map((number, index) => (
+            <div
+              key={`slot-${number}`}
+              ref={index === 0 ? boundaryRef : undefined}
+              className="goalSlot goalSlotEmpty"
+              aria-hidden="true"
+            >
               <span>{number}</span>
             </div>
           ))}
@@ -105,7 +111,7 @@ function GoalCover({ book }: { book: Book }) {
       onClick={() => onOpen(book)}
       title={`${book.title}${book.author ? ` by ${book.author}` : ''}`}
     >
-      <BookCover book={book} />
+      <BookCover book={book} lazy />
     </button>
   )
 }

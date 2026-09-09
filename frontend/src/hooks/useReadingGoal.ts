@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { apiFetch } from '../api.js'
+import { apiFetch, BOOTSTRAP_RETRIES, BOOTSTRAP_RETRY_DELAY_MS } from '../api.js'
+import { sleep } from '../utils.js'
 import type { Book, ReadingGoalState } from '../types.js'
 
 // A year is 365 days for pacing purposes. The dialog's two fields are a
@@ -46,18 +47,40 @@ function useReadingGoal(finished: Book[]): ReadingGoalState {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Retried on the same schedule App's bootstrap uses, because this fetch races
+  // the very same cold start: the shell can take ~30s to get the backend
+  // answering, and a single refused connection at launch left a goal that is
+  // sitting in the database reading as "no goal set" until the next reload.
+  // `loading` stays true for the duration, so the card shows nothing rather
+  // than inviting you to set a target you already have.
   useEffect(() => {
     let cancelled = false
-    apiFetch<{ year?: number; target?: number }>(`/settings/reading-goal?year=${year}`)
-      .then((data) => {
-        if (!cancelled) setTarget(Math.max(0, Number(data.target) || 0))
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load your reading goal.')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+
+    async function load() {
+      for (let attempt = 0; attempt <= BOOTSTRAP_RETRIES; attempt += 1) {
+        try {
+          const data = await apiFetch<{ year?: number; target?: number }>(
+            `/settings/reading-goal?year=${year}`,
+          )
+          if (cancelled) return
+          setTarget(Math.max(0, Number(data.target) || 0))
+          setError(null)
+          setLoading(false)
+          return
+        } catch (err) {
+          if (cancelled) return
+          if (attempt < BOOTSTRAP_RETRIES) {
+            await sleep(BOOTSTRAP_RETRY_DELAY_MS)
+            if (cancelled) return
+            continue
+          }
+          setError(err instanceof Error ? err.message : 'Could not load your reading goal.')
+          setLoading(false)
+        }
+      }
+    }
+
+    load()
     return () => { cancelled = true }
   }, [year])
 
