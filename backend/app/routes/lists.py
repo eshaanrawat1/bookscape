@@ -17,6 +17,10 @@ class RenameListIn(BaseModel):
     name: str
 
 
+class SetIconIn(BaseModel):
+    icon: str = ""
+
+
 class AddBookIn(BaseModel):
     book_id: str
 
@@ -30,6 +34,7 @@ def create_router(root: Path, repo: DataRepository, lists: ReadingListStore) -> 
             books = [b for bid in row.get("books", []) if (b := load_book(root, bid))]
             out.append({
                 "name": row.get("name", ""),
+                "icon": row.get("icon", ""),
                 "book_ids": row.get("books", []),
                 "books": books,
                 "count": len(books),
@@ -60,6 +65,16 @@ def create_router(root: Path, repo: DataRepository, lists: ReadingListStore) -> 
     def rename_reading_list(name: str, payload: RenameListIn) -> dict:
         try:
             lists.rename_list(name, payload.name)
+        except KeyError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        return {"lists": _hydrate_lists(lists.list_all())}
+
+    @router.patch("/reading-lists/{name}/icon")
+    def set_reading_list_icon(name: str, payload: SetIconIn) -> dict:
+        try:
+            lists.set_icon(name, payload.icon)
         except KeyError as e:
             raise HTTPException(status_code=404, detail=str(e)) from e
         except ValueError as e:

@@ -49,6 +49,7 @@ function mapReadingLists(rawLists: RawList[]): Collection[] {
     id: collectionIdFromName(list.name),
     name: list.name,
     description: '',
+    icon: list.icon || '',
     bookIds: (list.book_ids || []),
     books: (list.books || []).map(normaliseBook),
   }))

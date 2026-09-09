@@ -74,6 +74,7 @@ export interface Book {
 
 export interface RawList {
   name: string
+  icon?: string
   book_ids?: string[]
   books?: RawBookPayload[]
 }
@@ -82,6 +83,8 @@ export interface Collection {
   id: string
   name: string
   description: string
+  // A lucide name from collectionIcons.ts, or '' for the default dot.
+  icon: string
   bookIds: string[]
   books: Book[]
 }
@@ -224,6 +227,7 @@ export interface LibraryDataContextValue {
   toggleBookWantToRead: (bookId: string, isSaved: boolean) => Promise<void>
   createCollection: () => Promise<string>
   renameCollection: (collection: Collection, name: string) => Promise<string>
+  setCollectionIcon: (collection: Collection, icon: string) => Promise<void>
   deleteCollection: (collection: Collection) => Promise<void>
 }
 

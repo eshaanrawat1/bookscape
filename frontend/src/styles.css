@@ -28,16 +28,7 @@
   --status-reading: oklch(0.72 0.16 72);
   --status-not-started: oklch(0.69 0.05 85);
   --status-finished: #7dbf85;
-  /* Deliberately short of --danger's chroma: abandoning a book is a choice, not
-     an error, so DNF reads as a muted rose rather than a warning. */
   --status-dnf: oklch(0.66 0.07 20);
-  /* Reading-heatmap ramp: one hue, light -> dark, on the app's warm primary.
-     --heat-0 is "no reading" and sits outside the ramp as a neutral, so an
-     empty day never reads as a light one. Steps were solved for, not picked:
-     lightness is strictly decreasing (0.892 > 0.794 > 0.644 > 0.429) and every
-     adjacent pair clears 8 dE in OKLab under normal, protanopic and
-     deuteranopic vision — the empty -> lowest boundary is the tight one at 8.0,
-     so nudge these together or not at all. */
   --heat-0: #dfdeda;
   --heat-1: #fbd59b;
   --heat-2: #ddb571;
@@ -329,7 +320,7 @@ svg {
 
 /* The dot's own halo would be a second lit thing an inch from the rail, on the
    same row, on the same side. Let the rail have the row to itself. */
-[data-nav-style='rail'] .collectionButton.active .collectionDot {
+[data-nav-style='rail'] .collectionButton.active .collectionDot:not(.hasIcon)::before {
   box-shadow: 0 0 0 3px var(--card);
 }
 
@@ -344,12 +335,163 @@ svg {
     inset 0 1px 0 color-mix(in oklch, white 45%, transparent);
 }
 
+/* Click target for the icon picker as well as the row's leading mark. The box
+   is 1.5rem — the same as a nav row's icon — whichever mark it holds, so every
+   label in the sidebar starts on the same line and swapping the dot for an icon
+   never shifts one sideways. The dot is drawn inside that box at its own
+   smaller size rather than sizing the box to itself. */
 .collectionDot {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 0;
+  color: var(--ember-soft);
+  cursor: pointer;
+  transition: transform 140ms ease;
+}
+
+.collectionDot:not(.hasIcon)::before {
+  content: '';
   width: 1.1rem;
   height: 1.1rem;
   border-radius: 999px;
   background: var(--ember-soft);
   box-shadow: 0 0 0 3px var(--card), 0 0 12px 2px oklch(0.72 0.12 62 / 0.4);
+}
+
+.collectionDot.hasIcon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.collectionDot:hover,
+.collectionDot:focus-visible {
+  transform: scale(1.15);
+  outline: 0;
+}
+
+/* ========================================================================== */
+/* Collection Icon Picker                                                     */
+/* ========================================================================== */
+
+/* Portalled and fixed rather than parented to the row: `.collectionList`
+   scrolls its own overflow, and a panel inside it would be clipped by the very
+   list it belongs to. Position comes from the dot's rect at open time. */
+.iconPicker {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  width: 26rem;
+  flex-direction: column;
+  gap: 0.65rem;
+  border: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
+  border-radius: 1.2rem;
+  background: color-mix(in oklch, var(--card) 94%, white);
+  padding: 1rem;
+  box-shadow: var(--shadow-panel);
+  animation: dialogTabPanelFadeIn 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.iconPickerHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.iconPickerFilter {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid color-mix(in oklch, var(--border) 85%, transparent);
+  border-radius: 999px;
+  background: var(--background);
+  padding: 0.5rem 0.9rem;
+  color: var(--foreground);
+  font: inherit;
+}
+
+.iconPickerFilter:focus-visible {
+  border-color: var(--ring);
+  outline: 0;
+}
+
+.iconPickerReset {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid color-mix(in oklch, var(--border) 85%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  padding: 0.5rem 0.8rem;
+  color: var(--muted-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.iconPickerReset:hover:not(:disabled) {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+/* Already on the default — the button stays visible as a label for what the
+   plain dot means, but there is nothing to reset to. */
+.iconPickerReset:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.iconPickerDot {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 999px;
+  background: var(--ember-soft);
+}
+
+.iconPickerGrid {
+  display: grid;
+  max-height: 24rem;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0.3rem;
+  overflow-y: auto;
+}
+
+.iconPickerOption {
+  display: grid;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 0;
+  border-radius: 0.7rem;
+  background: transparent;
+  padding: 0;
+  color: var(--ember-soft);
+  cursor: pointer;
+}
+
+.iconPickerOption svg {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+.iconPickerOption:hover,
+.iconPickerOption:focus-visible {
+  background: var(--muted);
+  outline: 0;
+}
+
+.iconPickerOption.selected {
+  background: color-mix(in oklch, var(--ember-soft) 22%, transparent);
+}
+
+.iconPickerEmpty {
+  margin: 0;
+  padding: 1.2rem 0.4rem;
+  color: var(--muted-foreground);
+  text-align: center;
 }
 
 .collectionNameButton {

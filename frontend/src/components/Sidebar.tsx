@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Plus, X, type LucideIcon } from 'lucide-react'
 import { collectionIdFromName } from '../utils.js'
+import { resolveCollectionIcon } from '../collectionIcons.js'
 import { mainNav, shelfNav } from '../constants.js'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import BrandMark from './BrandMark.jsx'
+import CollectionIconPicker from './CollectionIconPicker.jsx'
 import ConfirmDialog from './ConfirmDialog.jsx'
 import ReadingGoalWidget from './ReadingGoalWidget.jsx'
 import type { Collection } from '../types.js'
@@ -18,12 +20,15 @@ function Sidebar({ active, onSelect }: SidebarProps) {
     collections,
     createCollection: onCreateCollection,
     renameCollection: onRenameCollection,
+    setCollectionIcon: onSetCollectionIcon,
     deleteCollection: onDeleteCollection,
   } = useLibraryData()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draftName, setDraftName] = useState('')
   const [collectionError, setCollectionError] = useState('')
   const [saving, setSaving] = useState(false)
+  // The collection whose icon picker is open, and the dot it hangs off.
+  const [iconPicker, setIconPicker] = useState<{ id: string; anchor: HTMLElement } | null>(null)
   const [pendingDelete, setPendingDelete] = useState<Collection | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -59,6 +64,17 @@ function Sidebar({ active, onSelect }: SidebarProps) {
       setCollectionError(err instanceof Error ? err.message : 'Could not rename collection.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const chooseIcon = async (collection: Collection, icon: string) => {
+    setIconPicker(null)
+    if (icon === collection.icon) return
+    setCollectionError('')
+    try {
+      await onSetCollectionIcon(collection, icon)
+    } catch (err) {
+      setCollectionError(err instanceof Error ? err.message : 'Could not change the icon.')
     }
   }
 
@@ -129,6 +145,10 @@ function Sidebar({ active, onSelect }: SidebarProps) {
             const isActive = active === id
             const isEditing = editingId === collection.id
             const bookCount = (collection.books?.length ?? collection.bookIds?.length ?? 0)
+            // An icon name the current lucide set no longer has resolves to
+            // null, and the row quietly falls back to the plain dot.
+            const Icon = resolveCollectionIcon(collection.icon)
+            const pickerOpen = iconPicker?.id === collection.id
             return (
               <div
                 key={collection.id}
@@ -144,7 +164,29 @@ function Sidebar({ active, onSelect }: SidebarProps) {
                   }
                 }}
               >
-                <span className="collectionDot" />
+                <button
+                  type="button"
+                  className={Icon ? 'collectionDot hasIcon' : 'collectionDot'}
+                  aria-label={`Change the icon for ${collection.name}`}
+                  title="Change icon"
+                  aria-haspopup="dialog"
+                  aria-expanded={pickerOpen}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    const anchor = event.currentTarget
+                    setIconPicker((open) => (open?.id === collection.id ? null : { id: collection.id, anchor }))
+                  }}
+                >
+                  {Icon && <Icon />}
+                </button>
+                {pickerOpen && (
+                  <CollectionIconPicker
+                    anchor={iconPicker.anchor}
+                    current={collection.icon}
+                    onSelect={(icon) => chooseIcon(collection, icon)}
+                    onClose={() => setIconPicker(null)}
+                  />
+                )}
                 {isEditing ? (
                   <form
                     className="collectionEditForm"

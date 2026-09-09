@@ -260,6 +260,18 @@ export default function App() {
     return name
   }
 
+  async function setCollectionIcon(collection: Collection, icon: string): Promise<void> {
+    const data = await apiFetch<{ lists?: RawList[] }>(
+      `/reading-lists/${collectionIdFromName(collection.name)}/icon`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ icon }),
+      },
+    )
+    setCollections(mapReadingLists(data.lists || []))
+  }
+
   async function deleteCollection(collection: Collection): Promise<void> {
     const data = await apiFetch<{ lists?: RawList[] }>(`/reading-lists/${collectionIdFromName(collection.name)}`, {
       method: 'DELETE',
@@ -357,6 +369,7 @@ export default function App() {
     toggleBookWantToRead,
     createCollection,
     renameCollection,
+    setCollectionIcon,
     deleteCollection,
   }
 

@@ -89,9 +89,14 @@ CREATE TABLE IF NOT EXISTS reading_days (
 );
 CREATE INDEX IF NOT EXISTS idx_reading_days_day ON reading_days(day);
 
+-- `icon` is a lucide icon name (kebab-case) or '' for the default dot. The
+-- backend keeps it opaque: the icon set lives in the frontend, so a name that
+-- no longer resolves there simply falls back to the dot rather than 404ing
+-- here.
 CREATE TABLE IF NOT EXISTS collections (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   name       TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  icon       TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
@@ -173,6 +178,7 @@ def _add_missing_columns(conn: sqlite3.Connection) -> None:
             "my_rating",
             "REAL NOT NULL DEFAULT 0 CHECK (my_rating >= 0 AND my_rating <= 5)",
         ),
+        ("collections", "icon", "TEXT NOT NULL DEFAULT ''"),
     ):
         existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
         if column not in existing:
