@@ -70,6 +70,22 @@ export default function App() {
   const [showPalette, setShowPalette] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Temporary: A/B for the active-nav treatment, ⌥⌘G to cycle. Deliberately
+  // chorded with Alt, which useAppHotkeys drops on the floor. Delete this and
+  // the loser's CSS block once we've picked one.
+  const [navStyle, setNavStyle] = useState<'rail' | 'ember'>('rail')
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.altKey || !(event.metaKey || event.ctrlKey)) return
+      if (event.key.toLowerCase() !== 'g') return
+      event.preventDefault()
+      setNavStyle((current) => (current === 'rail' ? 'ember' : 'rail'))
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     async function load() {
@@ -393,7 +409,7 @@ export default function App() {
               <Plus />
             </button>
           </div>
-          <div className="hearthShell">
+          <div className="hearthShell" data-nav-style={navStyle}>
             <Sidebar active={view} onSelect={goTo} />
 
             {mobileNav && (

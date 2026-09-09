@@ -292,11 +292,55 @@ svg {
   background: color-mix(in oklch, var(--sidebar-accent) 70%, transparent);
 }
 
+/* Active-state experiment. Two directions live side by side, switched by
+   `data-nav-style` on .hearthShell (⌥⌘G cycles). Both drop the old outer halo:
+   an outer glow on an opaque pill over an opaque sidebar has nowhere to bloom,
+   so it only ever read as a smudge at the pill's edge.
+   Once we pick, fold the winner into a plain .active rule and delete the rest. */
 .navButton.active,
 .collectionButton.active {
-  background: var(--sidebar-accent);
+  position: relative;
   color: var(--sidebar-foreground);
-  box-shadow: 0 0 10px 1px color-mix(in oklch, var(--ember-soft) 22%, transparent);
+  background: var(--sidebar-accent);
+}
+
+/* -- "rail": state reads as position. The pill barely lifts off the sidebar and
+   a lit bar in the left gutter carries the signal, so the column of nav rows
+   scans as one. The glow lands on the bar, where it has open ground to bloom. */
+[data-nav-style='rail'] .navButton.active,
+[data-nav-style='rail'] .collectionButton.active {
+  background: color-mix(in oklch, var(--sidebar-accent) 55%, transparent);
+}
+
+[data-nav-style='rail'] .navButton.active::before,
+[data-nav-style='rail'] .collectionButton.active::before {
+  content: '';
+  position: absolute;
+  left: 0.3rem;
+  top: 50%;
+  translate: 0 -50%;
+  width: 0.26rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background: var(--ember-soft);
+  box-shadow: 0 0 8px 1px color-mix(in oklch, var(--ember-soft) 55%, transparent);
+}
+
+/* The dot's own halo would be a second lit thing an inch from the rail, on the
+   same row, on the same side. Let the rail have the row to itself. */
+[data-nav-style='rail'] .collectionButton.active .collectionDot {
+  box-shadow: 0 0 0 3px var(--card);
+}
+
+/* -- "ember": state reads as warmth. The pill is lit from inside rather than
+   haloed from outside, which is the one place a glow still works on an opaque
+   ground — and it's the more on-theme of the two for a hearth. */
+[data-nav-style='ember'] .navButton.active,
+[data-nav-style='ember'] .collectionButton.active {
+  background: color-mix(in oklch, var(--ember-soft) 18%, var(--sidebar-accent));
+  box-shadow:
+    inset 0 0 14px -2px color-mix(in oklch, var(--ember-soft) 45%, transparent),
+    inset 0 1px 0 color-mix(in oklch, white 45%, transparent);
 }
 
 .collectionDot {
