@@ -3,6 +3,7 @@ import { Pencil, Plus, Trash2 } from 'lucide-react'
 import BookCover from '../components/BookCover.jsx'
 import BrandMark from '../components/BrandMark.jsx'
 import HighlightDialog from '../components/HighlightDialog.jsx'
+import useAutoGrowTextarea from '../hooks/useAutoGrowTextarea.js'
 import useHighlights from '../hooks/useHighlights.js'
 import { formatDayLabel } from '../utils.js'
 import { useToast } from '../context/ToastContext.jsx'
@@ -188,6 +189,9 @@ function HighlightCard({ highlight, onSaveNote, onSaveEdit, onDelete }: Highligh
   const [note, setNote] = useState(highlight.note)
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState(false)
+  // The note grows with what you type; the edit field above it keeps a fixed
+  // box and a resize handle, since a highlight can run to a full passage.
+  const noteRef = useAutoGrowTextarea(note)
   const [draftText, setDraftText] = useState(highlight.text)
   const [draftPage, setDraftPage] = useState(highlight.page > 0 ? String(highlight.page) : '')
 
@@ -303,6 +307,7 @@ function HighlightCard({ highlight, onSaveNote, onSaveEdit, onDelete }: Highligh
         </div>
       </div>
       <textarea
+        ref={noteRef}
         className="highlightNoteInput"
         value={note}
         rows={1}
