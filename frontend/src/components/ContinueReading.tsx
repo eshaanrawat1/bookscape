@@ -81,13 +81,13 @@ function SeriesCard({ entry }: { entry: SeriesProgress }) {
         <div className="coverWrap">
           {/* The cover belongs to the next book, not to the series, so the card
               says which one it is showing — otherwise it reads as a series
-              whose art happens to be book three's. */}
+              whose art happens to be book three's. Only "up next" is worth
+              saying, though: every card on this shelf is something you are
+              partway through, so a "Reading" flag would be true of all of them
+              and was only ever on the series cards, which read as arbitrary.
+              Silence now means mid-book, and the flag marks the exception. */}
           {nextBook ? <BookCover book={nextBook} /> : <div className="seriesCardNoCover" />}
-          {nextBook && (
-            <span className={`seriesCardFlag ${reading ? 'isReading' : 'isNextUp'}`}>
-              {reading ? 'Reading' : 'Up next'}
-            </span>
-          )}
+          {nextBook && !reading && <span className="seriesCardFlag isNextUp">Up next</span>}
         </div>
       </button>
       <button type="button" className="seriesCardTitle" onClick={() => onOpenSeries(entry.series)}>
