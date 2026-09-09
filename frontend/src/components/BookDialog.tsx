@@ -1,11 +1,10 @@
-import { useState, useEffect, useLayoutEffect, useRef, type CSSProperties, type Ref } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, type Ref } from 'react'
 import {
   X, Star, MessageSquareText, FileText, Plus, Heart, ChevronDown, Upload, Download,
   LoaderCircle, Hash, Sigma, Calendar, CalendarCheck, TextAlignStart,
 } from 'lucide-react'
 import { apiFetch } from '../api.js'
 import { normaliseBook, getCatalogBookId, formatCompactNumber, resolveSavedWantToReadBook } from '../utils.js'
-import { buildDialogGlow } from '../color.js'
 import BookCover from './BookCover.jsx'
 import DateProperty from './DateProperty.jsx'
 import GenrePills from './GenrePills.jsx'
@@ -449,7 +448,6 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
       <article
         ref={cardRef}
         className={articleClassName}
-        style={{ '--dialog-glow': buildDialogGlow(displayBook.color) } as CSSProperties}
         onClick={(event) => event.stopPropagation()}
       >
         <button className="dialogIconButton dialogClose" onClick={onClose} aria-label="Close details">
@@ -457,7 +455,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
         </button>
         <div className="dialogTop">
           <div className="dialogCover">
-            <BookCover book={displayBook} glow />
+            <BookCover book={displayBook} />
             {view === 'tracking' && canSyncObsidian && (
               <div className="trackingVault">
                 <div className="trackingVaultRow">

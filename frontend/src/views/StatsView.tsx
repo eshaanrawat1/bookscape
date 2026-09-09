@@ -1,9 +1,7 @@
-import { type CSSProperties } from 'react'
 import AccordionFilter from '../components/AccordionFilter.jsx'
 import ReadingHeatmap from '../components/ReadingHeatmap.jsx'
 import StatsCarousel from '../components/StatsCarousel.jsx'
 import { monthOptions } from '../constants.js'
-import { buildHeroGlow } from '../color.js'
 import { formatCompactNumber } from '../utils.js'
 import useHeatmap from '../hooks/useHeatmap.js'
 import useStats from '../hooks/useStats.js'
@@ -12,7 +10,6 @@ function StatsView() {
   const { summary, loading, error, year, month, setYear, setMonth } = useStats()
   const years = summary?.available_years || []
   const hasBooks = (summary?.books_read || 0) > 0
-  const heroColor = summary?.most_time_spent?.color || summary?.densest_book?.color || 'oklch(0.62 0.14 55)'
 
   // The grid is a calendar year, so "All years" has to resolve to one: the most
   // recent year with finished books, falling back to the current one. The month
@@ -51,7 +48,6 @@ function StatsView() {
       ) : summary && hasBooks ? (
         <>
           <section className="heroCard paperGrain statsHeroCard">
-            <div className="heroGlow statsHeroGlow" style={{ '--hero-glow': buildHeroGlow(heroColor) } as CSSProperties} />
             <div className="statsHeroCopy">
               <h2>Reading at a glance</h2>
               <p>Minimal stats pulled from your finished books and Obsidian snapshot.</p>

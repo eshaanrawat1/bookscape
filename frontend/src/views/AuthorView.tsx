@@ -1,6 +1,5 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Star, MessageSquareText, FileText } from 'lucide-react'
-import { buildHeroGlow } from '../color.js'
 import { formatCompactNumber } from '../utils.js'
 import BookCover from '../components/BookCover.jsx'
 import useAuthorBooks from '../hooks/useAuthorBooks.js'
@@ -47,11 +46,8 @@ function AuthorHero({ books, onOpen }: AuthorHeroProps) {
     setCurrentIndex((i) => (i - 1 + books.length) % books.length)
   }
 
-  const heroGlowColor = buildHeroGlow(book.color)
-
   return (
     <section className="heroCard paperGrain">
-      <div className="heroGlow" style={{ '--hero-glow': heroGlowColor } as CSSProperties} />
       {books.length > 1 && (
         <div className="carouselControls">
           <button className="carouselButton" onClick={prevBook} aria-label="Previous book">
@@ -64,7 +60,7 @@ function AuthorHero({ books, onOpen }: AuthorHeroProps) {
       )}
       <div className={`heroInner heroSlide-${direction}`} key={book.id}>
         <button className="heroCover" onClick={() => onOpen(book)}>
-          <BookCover book={book} glow />
+          <BookCover book={book} />
         </button>
         <div className="heroCopy">
           <h2>{book.title}</h2>

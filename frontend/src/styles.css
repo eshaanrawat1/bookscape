@@ -863,16 +863,6 @@ svg {
   padding: 3.4rem;
 }
 
-.heroGlow {
-  position: absolute;
-  inset: 0;
-  background: var(--hero-glow, oklch(0.62 0.14 250));
-  opacity: 0.4;
-  -webkit-mask-image: radial-gradient(60% 75% at 100% 0%, black 0%, transparent 75%);
-  mask-image: radial-gradient(60% 75% at 100% 0%, black 0%, transparent 75%);
-  pointer-events: none;
-}
-
 .heroInner {
   position: relative;
   display: grid;
@@ -1179,21 +1169,6 @@ svg {
   width: 100%;
 }
 
-.coverGlow {
-  position: absolute;
-  inset: -0.8rem;
-  z-index: 0;
-  border-radius: 2rem;
-  background: var(--cover-glow);
-  opacity: 0.5;
-  filter: blur(26px);
-  /* fade the gradient to zero before it reaches the box edge, so the glow has no
-     silhouette to clip — without this the element's rounded rect shows as a faint
-     outline around the cover (same technique as .heroGlow) */
-  -webkit-mask-image: radial-gradient(closest-side, black 55%, transparent 100%);
-  mask-image: radial-gradient(closest-side, black 55%, transparent 100%);
-}
-
 .coverImage {
   position: relative;
   z-index: 1;
@@ -1253,21 +1228,6 @@ svg {
 /* ========================================================================== */
 /* Book Dialog                                                              */
 /* ========================================================================== */
-
-.bookDialog .coverGlow {
-  inset: -1.15rem;
-  opacity: 0.74;
-  filter: blur(18px);
-}
-
-.bookDialog {
-  background-image:
-    var(--dialog-glow, linear-gradient(180deg, transparent, transparent)),
-    linear-gradient(180deg, color-mix(in oklch, var(--card) 94%, white) 0%, color-mix(in oklch, var(--card) 86%, var(--background)) 100%);
-  background-size: auto, cover;
-  background-position: center;
-  background-blend-mode: soft-light, normal;
-}
 
 .dialogTop {
   display: grid;
@@ -2609,12 +2569,6 @@ svg {
   display: grid;
   gap: 1.6rem;
   align-items: start;
-}
-
-.statsHeroGlow {
-  top: -4rem;
-  right: -5rem;
-  opacity: 0.44;
 }
 
 .statsHeroCopy {

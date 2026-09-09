@@ -1,14 +1,11 @@
-import { useRef, useState, type CSSProperties, type SyntheticEvent } from 'react'
-import { buildHeroGlow } from '../color.js'
+import { useRef, useState, type SyntheticEvent } from 'react'
 import type { Book } from '../types.js'
 
 interface BookCoverProps {
   book: Book
-  glow?: boolean
 }
 
-function BookCover({ book, glow = false }: BookCoverProps) {
-  const coverGlowColor = buildHeroGlow(book.color)
+function BookCover({ book }: BookCoverProps) {
   const [loaded, setLoaded] = useState(false)
   const prevCoverRef = useRef(book.cover)
 
@@ -27,8 +24,7 @@ function BookCover({ book, glow = false }: BookCoverProps) {
   }
 
   return (
-    <div className={glow ? 'bookCover hasGlow' : 'bookCover'} style={{ '--cover-glow': coverGlowColor } as CSSProperties}>
-      {glow && <div className="coverGlow" />}
+    <div className="bookCover">
       <div className="coverImage">
         <div className="spineShadow" />
         <img

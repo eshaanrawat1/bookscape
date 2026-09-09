@@ -1,6 +1,5 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { buildHeroGlow } from '../color.js'
 import BookCover from '../components/BookCover.jsx'
 import Progress from '../components/Progress.jsx'
 import SeriesShelf from '../components/SeriesShelf.jsx'
@@ -57,11 +56,9 @@ function ReadingNowHero({ books, onOpen }: ReadingNowHeroProps) {
   // counts agree the answer was approximate, since it scaled a length by a
   // percentage already rounded to a whole number.
   const pagesLeft = Math.max(0, book.totalPages - book.currentPage)
-  const heroGlowColor = buildHeroGlow(book.color)
 
   return (
     <section className="heroCard paperGrain">
-      <div className="heroGlow" style={{ '--hero-glow': heroGlowColor } as CSSProperties} />
       {books.length > 1 && (
         <div className="carouselControls">
           <button className="carouselButton" onClick={prevBook} aria-label="Previous book">
@@ -74,7 +71,7 @@ function ReadingNowHero({ books, onOpen }: ReadingNowHeroProps) {
       )}
       <div className={`heroInner heroSlide-${direction}`} key={book.id}>
         <button className="heroCover" onClick={() => onOpen(book)}>
-          <BookCover book={book} glow />
+          <BookCover book={book} />
         </button>
         <div className="heroCopy">
           <h2>{book.title}</h2>
