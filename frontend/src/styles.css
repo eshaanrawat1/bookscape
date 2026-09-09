@@ -634,7 +634,6 @@ svg {
   transform: translateY(-1px);
 }
 
-.heroCopy h2,
 .shelf h2,
 .emptyState h2,
 .bookDialog h2 {
@@ -904,63 +903,6 @@ svg {
   padding: 3.4rem;
 }
 
-.heroInner {
-  position: relative;
-  display: grid;
-  grid-template-columns: 15rem minmax(0, 1fr);
-  align-items: start;
-  gap: 2.4rem;
-}
-
-.heroSlide-next {
-  animation: heroSlideInNext 260ms ease;
-}
-
-.heroSlide-prev {
-  animation: heroSlideInPrev 260ms ease;
-}
-
-@keyframes heroSlideInNext {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes heroSlideInPrev {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.heroCover {
-  border: 0;
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-}
-
-.heroCopy {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-
-.carouselControls {
-  position: absolute;
-  top: 1.5rem;
-  right: 1.5rem;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
 .carouselButton {
   display: grid;
   width: 2.8rem;
@@ -977,24 +919,6 @@ svg {
 .carouselButton svg {
   width: 1.4rem;
   height: 1.4rem;
-}
-
-.heroCopy h2 {
-  font-size: clamp(2.2rem, 3.5vw, 3.2rem);
-  line-height: 1.22;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.heroBlurb {
-  max-width: 47rem;
-  color: color-mix(in oklch, var(--foreground) 78%, transparent);
-  line-height: 1.55;
-  display: -webkit-box;
-  -webkit-line-clamp: 5;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 /* ========================================================================== */
@@ -1315,8 +1239,7 @@ svg {
 /* Shelf & Book Card                                                        */
 /* ========================================================================== */
 
-.bookMeta,
-.heroBlurb {
+.bookMeta {
   margin: 0;
   color: var(--muted-foreground);
   font-size: 1.22rem;
@@ -1657,11 +1580,6 @@ svg {
   margin-top: 0.2rem;
   padding-bottom: 0.55rem;
   border-bottom: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
-}
-
-.heroCopy .dialogStatsRow {
-  padding-bottom: 0;
-  border-bottom: 0;
 }
 
 .dialogStatItem {
@@ -4093,10 +4011,6 @@ svg {
     padding-inline: 1.5rem;
   }
 
-  .heroInner {
-    grid-template-columns: 12rem minmax(0, 1fr);
-  }
-
   .bookGrid {
     grid-template-columns: repeat(3, minmax(10rem, 1fr));
   }
@@ -4142,7 +4056,6 @@ svg {
     padding: 2.1rem;
   }
 
-  .heroInner,
   .dialogTop,
   .goalTop {
     grid-template-columns: 1fr;
@@ -4157,14 +4070,9 @@ svg {
     margin-left: 0;
   }
 
-  .heroCover,
   .dialogCover {
     width: min(12rem, 68vw);
     margin: 0 auto;
-  }
-
-  .heroCopy h2 {
-    font-size: 2rem;
   }
 
   .bookGrid {
@@ -4209,8 +4117,7 @@ svg {
   }
 
   .brandTag,
-  .bookMeta,
-  .heroBlurb {
+  .bookMeta {
     font-size: 1rem;
   }
 

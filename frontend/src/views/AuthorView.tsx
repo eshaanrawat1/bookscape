@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Star, MessageSquareText, FileText } from 'lucide-react'
-import { formatCompactNumber } from '../utils.js'
+import { ChevronRight, Star } from 'lucide-react'
 import BookCover from '../components/BookCover.jsx'
 import useAuthorBooks from '../hooks/useAuthorBooks.js'
 import { useNavigation } from '../context/NavigationContext.jsx'
@@ -8,88 +6,6 @@ import type { Book } from '../types.js'
 
 interface AuthorViewProps {
   author: string
-}
-
-interface AuthorHeroProps {
-  books: Book[]
-  onOpen: (book: Book) => void
-}
-
-function AuthorHero({ books, onOpen }: AuthorHeroProps) {
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [direction, setDirection] = useState<'next' | 'prev'>('next')
-
-  const safeIndex = currentIndex >= books.length ? 0 : currentIndex
-
-  useEffect(() => {
-    if (books.length < 2) return
-    const neighborCovers = [
-      books[(safeIndex + 1) % books.length]?.cover,
-      books[(safeIndex - 1 + books.length) % books.length]?.cover,
-    ]
-    neighborCovers.forEach((src) => {
-      if (!src) return
-      const preload = new Image()
-      preload.src = src
-    })
-  }, [books, safeIndex])
-
-  const book = books[safeIndex]
-  if (!book) return null
-
-  const nextBook = () => {
-    setDirection('next')
-    setCurrentIndex((i) => (i + 1) % books.length)
-  }
-  const prevBook = () => {
-    setDirection('prev')
-    setCurrentIndex((i) => (i - 1 + books.length) % books.length)
-  }
-
-  return (
-    <section className="heroCard">
-      {books.length > 1 && (
-        <div className="carouselControls">
-          <button className="carouselButton" onClick={prevBook} aria-label="Previous book">
-            <ChevronLeft />
-          </button>
-          <button className="carouselButton" onClick={nextBook} aria-label="Next book">
-            <ChevronRight />
-          </button>
-        </div>
-      )}
-      <div className={`heroInner heroSlide-${direction}`} key={book.id}>
-        <button className="heroCover" onClick={() => onOpen(book)}>
-          <BookCover book={book} />
-        </button>
-        <div className="heroCopy">
-          <h2>{book.title}</h2>
-          <p className="bookMeta">{book.author} · {book.genre}</p>
-          <p className="heroBlurb">{book.blurb}</p>
-          <div className="dialogStatsRow">
-            {book.rating > 0 && (
-              <span className="dialogStatItem">
-                <Star />
-                <span>{book.rating.toFixed(2)}{book.ratingCount > 0 ? ` (${formatCompactNumber(book.ratingCount)})` : ''}</span>
-              </span>
-            )}
-            {book.reviewCount > 0 && (
-              <span className="dialogStatItem">
-                <MessageSquareText />
-                <span>{formatCompactNumber(book.reviewCount)}</span>
-              </span>
-            )}
-            {book.pages > 0 && (
-              <span className="dialogStatItem">
-                <FileText />
-                <span>{formatCompactNumber(book.pages)} pages</span>
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    </section>
-  )
 }
 
 function AuthorView({ author }: AuthorViewProps) {
@@ -108,20 +24,17 @@ function AuthorView({ author }: AuthorViewProps) {
           <p>{error}</p>
         </div>
       ) : books.length > 0 ? (
-        <>
-          <AuthorHero key={author} books={books} onOpen={onOpen} />
-          <section className="authorBooksSection">
-            <div className="shelfHeader">
-              <h2>All books</h2>
-              <p className="authorBooksCaption">Every title matched to this author</p>
-            </div>
-            <ul className="authorBookList">
-              {books.map((book) => (
-                <AuthorBookRow key={book.id} book={book} onOpen={onOpen} />
-              ))}
-            </ul>
-          </section>
-        </>
+        <section className="authorBooksSection">
+          <div className="shelfHeader">
+            <h2>All books</h2>
+            <p className="authorBooksCaption">Every title matched to this author</p>
+          </div>
+          <ul className="authorBookList">
+            {books.map((book) => (
+              <AuthorBookRow key={book.id} book={book} onOpen={onOpen} />
+            ))}
+          </ul>
+        </section>
       ) : (
         <div className="emptyState">
           <h2>No books found</h2>
