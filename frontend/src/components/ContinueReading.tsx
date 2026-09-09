@@ -60,7 +60,7 @@ function ContinueReading({ books, series }: ContinueReadingProps) {
 }
 
 function SeriesCard({ entry }: { entry: SeriesProgress }) {
-  const { onOpenSeries } = useNavigation()
+  const { onOpen, onOpenSeries } = useNavigation()
   // The payload is a raw catalog row like every other endpoint's, so the cover
   // is built the same way the rest of the app builds one rather than from a
   // second hand-rolled shape.
@@ -69,7 +69,15 @@ function SeriesCard({ entry }: { entry: SeriesProgress }) {
 
   return (
     <div className="bookCard seriesCard">
-      <button type="button" className="bookCardButton" onClick={() => onOpenSeries(entry.series)}>
+      {/* A cover opens the book it is a cover of — that is what it does in every
+          other shelf, and a card sitting in the same row should not be the one
+          exception. The series stays one click away on its name below; only a
+          card with no next book to open falls back to it here. */}
+      <button
+        type="button"
+        className="bookCardButton"
+        onClick={() => (nextBook ? onOpen(nextBook) : onOpenSeries(entry.series))}
+      >
         <div className="coverWrap">
           {/* The cover belongs to the next book, not to the series, so the card
               says which one it is showing — otherwise it reads as a series
@@ -81,6 +89,8 @@ function SeriesCard({ entry }: { entry: SeriesProgress }) {
             </span>
           )}
         </div>
+      </button>
+      <button type="button" className="seriesCardTitle" onClick={() => onOpenSeries(entry.series)}>
         <strong>{entry.series}</strong>
       </button>
       <div className="seriesCardMeta">

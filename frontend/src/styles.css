@@ -3812,6 +3812,30 @@ svg {
   position: relative;
 }
 
+/* The cover above opens the book, so the series needs its own target: the name,
+   split out of the cover button the way .bookAuthorButton is split out on a
+   book card. It keeps the title's type and only picks up an underline on hover,
+   so the row still reads as a column of titles rather than of links. */
+.seriesCardTitle {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.seriesCardTitle:hover strong,
+.seriesCardTitle:focus-visible strong {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklch, var(--foreground) 32%, transparent);
+  text-decoration-thickness: 0.06em;
+  text-underline-offset: 0.16em;
+}
+
 .seriesCardNoCover {
   aspect-ratio: 2 / 3;
   width: 100%;
