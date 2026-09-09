@@ -47,7 +47,7 @@ function AuthorHero({ books, onOpen }: AuthorHeroProps) {
   }
 
   return (
-    <section className="heroCard paperGrain">
+    <section className="heroCard">
       {books.length > 1 && (
         <div className="carouselControls">
           <button className="carouselButton" onClick={prevBook} aria-label="Previous book">

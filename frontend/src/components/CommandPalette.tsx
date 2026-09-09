@@ -109,7 +109,7 @@ function CommandPalette({ commands, onClose }: CommandPaletteProps) {
   return (
     <div className="dialogScrim paletteScrim" onClick={onClose}>
       <article
-        className="bookDialog paperGrain commandPalette"
+        className="bookDialog commandPalette"
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"

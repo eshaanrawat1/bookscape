@@ -89,7 +89,7 @@ function Sidebar({ active, onSelect }: SidebarProps) {
   }
 
   return (
-    <aside className="sidebar paperGrain">
+    <aside className="sidebar">
       <div className="brand" data-tauri-drag-region>
         <div className="brandMark">
           <Flame />

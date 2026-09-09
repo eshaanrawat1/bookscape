@@ -70,7 +70,7 @@ function SettingsDialog({ onClose }: SettingsDialogProps) {
 
   return (
     <div className="dialogScrim" onClick={onClose}>
-      <article className="bookDialog paperGrain scraperDialog" onClick={(e) => e.stopPropagation()}>
+      <article className="bookDialog scraperDialog" onClick={(e) => e.stopPropagation()}>
         <button className="dialogIconButton dialogClose" onClick={onClose} aria-label="Close dialog">
           <X />
         </button>

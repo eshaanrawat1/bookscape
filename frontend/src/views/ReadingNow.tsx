@@ -58,7 +58,7 @@ function ReadingNowHero({ books, onOpen }: ReadingNowHeroProps) {
   const pagesLeft = Math.max(0, book.totalPages - book.currentPage)
 
   return (
-    <section className="heroCard paperGrain">
+    <section className="heroCard">
       {books.length > 1 && (
         <div className="carouselControls">
           <button className="carouselButton" onClick={prevBook} aria-label="Previous book">

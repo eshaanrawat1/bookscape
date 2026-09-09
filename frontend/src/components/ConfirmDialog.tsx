@@ -28,7 +28,7 @@ function ConfirmDialog({
   return (
     <div className="dialogScrim" onClick={() => { if (!busy) onCancel() }}>
       <article
-        className="bookDialog paperGrain confirmDialog"
+        className="bookDialog confirmDialog"
         role="alertdialog"
         aria-modal="true"
         aria-label={title}

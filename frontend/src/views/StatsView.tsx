@@ -47,7 +47,7 @@ function StatsView() {
         </div>
       ) : summary && hasBooks ? (
         <>
-          <section className="heroCard paperGrain statsHeroCard">
+          <section className="heroCard statsHeroCard">
             <div className="statsHeroCopy">
               <h2>Reading at a glance</h2>
               <p>Minimal stats pulled from your finished books and Obsidian snapshot.</p>

@@ -439,7 +439,6 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
 
   const articleClassName = [
     'bookDialog',
-    'paperGrain',
     isNavigation && 'navigating',
     exiting && 'exiting',
   ].filter(Boolean).join(' ')

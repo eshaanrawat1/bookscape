@@ -131,11 +131,6 @@ svg {
   background: var(--background);
 }
 
-.paperGrain {
-  background-image: radial-gradient(oklch(0.4 0.02 50 / 0.04) 1px, transparent 1px);
-  background-size: 4px 4px;
-}
-
 .contentPane {
   flex: 1;
   min-width: 0;
