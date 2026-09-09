@@ -1070,25 +1070,42 @@ svg {
 /* Sidebar widget                                                            */
 
 .goalWidget {
+  display: flex;
   flex: 0 0 auto;
+  flex-direction: column;
+  border-radius: 1.2rem;
+  background: color-mix(in oklch, var(--card) 45%, transparent);
+  padding: 1rem 1.25rem;
+  transition: background 160ms ease;
 }
 
-.goalWidgetButton {
+.goalWidget:hover {
+  background: color-mix(in oklch, var(--card) 85%, transparent);
+}
+
+.goalWidgetToggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.goalWidgetBody {
   display: flex;
   width: 100%;
   flex-direction: column;
   gap: 0.7rem;
   border: 0;
-  border-radius: 1.2rem;
-  background: color-mix(in oklch, var(--card) 45%, transparent);
-  padding: 1rem 1.25rem;
+  background: none;
+  padding: 0.7rem 0 0;
   text-align: left;
   cursor: pointer;
-  transition: background 160ms ease;
-}
-
-.goalWidgetButton:hover {
-  background: color-mix(in oklch, var(--card) 85%, transparent);
 }
 
 .goalWidgetTop {
@@ -1110,7 +1127,17 @@ svg {
   letter-spacing: 0.005em;
 }
 
-.goalWidgetButton .progressTrack {
+.goalWidgetChevron {
+  display: flex;
+  color: var(--muted-foreground);
+}
+
+.goalWidgetChevron svg {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+.goalWidgetBody .progressTrack {
   height: 0.45rem;
   background: color-mix(in oklch, var(--sidebar-foreground) 12%, transparent);
 }
