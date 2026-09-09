@@ -4003,25 +4003,32 @@ svg {
   font-size: 1.05rem;
 }
 
-/* Bleeds off the right edge of the row, the way a book set into the card
-   would. */
+/* A slot, not a frame: the cover is a full 2:3 book hung from near the top of
+   the card, tilted a couple of degrees, running off the bottom edge and just
+   past the right one. The row's own overflow/radius does the clipping, so it
+   reads as a book laid on the card rather than a rectangle packed into it.
+   Geometry measured off the reference design at a 7.4rem row height:
+   5.25rem wide, 0.9rem down from the card's inner top edge, 0.25rem of bleed
+   past the right edge, ~2deg of tilt. */
 .highlightsBookCover {
-  flex: 0 0 7rem;
+  position: relative;
+  flex: 0 0 5rem;
   align-self: stretch;
   margin: -1.1rem 0;
-  overflow: hidden;
 }
 
-.highlightsBookCover .bookCover,
+.highlightsBookCover .bookCover {
+  position: absolute;
+  top: 0.9rem;
+  right: -0.25rem;
+  width: 5.25rem;
+  transform: rotate(2deg);
+}
+
+/* Nearly square corners — at this size the stock 0.85rem radius reads as a
+   rounded tile rather than a book. */
 .highlightsBookCover .coverImage {
-  width: 100%;
-  height: 100%;
-}
-
-.highlightsBookCover .coverImage img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  border-radius: 0.25rem;
 }
 
 .highlightsDetailPane {
