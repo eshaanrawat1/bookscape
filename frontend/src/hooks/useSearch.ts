@@ -67,7 +67,10 @@ function useSearch() {
     return () => { cancelled = true }
   }, [dataVersion])
 
-  async function runSearch(rawQuery = draft) {
+  // Returns the books it found as well as storing them: the caller captions a
+  // recent-search row from them, and reading them off state would mean waiting
+  // a render for a value this already has in hand.
+  async function runSearch(rawQuery = draft): Promise<Book[]> {
     const nextQuery = String(rawQuery || '').trim()
     setDraft(nextQuery)
     setQuery(nextQuery)
@@ -75,16 +78,19 @@ function useSearch() {
     if (!nextQuery) {
       setResults([])
       setError(null)
-      return
+      return []
     }
 
     setLoading(true)
     setError(null)
     try {
-      setResults(await searchBooks(nextQuery, RESULT_LIMIT))
+      const books = await searchBooks(nextQuery, RESULT_LIMIT)
+      setResults(books)
+      return books
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not search books.')
       setResults([])
+      return []
     } finally {
       setLoading(false)
     }

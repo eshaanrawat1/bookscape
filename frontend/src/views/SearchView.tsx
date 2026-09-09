@@ -1,9 +1,10 @@
 import { useEffect, useRef, type FormEvent, type RefObject } from 'react'
-import { ChevronRight, Search, X } from 'lucide-react'
+import { ChevronRight, Clock, Search, X } from 'lucide-react'
 import BookCover from '../components/BookCover.jsx'
 import BookGrid from '../components/BookGrid.jsx'
 import { formatCompactNumber } from '../utils.js'
 import useSearch from '../hooks/useSearch.js'
+import useRecentSearches, { type RecentSearch } from '../hooks/useRecentSearches.js'
 import useListNavigation from '../hooks/useListNavigation.js'
 import { useNavigation } from '../context/NavigationContext.jsx'
 import type { Book } from '../types.js'
@@ -20,6 +21,7 @@ function SearchView() {
     setDraft,
     runSearch,
   } = useSearch()
+  const { recents, addRecent, clearRecents } = useRecentSearches()
   const { onOpen } = useNavigation()
   const inputRef = useRef<HTMLInputElement>(null)
   const draftQuery = draft.trim()
@@ -27,32 +29,45 @@ function SearchView() {
   const hasSubmittedResults = Boolean(draftQuery && draftQuery === submittedQuery)
   const showPreview = Boolean(draftQuery && draftQuery !== submittedQuery && (previewLoading || previewResults.length > 0))
 
-  const submitSearch = async (event: FormEvent) => {
-    event.preventDefault()
-    await runSearch(draft)
+  const search = async (rawQuery: string, meta?: string) => {
+    const books = await runSearch(rawQuery)
+    addRecent(rawQuery, meta ?? recentMeta(rawQuery, books))
   }
 
+  const submitSearch = async (event: FormEvent) => {
+    event.preventDefault()
+    await search(draft)
+  }
+
+  // Opening a book from the preview is a finished search too — it just ends in
+  // the dialog rather than in the grid, so the row it leaves behind is the book
+  // you landed on rather than the half-typed string that found it.
+  const openBook = (book: Book) => {
+    addRecent(book.title, book.author)
+    onOpen(book)
+  }
+
+  const header = (
+    <SearchHeader
+      draft={draft}
+      previewResults={previewResults}
+      previewLoading={previewLoading}
+      showPreview={showPreview}
+      onDraftChange={setDraft}
+      onSubmit={submitSearch}
+      onOpen={openBook}
+      inputRef={inputRef}
+    />
+  )
+
   if (loading) {
-    return (
-      <div className="stack">
-        <SearchHeader draft={draft} onDraftChange={setDraft} onSubmit={submitSearch} inputRef={inputRef} />
-      </div>
-    )
+    return <div className="stack">{header}</div>
   }
 
   if (error) {
     return (
       <div className="stack">
-        <SearchHeader
-          draft={draft}
-          previewResults={previewResults}
-          previewLoading={previewLoading}
-          showPreview={showPreview}
-          onDraftChange={setDraft}
-          onSubmit={submitSearch}
-          onOpen={onOpen}
-          inputRef={inputRef}
-        />
+        {header}
         <SearchLanding title="Could not search books" body={error} />
       </div>
     )
@@ -61,16 +76,7 @@ function SearchView() {
   if (hasSubmittedResults) {
     return (
       <div className="stack">
-        <SearchHeader
-          draft={draft}
-          previewResults={previewResults}
-          previewLoading={previewLoading}
-          showPreview={showPreview}
-          onDraftChange={setDraft}
-          onSubmit={submitSearch}
-          onOpen={onOpen}
-          inputRef={inputRef}
-        />
+        {header}
         {results.length > 0 ? (
           <BookGrid books={results} />
         ) : (
@@ -80,29 +86,66 @@ function SearchView() {
     )
   }
 
+  // Recents hold the space under the field for as long as nothing better is
+  // there to fill it — an empty field, or a draft the preview has not answered
+  // yet — so the page is never a lone search bar over blank paper.
   return (
     <div className="stack">
-      <SearchHeader
-        draft={draft}
-        previewResults={previewResults}
-        previewLoading={previewLoading}
-        showPreview={showPreview}
-        onDraftChange={setDraft}
-        onSubmit={submitSearch}
-        onOpen={onOpen}
-        inputRef={inputRef}
-      />
-      {!draftQuery ? (
-        <SearchLanding
-          title=""
-          body="Type a title or author, then press Enter."
-          emptyText="Search for a book to see results here."
+      {header}
+      {!showPreview ? (
+        <RecentSearches
+          recents={recents}
+          onSelect={(entry) => search(entry.query, entry.meta)}
+          onClear={clearRecents}
         />
-      ) : !showPreview ? (
-        <SearchLanding title="" body="Press Enter to search the full catalog." />
       ) : null}
     </div>
   )
+}
+
+interface RecentSearchesProps {
+  recents: RecentSearch[]
+  onSelect: (entry: RecentSearch) => void
+  onClear: () => void
+}
+
+function RecentSearches({ recents, onSelect, onClear }: RecentSearchesProps) {
+  if (recents.length === 0) return null
+
+  return (
+    <section className="recentSearches">
+      <div className="recentSearchesHeader">
+        <h2>Recent searches</h2>
+        <button type="button" className="recentSearchesClear" onClick={onClear}>
+          Clear all
+        </button>
+      </div>
+      <ul className="recentSearchList">
+        {recents.map((entry) => (
+          <li key={entry.query}>
+            <button type="button" className="recentSearchItem" onClick={() => onSelect(entry)}>
+              <Clock />
+              <span className="recentSearchQuery">{entry.query}</span>
+              <span className="recentSearchMeta">{entry.meta}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+// The caption on the right of a recent row. A query the catalog only matches on
+// an author — "Brandon Sanderson" — is labelled as one; anything else is
+// captioned with the author of the book it found, which is what makes a bare
+// title like "Dune" readable a week later.
+function recentMeta(rawQuery: string, books: Book[]): string {
+  const needle = rawQuery.trim().toLowerCase()
+  if (!needle) return ''
+  const titleMatch = books.find((book) => book.title?.toLowerCase().includes(needle))
+  const authorMatch = books.find((book) => book.author?.toLowerCase().includes(needle))
+  if (authorMatch && !titleMatch) return 'Author'
+  return (titleMatch ?? authorMatch)?.author ?? ''
 }
 
 interface SearchHeaderProps {
@@ -156,7 +199,7 @@ function SearchHeader({
           value={draft}
           onChange={(event) => onDraftChange(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder=""
+          placeholder="Search for a book, author, or genre…"
           aria-label="Search books"
           aria-expanded={showPreview}
           aria-autocomplete="list"
@@ -248,21 +291,15 @@ function previewMeta(book: Book): string {
 interface SearchLandingProps {
   title: string
   body: string
-  emptyText?: string
 }
 
-function SearchLanding({ title, body, emptyText }: SearchLandingProps) {
+function SearchLanding({ title, body }: SearchLandingProps) {
   return (
     <div className="searchLanding">
       <div className="searchHeader">
         <h2>{title}</h2>
         <p>{body}</p>
       </div>
-      {emptyText ? (
-        <div className="emptyState">
-          <p>{emptyText}</p>
-        </div>
-      ) : null}
     </div>
   )
 }
