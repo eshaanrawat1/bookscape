@@ -457,3 +457,90 @@ def get_series_progress(root: Path) -> list[dict]:
         )
     )
     return progress
+
+
+# A settled book is one you have already made up your mind about, and none of
+# them belong in a row of things to read next — a finished book least of all,
+# since finishing it is what put its neighbours on the list in the first place.
+# `want_to_read` is deliberately not here: a saved book is a book you have not
+# read yet, and seeing it turn up again as a recommendation is a reminder, not a
+# repeat.
+SUGGESTION_EXCLUDED_STATUSES = frozenset({"done", "reading", "dnf"})
+
+
+def get_suggested_books(
+    root: Path, limit: int = 20, sources: int = 8, per_source: int = 4
+) -> list[dict]:
+    """Books to read next, drawn from what you most recently finished.
+
+    Each source book carries Goodreads' own similar-books list, kept in the
+    order it was scraped in — that order is the relevance ranking, so candidates
+    are taken from the front rather than re-sorted by rating or popularity.
+
+    The picking is round-robin, one book per source per round, so the row leads
+    with your latest finish and every source is represented before any source
+    gets a second slot. Taking all of one source's picks before moving on would
+    hand the first third of the row to a single book.
+
+    Ids that no longer resolve to a catalog row are dropped: the scraper stores
+    whatever Goodreads listed, and most of those neighbours were never imported.
+    That is also why `per_source` is a ceiling rather than a quota — a source
+    whose pool runs dry just stops contributing, and the rounds keep going.
+    """
+    with transaction(root) as conn:
+        recent = conn.execute(
+            # Undated finishes are excluded rather than sorted last: an empty
+            # string sorts above every real date, so a book finished at an
+            # unknown time would otherwise claim the "most recent" slot.
+            "SELECT books.uid AS uid, books.similar_book_ids AS similar_book_ids "
+            "FROM user_book_state JOIN books ON books.uid = user_book_state.uid "
+            "WHERE user_book_state.status = 'done' AND TRIM(user_book_state.finish_date) <> '' "
+            "ORDER BY user_book_state.finish_date DESC, books.uid DESC LIMIT ?",
+            (sources,),
+        ).fetchall()
+        if not recent:
+            return []
+
+        states = _states_map(conn)
+        excluded = {
+            uid
+            for uid, state in states.items()
+            if str(state.get("status") or "") in SUGGESTION_EXCLUDED_STATUSES
+        }
+
+        # One membership query for the union of every source's candidates, so
+        # the cost stays flat in the number of sources rather than one lookup
+        # per suggested id.
+        candidates = [
+            [
+                sid
+                for raw in _parse_json_list(row["similar_book_ids"])
+                if (sid := str(raw).strip()) and sid not in excluded
+            ]
+            for row in recent
+        ]
+        wanted = {sid for pool in candidates for sid in pool}
+        if not wanted:
+            return []
+        wanted_list = list(wanted)
+        placeholders = ", ".join(["?"] * len(wanted_list))
+        rows = conn.execute(
+            f"SELECT * FROM books WHERE uid IN ({placeholders})", wanted_list
+        ).fetchall()
+        by_uid = {row["uid"]: row for row in rows}
+
+        picked: list[str] = []
+        seen: set[str] = set()
+        for _ in range(per_source):
+            if len(picked) >= limit:
+                break
+            for pool in candidates:
+                sid = next((s for s in pool if s not in seen and s in by_uid), None)
+                if sid is None:
+                    continue
+                seen.add(sid)
+                picked.append(sid)
+                if len(picked) >= limit:
+                    break
+
+        return [_row_to_book(conn, by_uid[sid], states_map=states) for sid in picked]

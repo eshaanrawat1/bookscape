@@ -8,6 +8,7 @@ import Shelf from '../components/Shelf.jsx'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
 import useSeriesProgress from '../hooks/useSeriesProgress.js'
+import useSuggestedBooks from '../hooks/useSuggestedBooks.js'
 import type { Book } from '../types.js'
 
 interface ReadingNowHeroProps {
@@ -101,6 +102,7 @@ function ReadingNow() {
   const { currentlyReading, wantToRead, collections, booksByIds } = useLibraryData()
   const { onOpen, onOpenWantToRead } = useNavigation()
   const seriesInProgress = useSeriesProgress()
+  const suggested = useSuggestedBooks()
   return (
     <div className="stack">
       {currentlyReading.length > 0 && <ReadingNowHero books={currentlyReading} onOpen={onOpen} />}
@@ -108,6 +110,15 @@ function ReadingNow() {
           already inside of is a stronger claim on what to read next than a book
           you once bookmarked. */}
       <SeriesShelf series={seriesInProgress} />
+      {/* Below the series row and above "Up next": both of those are books you
+          have already chosen, and this one is the page's only guess. It earns
+          its place under them, not over them. Shelf renders nothing on an empty
+          list, so a library with nothing finished simply has no such row. */}
+      <Shelf
+        title="Suggested"
+        subtitle="Because of what you finished recently."
+        books={suggested}
+      />
       <Shelf
         title="Up next"
         subtitle="Saved for the right moment."
