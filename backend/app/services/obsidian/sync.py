@@ -75,20 +75,18 @@ def _apply_parsed_book(root: Path, book: dict, *, dry_run: bool) -> str:
     return ""
 
 
-def pull_one(root: Path, *, uid: str | None = None, filename: str | None = None, dry_run: bool = False) -> dict:
+def pull_one(root: Path, *, uid: str, dry_run: bool = False) -> dict:
     """Pull a single book's note from the vault into Bookscape."""
     vault_path = resolve_vault_path(root)
     if not vault_path.exists():
         raise FileNotFoundError(f"Obsidian vault not found at: {vault_path}")
 
-    target_filename = filename
-    if not target_filename and uid:
-        state = DataRepository(root).get_book_state(uid)
-        target_filename = state.get("obsidian_filename") if state else None
-        if not target_filename:
-            book = resolve_book(root, uid)
-            if book and book.get("title"):
-                target_filename = safe_filename(book["title"])
+    state = DataRepository(root).get_book_state(uid)
+    target_filename = state.get("obsidian_filename") if state else None
+    if not target_filename:
+        book = resolve_book(root, uid)
+        if book and book.get("title"):
+            target_filename = safe_filename(book["title"])
 
     if not target_filename:
         raise FileNotFoundError("Could not resolve a vault file for this book")

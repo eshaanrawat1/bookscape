@@ -89,6 +89,5 @@ start_worker(ROOT)
 
 
 @app.get("/health")
-@app.get("/api/health")
 def health() -> dict:
     return {"ok": True, "has_data": has_data(ROOT), "backend_api_version": BACKEND_API_VERSION}

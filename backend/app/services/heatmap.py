@@ -11,19 +11,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-DEFAULT_DAYS = 371  # 53 weeks, so a full year always fills the grid
 LEVELS = 4
-
-
-def window(end: date, days: int = DEFAULT_DAYS) -> tuple[date, date]:
-    """Inclusive [start, end] spanning at least `days`, starting on a Sunday.
-
-    The Sunday alignment is not cosmetic: the grid is laid out in columns of
-    seven, so a start mid-week shifts every weekday into the wrong row and the
-    horizontal day-of-week bands turn into noise.
-    """
-    start = end - timedelta(days=max(1, days) - 1)
-    return start - timedelta(days=(start.weekday() + 1) % 7), end
 
 
 def year_window(year: int) -> tuple[date, date]:
