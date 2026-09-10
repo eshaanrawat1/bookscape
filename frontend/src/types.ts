@@ -160,8 +160,6 @@ export interface StatsSummary {
   pages_read: number
   genres_covered: number
   genre_list: string[]
-  densest_book: RawBookPayload | null
-  most_time_spent: RawBookPayload | null
   most_time_spent_days: number
   featured: FeaturedStat[]
 }
@@ -170,7 +168,6 @@ export interface HeatmapDay {
   date: string
   pages: number
   books: number
-  book_ids: string[]
   level: number
 }
 
@@ -181,12 +178,11 @@ export interface ReadingHeatmap {
   end: string
   year: number | null
   days: HeatmapDay[]
-  thresholds: number[]
   levels: number
   total_pages: number
   days_read: number
   best_day: HeatmapDay | null
-  streak: { current: number; longest: number }
+  streak: { longest: number }
 }
 
 // One series you have started and not finished, as /series-progress reports it.

@@ -1,7 +1,7 @@
 """Shaping for the reading heatmap.
 
 Everything here is pure: it works on the plain
-`[{"date", "pages", "books", "book_ids"}]` list `DataRepository.reading_days()`
+`[{"date", "pages", "books"}]` list `DataRepository.reading_days()`
 returns, so the calendar arithmetic and the bucketing can be exercised without
 touching a database. The repository owns the SQL, the route owns the HTTP, and
 the awkward parts — week alignment, quantiles, streaks — live here.
@@ -51,27 +51,25 @@ def level(pages: int, cuts: list[int]) -> int:
     return 1 + sum(1 for cut in cuts if pages >= cut)
 
 
-def streaks(days: list[dict], today: date) -> dict:
-    """Longest and current runs of consecutive reading days.
+def streaks(days: list[dict]) -> dict:
+    """Longest run of consecutive reading days.
 
-    Both are measured inside the requested window, so a run that began before
-    `start` is reported from `start`. The current streak counts a run ending
-    yesterday as still live — otherwise it would read zero every morning until
-    the day's first page was logged.
+    Measured inside the requested window, so a run that began before `start` is
+    reported from `start`.
     """
     dates = sorted(date.fromisoformat(d["date"]) for d in days)
     if not dates:
-        return {"current": 0, "longest": 0}
+        return {"longest": 0}
 
     longest = run = 1
     for previous, current in zip(dates, dates[1:]):
         run = run + 1 if (current - previous).days == 1 else 1
         longest = max(longest, run)
 
-    return {"current": run if (today - dates[-1]).days <= 1 else 0, "longest": longest}
+    return {"longest": longest}
 
 
-def build(days: list[dict], *, start: date, end: date, today: date, levels: int = LEVELS) -> dict:
+def build(days: list[dict], *, start: date, end: date, levels: int = LEVELS) -> dict:
     """Assemble the heatmap payload.
 
     `days` stays sparse — only days with reading are listed, and the client
@@ -83,10 +81,9 @@ def build(days: list[dict], *, start: date, end: date, today: date, levels: int 
         "start": start.isoformat(),
         "end": end.isoformat(),
         "days": [{**day, "level": level(day["pages"], cuts)} for day in days],
-        "thresholds": cuts,
         "levels": levels,
         "total_pages": sum(day["pages"] for day in days),
         "days_read": len(days),
         "best_day": max(days, key=lambda day: day["pages"], default=None),
-        "streak": streaks(days, today),
+        "streak": streaks(days),
     }

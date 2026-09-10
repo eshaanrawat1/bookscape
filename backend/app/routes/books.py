@@ -77,7 +77,6 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
                 **reading_overlay({**row, "status": status}, catalog.get("page_count")),
                 "id": str(book_id),
                 "linked_catalog_book": catalog or None,
-                "notes": row.get("notes", ""),
             })
         books.sort(
             key=lambda b: (str(b.get("reading_finish_date") or ""), str(b.get("reading_start_date") or ""), str(b.get("title") or "")),

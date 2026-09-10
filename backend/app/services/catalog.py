@@ -90,7 +90,6 @@ def reading_overlay(state: dict | None, page_count: object = 0) -> dict:
         "reading_total_pages": total_pages,
         "reading_start_date": str(state.get("start_date") or ""),
         "reading_finish_date": str(state.get("finish_date") or ""),
-        "want_to_read": bool(state.get("want_to_read")),
     }
 
 

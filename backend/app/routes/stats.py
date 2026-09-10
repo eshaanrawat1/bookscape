@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import date
 from fastapi import APIRouter, Query
 from pathlib import Path
 
@@ -10,13 +9,6 @@ from ..services.catalog import reading_overlay, resolve_book as load_book
 from ..utils import parse_iso_date
 
 
-# Books travel in the raw payload shape every other endpoint uses, so the client
-# builds them with the same normaliseBook() as everything else. This route used
-# to hand-assemble the client's Book shape itself — a second definition of what
-# a book is, which drifted: it never carried `pages`, `series` or
-# `seriesNumber`, so a card opened from the stats carousel showed no series link
-# until its /book/{id} fetch landed. These accessors are the only places that
-# need to know the raw field names.
 def _pages(book: dict) -> int:
     return int(book.get("reading_total_pages") or 0)
 
@@ -29,14 +21,6 @@ def _rating_count(book: dict) -> int:
     return int(book.get("rating_count") or 0)
 
 
-# The carousel's cards, in priority order. `rank` sorts candidates best-first and
-# `eligible` drops books the card cannot honestly describe (a book with no page
-# count is not the shortest one, it is unmeasured). `value`/`unit` are split so
-# the card can typeset the number large and the unit small.
-#
-# Order is load-bearing: picking is de-duplicated, so an earlier card claims its
-# winner outright and a later one falls through to its next-best book. Densest
-# and longest lead because they are the two the page has always shown.
 def _featured_specs(days_spent) -> list[dict]:
     def pace(book: dict) -> float:
         days = days_spent(book)
@@ -75,9 +59,7 @@ def _featured_specs(days_spent) -> list[dict]:
             "rank": pace,
             "value": lambda b: round(pace(b)),
         },
-        # Goodreads' numbers, not the reader's own — the labels say "crowd" and
-        # "deepest cut" rather than "highest rated" so the page never implies
-        # these are personal ratings.
+        # Goodreads ratings used
         {
             "key": "acclaimed",
             "label": "Crowd favourite",
@@ -98,13 +80,7 @@ def _featured_specs(days_spent) -> list[dict]:
 
 
 def _featured_books(books_list: list[dict], days_spent) -> list[dict]:
-    """Pick one book per superlative, never repeating a book across cards.
-
-    Filtering to a single month can leave two or three books, at which point one
-    of them legitimately wins nearly every category. Showing the same cover six
-    times reads as a bug, so each card takes the best book not already claimed
-    and is dropped entirely once no eligible book is left.
-    """
+    """Pick one book per category, deduped."""
     claimed: set[str] = set()
     cards: list[dict] = []
     for spec in _featured_specs(days_spent):
@@ -130,9 +106,6 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
     router = APIRouter()
 
     def _stats_book_payload(book_id: str, row: dict) -> dict:
-        # Same recipe as /my-books: the catalog half and the reading half of a
-        # book, assembled once. A book on this page is finished by definition,
-        # and the reading row says so on its own — no status to hardcode here.
         catalog = load_book(root, book_id) or {}
         return {
             **catalog,
@@ -177,7 +150,6 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
             f = parse_iso_date(b.get("reading_finish_date"))
             return max(1, (f - s).days + 1) if s and f and f >= s else 0
 
-        densest = max(books_list, key=_pages, default=None)
         longest = max(books_list, key=_days_spent, default=None)
 
         featured = _featured_books(books_list, _days_spent)
@@ -190,23 +162,15 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
             "pages_read": sum(_pages(b) for b in books_list),
             "genres_covered": len(genres),
             "genre_list": sorted(genres),
-            "densest_book": densest,
-            "most_time_spent": longest,
             "most_time_spent_days": _days_spent(longest) if longest else 0,
             "featured": featured,
         }
 
     @router.get("/stats/heatmap")
     def get_heatmap(year: int = Query(..., ge=1900, le=3000)) -> dict:
-        """Per-day page totals for the calendar heatmap.
-
-        A Jan–Dec grid for one year, so the heatmap follows the same year
-        filter as the summary above it. `today` is the machine's local date,
-        matching how progress is credited on write: the API is a local
-        process, so its date is the user's.
-        """
+        """Per-day page totals for the heatmap."""
         start, last = heatmap.year_window(year)
         rows = repo.reading_days(start.isoformat(), last.isoformat())
-        return {**heatmap.build(rows, start=start, end=last, today=date.today()), "year": year}
+        return {**heatmap.build(rows, start=start, end=last), "year": year}
 
     return router

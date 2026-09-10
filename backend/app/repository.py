@@ -220,7 +220,7 @@ class DataRepository:
         """
         with transaction(self.root) as conn:
             rows = conn.execute(
-                "SELECT day, SUM(pages) AS pages, COUNT(*) AS books, GROUP_CONCAT(uid) AS uids "
+                "SELECT day, SUM(pages) AS pages, COUNT(*) AS books "
                 "FROM reading_days "
                 "WHERE pages > 0 AND day BETWEEN ? AND ? "
                 "GROUP BY day ORDER BY day",
@@ -231,9 +231,6 @@ class DataRepository:
                 "date": row["day"],
                 "pages": int(row["pages"] or 0),
                 "books": int(row["books"] or 0),
-                # Catalog uids are numeric strings, so the default separator is
-                # unambiguous.
-                "book_ids": [u for u in str(row["uids"] or "").split(",") if u],
             }
             for row in rows
         ]
