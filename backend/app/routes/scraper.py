@@ -12,7 +12,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..services.catalog import get_book_with_similar as load_book_with_similar
 from ..services.catalog import resolve_book, upsert_book
-from ..services.cover_worker import poke_worker
 from ..urls import canonical_book_url
 
 
@@ -29,9 +28,6 @@ class ScrapedBookIn(BaseModel):
     catalog: `extra="forbid"` turns a payload carrying unexpected fields into a
     422 instead of a silent partial write, and the length caps stop a single
     import from parking megabytes in the database.
-
-    `color` is absent on purpose — the scraper never sets it, and the cover
-    worker owns that column.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -185,9 +181,6 @@ def create_router(root: Path) -> APIRouter:
         uid = book["uid"]
 
         upsert_book(root, book)
-        # The scraper leaves `color` empty on purpose; wake the extractor so the
-        # new book gets one now rather than at the worker's next idle poll.
-        poke_worker()
         saved = load_book_with_similar(root, uid)
         if not saved:
             raise HTTPException(status_code=500, detail="Book was saved but could not be reloaded.")

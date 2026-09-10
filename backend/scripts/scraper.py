@@ -22,13 +22,8 @@ Similar books:
   browser fingerprint / cookies that solved the WAF challenge.
   The API key + endpoint are extracted from the JS bundle on first run.
 
-Cover colors are NOT extracted here — gradient.py handles those separately
-on its own rate-limited pass.
-
 Scraped books are written straight into bookscape.db via the app's own
 upsert_book(), so the crawler and the desktop app share one source of truth.
-Cover colors are filled in afterwards by gradient.py, which finds its own work
-by querying for rows with an empty `color`.
 
 Usage:
     python scraper.py                        # run from existing frontier
@@ -692,7 +687,7 @@ def save_book(book: Book) -> None:
     Deliberately reuses upsert_book() rather than issuing SQL here: it already
     knows which columns exist, JSON-encodes similar_book_ids, and replaces the
     genre rows. It also updates only the keys present, so a re-scrape never
-    clobbers a `color` that gradient.py filled in later.
+    clobbers a column it does not carry.
     """
     upsert_book(PROJECT_ROOT, asdict(book))
 

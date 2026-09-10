@@ -5,17 +5,6 @@ from urllib.parse import ParseResult, urlparse
 
 GOODREADS_HOSTS = frozenset({"goodreads.com", "www.goodreads.com"})
 
-# Every cover in the catalog is served by Amazon's media CDN today; the
-# gr-assets names are Goodreads' older cover domains, kept because links stored
-# by earlier scrapes still point at them.
-COVER_HOSTS = frozenset({
-    "m.media-amazon.com",
-    "images-na.ssl-images-amazon.com",
-    "i.gr-assets.com",
-    "s.gr-assets.com",
-    "images.gr-assets.com",
-})
-
 _BOOK_PATH = re.compile(r"^/book/show/(\d+)")
 
 
@@ -72,17 +61,3 @@ def canonical_book_url(raw: object) -> tuple[str, str]:
 
     book_id = match.group(1)
     return book_id, f"https://www.goodreads.com/book/show/{book_id}"
-
-
-def is_allowed_cover_url(raw: object) -> bool:
-    """Whether the color extractor may fetch this cover.
-
-    Cover URLs arrive from the scraper and from Obsidian frontmatter, neither of
-    which is a trusted source of hostnames, and the extractor runs unattended in
-    a background worker — so a hostile one would be fetched with nobody
-    watching. https only: a cover is not worth a cleartext request.
-    """
-    parsed = _parse(raw)
-    if parsed is None or parsed.scheme != "https":
-        return False
-    return _hostname(parsed) in COVER_HOSTS

@@ -12,7 +12,7 @@ https://github.com/user-attachments/assets/59140fa7-9576-4428-9930-c8c0e3efb3e3
 - `frontend/` — React + Vite UI
 - `backend/app/` — FastAPI service (routes, services, SQLite persistence)
 - `backend/data/` — runtime data only (`bookscape.db`)
-- `backend/scripts/` — standalone scraper tooling (`scraper.py`, `gradient.py`)
+- `backend/scripts/` — standalone scraper tooling (`scraper.py`)
 
 ## Quickstart
 
@@ -65,8 +65,7 @@ All of the above accept `?dry_run=true` to preview without writing.
 
 ## Scraper
 
-`backend/scripts/scraper.py` scrapes Goodreads via Playwright, and
-`backend/scripts/gradient.py` extracts dominant cover colors. Both write
+`backend/scripts/scraper.py` scrapes Goodreads via Playwright and writes
 straight into `bookscape.db` — there is no intermediate file.
 
 The app's "Add Book" dialog shells out to `scraper.py --fetch-one`, which
@@ -74,4 +73,4 @@ prints the book and saves nothing; the API persists the result itself.
 Everything else is run by hand.
 
 See [`backend/scripts/README.md`](backend/scripts/README.md) for the full mode
-list, the crawl queue, and how the two scripts divide the work.
+list and the crawl queue.

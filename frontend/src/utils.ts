@@ -103,9 +103,9 @@ function normaliseBook(raw: RawBookPayload): Book {
   const primaryGenre = raw.genre || genres[0] || ''
   // /my-books is built around the reading row and carries none of the catalog's
   // review stats at the top level — only nested under `linked_catalog_book`, the
-  // same reason `color` and `series` fall back the way they do. Without these
-  // fallbacks a finished or in-progress book opened its About tab with no
-  // rating and no review count, while the very same book showed both in Library.
+  // same reason `series` falls back the way it does. Without these fallbacks a
+  // finished or in-progress book opened its About tab with no rating and no
+  // review count, while the very same book showed both in Library.
   const catalog = raw.linked_catalog_book || {}
   const rating = parseFloat(String(raw.avg_rating ?? catalog.avg_rating ?? '')) || 0
   const pages = raw.page_count || raw.total_pages || raw.reading_total_pages || totalPages || catalog.page_count || 0
@@ -117,11 +117,10 @@ function normaliseBook(raw: RawBookPayload): Book {
     title: raw.title || 'Untitled',
     author: raw.author || '',
     cover: raw.image_url || '',
-    color: raw.color || raw.linked_catalog_book?.color || '',
     genre: primaryGenre,
     genres,
-    // /my-books nests the catalog row under linked_catalog_book, the same
-    // reason `color` falls back the same way.
+    // /my-books nests the catalog row under linked_catalog_book, so the catalog
+    // fields fall back through it.
     series: raw.series || raw.linked_catalog_book?.series || '',
     seriesNumber: raw.series_number || raw.linked_catalog_book?.series_number || '',
     pages,

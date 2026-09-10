@@ -20,7 +20,6 @@ BOOK_COLUMNS = {
     "series_number",
     "similar_book_ids",
     "source_url",
-    "color",
     "scraped_at",
 }
 

@@ -8,10 +8,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .auth import TOKEN_HEADER, TokenAuthMiddleware, read_or_create_token
 from .db import init_app_db
-from .observability import configure_logging
 from .repository import DataRepository
 from .services.catalog import has_data
-from .services.cover_worker import start_worker
 from .services.highlights import HighlightStore
 from .services.reading import ReadingListStore
 from .routes.catalog import create_router as create_catalog_router
@@ -40,7 +38,6 @@ ALLOWED_ORIGINS = [
 ]
 
 init_app_db(ROOT)
-configure_logging(ROOT)
 
 app = FastAPI(title="Bookscape API", version="0.1.0")
 
@@ -81,11 +78,6 @@ api_router.include_router(create_scraper_router(ROOT))
 api_router.include_router(create_settings_router(ROOT, repo))
 
 app.include_router(api_router, prefix="/api")
-
-# Fills in cover colors for newly imported books in the background. Started
-# after the routes so a slow first claim cannot delay the health check the
-# Tauri shell waits on.
-start_worker(ROOT)
 
 
 @app.get("/health")

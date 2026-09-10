@@ -11,9 +11,7 @@ export interface RawBookPayload {
   title?: string
   author?: string
   image_url?: string
-  color?: string
   linked_catalog_book?: {
-    color?: string
     series?: string
     series_number?: string
     avg_rating?: number | string
@@ -49,7 +47,6 @@ export interface Book {
   title: string
   author: string
   cover: string
-  color: string
   genre: string
   genres: string[]
   // Kept as two fields rather than one pre-joined "Name #2" string: the name is
