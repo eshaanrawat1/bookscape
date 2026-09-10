@@ -79,7 +79,6 @@ export interface RawList {
 export interface Collection {
   id: string
   name: string
-  description: string
   // A lucide name from collectionIcons.ts, or '' for the default dot.
   icon: string
   bookIds: string[]
@@ -183,9 +182,9 @@ export interface ReadingHeatmap {
 }
 
 // One series you have started and not finished, as /series-progress reports it.
-// `read`/`reading`/`dnf` count books in that state; the rest of `total` are ones
-// you have not picked up. `next_book` is the one to read next — the book you are
-// currently in if there is one, otherwise the first unread in reading order. A
+// `read`/`reading` count books in that state; the rest of `total` are ones you
+// have not picked up or have set down. `next_book` is the one to read next —
+// the book you are in if there is one, otherwise the first unread in order. A
 // series with nothing left to read next is not in progress and never reaches
 // this list, so in practice it is always present; the type keeps it nullable
 // rather than have the shelf trust a guarantee it cannot see.
@@ -194,7 +193,6 @@ export interface SeriesProgress {
   total: number
   read: number
   reading: number
-  dnf: number
   next_book: RawBookPayload | null
 }
 
@@ -219,24 +217,6 @@ export interface ReadingGoalState {
   // on the number you typed instead of closing over a goal that never saved.
   save: (target: number) => Promise<void>
   clear: () => Promise<void>
-}
-
-export interface SyncPullResult {
-  ok: boolean
-  dry_run: boolean
-  vault_path: string
-  scanned_files: number
-  imported: number
-  skipped: string[]
-}
-
-export interface SyncPushResult {
-  ok: boolean
-  dry_run: boolean
-  vault_path: string
-  written: number
-  deleted: number
-  skipped_collisions: { filename: string; uids: string[] }[]
 }
 
 export interface LibraryDataContextValue {

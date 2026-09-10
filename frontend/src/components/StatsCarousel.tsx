@@ -115,8 +115,7 @@ function StatsCarousel({ featured }: StatsCarouselProps) {
                   <button
                     type="button"
                     className="statsFocusAuthor"
-                    onClick={() => onOpenAuthor?.(book.author)}
-                    disabled={!onOpenAuthor}
+                    onClick={() => onOpenAuthor(book.author)}
                   >
                     {book.author}
                   </button>

@@ -4491,15 +4491,6 @@ svg {
   transition: stroke-dasharray 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.progressRingLabel {
-  position: relative;
-  font-family: var(--font-serif);
-  font-size: 1.05rem;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  color: var(--foreground);
-}
-
 .seriesRowMarker {
   display: inline-flex;
   align-items: center;

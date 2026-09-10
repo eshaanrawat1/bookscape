@@ -59,7 +59,6 @@ function mapReadingLists(rawLists: RawList[]): Collection[] {
   return rawLists.map((list) => ({
     id: collectionIdFromName(list.name),
     name: list.name,
-    description: '',
     icon: list.icon || '',
     bookIds: (list.book_ids || []),
     books: (list.books || []).map(normaliseBook),
@@ -77,9 +76,9 @@ function formatCompactNumber(value: number | string): string {
   const num = Number(value)
   if (!Number.isFinite(num) || num <= 0) return '0'
   const compact = (divisor: number, suffix: string) => {
-    const truncated = Math.floor((Math.abs(num) / divisor) * 10) / 10
+    const truncated = Math.floor((num / divisor) * 10) / 10
     const text = truncated % 1 === 0 ? String(truncated.toFixed(0)) : String(truncated.toFixed(1))
-    return `${num < 0 ? '-' : ''}${text}${suffix}`
+    return `${text}${suffix}`
   }
   if (num >= 1_000_000_000) return compact(1_000_000_000, 'B')
   if (num >= 1_000_000) return compact(1_000_000, 'M')

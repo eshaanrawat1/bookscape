@@ -55,6 +55,9 @@ const navOrder: string[] = [...mainNav, ...shelfNav].map((item) => item.id)
 
 function navShortcut(viewId: string): string | null {
   const index = navOrder.indexOf(viewId)
+  // The 9 pairs with the /^[1-9]$/ test in useAppHotkeys: unreachable at the
+  // current 8 nav rows, but it is what stops a 10th from rendering a "⌘10"
+  // hint for a chord the handler will never fire.
   if (index === -1 || index >= 9) return null
   return shortcutLabel(String(index + 1))
 }

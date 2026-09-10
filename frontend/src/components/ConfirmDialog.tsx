@@ -4,7 +4,6 @@ interface ConfirmDialogProps {
   title: string
   message: string
   confirmLabel?: string
-  cancelLabel?: string
   busy?: boolean
   error?: string | null
   onConfirm: () => void
@@ -15,7 +14,6 @@ function ConfirmDialog({
   title,
   message,
   confirmLabel = 'Delete',
-  cancelLabel = 'Cancel',
   busy = false,
   error = null,
   onConfirm,
@@ -41,7 +39,7 @@ function ConfirmDialog({
 
         <div className="confirmActions">
           <button type="button" className="secondaryButton confirmButton" onClick={onCancel} disabled={busy}>
-            {cancelLabel}
+            Cancel
           </button>
           <button
             type="button"

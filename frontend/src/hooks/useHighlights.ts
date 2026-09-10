@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { apiFetch } from '../api.js'
 import { normaliseBook } from '../utils.js'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
@@ -48,11 +48,6 @@ function useHighlights() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    const data = await apiFetch<{ groups?: RawHighlightGroup[] }>('/highlights')
-    setGroups((data.groups || []).map(normaliseGroup).filter((g): g is HighlightGroup => g !== null))
-  }, [])
-
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -93,7 +88,7 @@ function useHighlights() {
     applyGroup(data)
   }
 
-  return { groups, loading, error, refresh: load, applyGroup, updateHighlight, deleteHighlight }
+  return { groups, loading, error, applyGroup, updateHighlight, deleteHighlight }
 }
 
 // Shared with the book dialog, which creates highlights without ever mounting

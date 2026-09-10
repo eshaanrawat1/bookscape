@@ -48,7 +48,7 @@ import AuthorView from './views/AuthorView.jsx'
 import SeriesView from './views/SeriesView.jsx'
 import GenreView from './views/GenreView.jsx'
 import CollectionView from './views/CollectionView.jsx'
-import type { Book, Collection, GenreSection, RawBookPayload, RawList, SyncPullResult, SyncPushResult } from './types.js'
+import type { Book, Collection, GenreSection, RawBookPayload, RawList } from './types.js'
 
 export default function App() {
   const { showToast } = useToast()
@@ -154,7 +154,7 @@ export default function App() {
   const activeAuthorName = authorNameFromView(view)
   const activeSeriesName = seriesNameFromView(view)
   const activeGenreName = genreNameFromView(view)
-  const meta: { title?: string; subtitle?: string; name?: string; description?: string } | undefined = activeCollection
+  const meta: { title?: string; subtitle?: string; name?: string } | undefined = activeCollection
     ? activeCollection
     : view.startsWith('author:')
       ? { title: activeAuthorName || 'Author' }
@@ -324,7 +324,7 @@ export default function App() {
     if (vaultBusy) return
     setVaultBusy('push')
     try {
-      await apiFetch<SyncPushResult>('/sync/obsidian/push', { method: 'POST' })
+      await apiFetch('/sync/obsidian/push', { method: 'POST' })
       showToast('Pushed your library to the vault.', { key: 'vault:library' })
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Could not push to Obsidian vault.', {
@@ -340,7 +340,7 @@ export default function App() {
     if (vaultBusy) return
     setVaultBusy('pull')
     try {
-      await apiFetch<SyncPullResult>('/sync/obsidian', { method: 'POST' })
+      await apiFetch('/sync/obsidian', { method: 'POST' })
       await reloadAppData()
       showToast('Pulled your library from the vault.', { key: 'vault:library' })
     } catch (err) {
@@ -460,7 +460,7 @@ export default function App() {
                       </button>
                     )}
                     <h1>{meta?.title || meta?.name}</h1>
-                    <p>{meta?.subtitle || meta?.description}</p>
+                    <p>{meta?.subtitle}</p>
                   </div>
                 </div>
               </header>

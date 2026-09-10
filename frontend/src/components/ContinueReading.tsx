@@ -98,7 +98,6 @@ function SeriesCard({ entry }: { entry: SeriesProgress }) {
           value={entry.read}
           total={entry.total}
           size={18}
-          showLabel={false}
           label={`${entry.read} of ${entry.total} books read`}
         />
         <span>

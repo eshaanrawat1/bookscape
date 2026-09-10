@@ -8,8 +8,6 @@ import type { ReadingHeatmap } from '../types.js'
 // and would only ever throw the month away.
 function useHeatmap(year: number | null) {
   const [heatmap, setHeatmap] = useState<ReadingHeatmap | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (year === null) {
@@ -18,27 +16,22 @@ function useHeatmap(year: number | null) {
     }
 
     let cancelled = false
-    setLoading(true)
 
+    // A failed load resolves to no grid rather than an error state: StatsView
+    // renders the heatmap only when it has one, and the summary above it is
+    // already reporting on the same fetch failing.
     apiFetch<ReadingHeatmap>(`/stats/heatmap?year=${year}`)
       .then((data) => {
-        if (cancelled) return
-        setHeatmap(data)
-        setError(null)
+        if (!cancelled) setHeatmap(data)
       })
-      .catch((err: unknown) => {
-        if (cancelled) return
-        setHeatmap(null)
-        setError(err instanceof Error ? err.message : 'Could not load reading days.')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
+      .catch(() => {
+        if (!cancelled) setHeatmap(null)
       })
 
     return () => { cancelled = true }
   }, [year])
 
-  return { heatmap, loading, error }
+  return { heatmap }
 }
 
 export default useHeatmap

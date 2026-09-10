@@ -490,8 +490,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
               <button
                 type="button"
                 className="dialogSeries dialogSeriesButton"
-                onClick={() => onOpenSeries?.(displayBook.series)}
-                disabled={!onOpenSeries}
+                onClick={() => onOpenSeries(displayBook.series)}
                 // The number is part of the label but not part of the
                 // destination — the page is the whole series.
                 aria-label={`View the ${displayBook.series} series`}
@@ -504,8 +503,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
               <button
                 type="button"
                 className="dialogAuthor dialogAuthorButton"
-                onClick={() => onOpenAuthor?.(displayBook.author)}
-                disabled={!onOpenAuthor}
+                onClick={() => onOpenAuthor(displayBook.author)}
               >
                 {displayBook.author}
               </button>
@@ -820,7 +818,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
                 similarBooks.map((simRaw) => {
                   const simBook = normaliseBook(simRaw)
                   return (
-                    <button key={simBook.id} className="similarCard" onClick={() => { if (onOpen) onOpen(simBook) }}>
+                    <button key={simBook.id} className="similarCard" onClick={() => onOpen(simBook)}>
                       <BookCover book={simBook} />
                     </button>
                   )
