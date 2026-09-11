@@ -2994,6 +2994,7 @@ svg {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+  align-items: center;
   justify-content: center;
   /* A wide rectangle, driven by the column width so the four keep their
      proportion at every breakpoint. Height stays auto, so the ratio is a floor:
@@ -3008,6 +3009,7 @@ svg {
      hairline, and it cannot drift if --background is ever retuned. */
   background: transparent;
   padding: 0 1.5rem;
+  text-align: center;
 }
 
 .statTile strong {
