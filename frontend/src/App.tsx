@@ -155,7 +155,7 @@ export default function App() {
   const activeSeriesName = seriesNameFromView(view)
   const activeGenreName = genreNameFromView(view)
   const meta: { title?: string; subtitle?: string; name?: string } | undefined = activeCollection
-    ? activeCollection
+    ? { ...activeCollection, subtitle: 'Kept together on purpose.' }
     : view.startsWith('author:')
       ? { title: activeAuthorName || 'Author' }
       : view.startsWith('series:')

@@ -22,9 +22,9 @@ const viewMeta: Record<string, ViewMetaEntry> = {
   search: { title: 'Search', subtitle: 'Find a book by title or author.' },
   stats: { title: 'Statistics', subtitle: 'A quick read on your finished books.' },
   highlights: { title: 'Highlights', subtitle: 'Passages worth keeping.' },
-  'want-to-read': { title: 'Want to Read', subtitle: 'Saved for a rainy day.' },
+  'want-to-read': { title: 'Want to Read', subtitle: 'Saved for the right moment.' },
   finished: { title: 'Finished', subtitle: "Books you've loved and closed." },
-  dnf: { title: 'Did Not Finish', subtitle: 'Set down before the last page.' },
+  dnf: { title: 'DNF', subtitle: 'Set down before the last page.' },
 }
 
 const mainNav: NavItem[] = [
@@ -38,7 +38,7 @@ const shelfNav: NavItem[] = [
   { id: 'reading-now', label: 'Reading Now', icon: BookOpen },
   { id: 'want-to-read', label: 'Want to Read', icon: Bookmark },
   { id: 'finished', label: 'Finished', icon: CheckCircle2 },
-  { id: 'dnf', label: 'Did Not Finish', icon: BookX },
+  { id: 'dnf', label: 'DNF', icon: BookX },
 ]
 
 const isMac = typeof navigator !== 'undefined'
