@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from datetime import date, timedelta
 from fastapi import APIRouter, Query
 from pathlib import Path
 
 from ..repository import DataRepository
-from ..services import heatmap
 from ..services.catalog import reading_overlay, resolve_book as load_book
 from ..utils import parse_iso_date
 
@@ -13,93 +13,44 @@ def _pages(book: dict) -> int:
     return int(book.get("reading_total_pages") or 0)
 
 
-def _rating(book: dict) -> float:
-    return float(book.get("avg_rating") or 0)
+def _span(book: dict) -> tuple[date, date] | None:
+    """The book's first-page-to-last-page window, or None if it isn't dated."""
+    start = parse_iso_date(book.get("reading_start_date"))
+    finish = parse_iso_date(book.get("reading_finish_date"))
+    if not start or not finish or finish < start:
+        return None
+    return start, finish
 
 
-def _rating_count(book: dict) -> int:
-    return int(book.get("rating_count") or 0)
+def _days_reading(books_list: list[dict]) -> int:
+    """Calendar days with a book open, counted once.
 
-
-def _featured_specs(days_spent) -> list[dict]:
-    def pace(book: dict) -> float:
-        days = days_spent(book)
-        return _pages(book) / days if days else 0.0
-
-    return [
-        {
-            "key": "densest",
-            "label": "Densest book",
-            "unit": "pages",
-            "eligible": lambda b: _pages(b) > 0,
-            "rank": _pages,
-            "value": lambda b: _pages(b),
-        },
-        {
-            "key": "longest",
-            "label": "Most time spent",
-            "unit": "days from first page to last",
-            "eligible": lambda b: days_spent(b) > 0,
-            "rank": days_spent,
-            "value": days_spent,
-        },
-        {
-            "key": "fastest",
-            "label": "Fastest read",
-            "unit": "days",
-            "eligible": lambda b: days_spent(b) > 0,
-            "rank": lambda b: -days_spent(b),
-            "value": days_spent,
-        },
-        {
-            "key": "pace",
-            "label": "Best pace",
-            "unit": "pages a day",
-            "eligible": lambda b: pace(b) > 0,
-            "rank": pace,
-            "value": lambda b: round(pace(b)),
-        },
-        # Goodreads ratings used
-        {
-            "key": "acclaimed",
-            "label": "Crowd favourite",
-            "unit": "average rating",
-            "eligible": lambda b: _rating(b) > 0,
-            "rank": _rating,
-            "value": lambda b: round(_rating(b), 2),
-        },
-        {
-            "key": "obscure",
-            "label": "Deepest cut",
-            "unit": "ratings on Goodreads",
-            "eligible": lambda b: _rating_count(b) > 0,
-            "rank": lambda b: -_rating_count(b),
-            "value": _rating_count,
-        },
-    ]
-
-
-def _featured_books(books_list: list[dict], days_spent) -> list[dict]:
-    """Pick one book per category, deduped."""
-    claimed: set[str] = set()
-    cards: list[dict] = []
-    for spec in _featured_specs(days_spent):
-        pool = [
-            b for b in books_list
-            if str(b.get("id")) not in claimed and spec["eligible"](b)
-        ]
-        if not pool:
+    A union rather than a sum of per-book spans: two books read side by side
+    over the same fortnight is a fortnight of reading, not a month of it.
+    """
+    days: set[date] = set()
+    for book in books_list:
+        span = _span(book)
+        if not span:
             continue
-        winner = max(pool, key=spec["rank"])
-        claimed.add(str(winner.get("id")))
-        cards.append({
-            "key": spec["key"],
-            "label": spec["label"],
-            "value": spec["value"](winner),
-            "unit": spec["unit"],
-            "book": winner,
-        })
-    return cards
+        day, finish = span
+        while day <= finish:
+            days.add(day)
+            day += timedelta(days=1)
+    return len(days)
+
+
+def _months(books_list: list[dict]) -> list[int]:
+    """Books finished per calendar month, January first.
+
+    Always twelve entries — the chart draws a full year, so an empty month is a
+    zero-height bar rather than a missing column.
+    """
+    counts = [0] * 12
+    for book in books_list:
+        if finish := parse_iso_date(book.get("reading_finish_date")):
+            counts[finish.month - 1] += 1
+    return counts
 
 
 def create_router(root: Path, repo: DataRepository) -> APIRouter:
@@ -115,10 +66,7 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
         }
 
     @router.get("/stats")
-    def get_stats(
-        year: int | None = Query(default=None, ge=1900, le=3000),
-        month: int | None = Query(default=None, ge=1, le=12),
-    ) -> dict:
+    def get_stats(year: int | None = Query(default=None, ge=1900, le=3000)) -> dict:
         books = repo.list_book_states()
 
         available_years = {
@@ -133,7 +81,6 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
             if str(row.get("status") or "").strip().lower() == "done"
             and (fd := parse_iso_date(row.get("finish_date")))
             and (year is None or fd.year == year)
-            and (month is None or fd.month == month)
         }
 
         books_list: list[dict] = []
@@ -143,34 +90,19 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
             books_list.append(book)
             genres.update(book.get("genres", []))
 
-        books_list.sort(key=lambda b: (str(b.get("reading_finish_date") or ""), str(b.get("title") or "")), reverse=True)
-
-        def _days_spent(b: dict) -> int:
-            s = parse_iso_date(b.get("reading_start_date"))
-            f = parse_iso_date(b.get("reading_finish_date"))
-            return max(1, (f - s).days + 1) if s and f and f >= s else 0
-
-        longest = max(books_list, key=_days_spent, default=None)
-
-        featured = _featured_books(books_list, _days_spent)
+        # Oldest first, so the covers read left to right the way the year did.
+        books_list.sort(key=lambda b: (str(b.get("reading_finish_date") or ""), str(b.get("title") or "")))
 
         return {
             "year": year,
-            "month": month,
             "available_years": sorted(available_years, reverse=True),
             "books_read": len(books_list),
             "pages_read": sum(_pages(b) for b in books_list),
             "genres_covered": len(genres),
             "genre_list": sorted(genres),
-            "most_time_spent_days": _days_spent(longest) if longest else 0,
-            "featured": featured,
+            "days_reading": _days_reading(books_list),
+            "months": _months(books_list),
+            "books": books_list,
         }
-
-    @router.get("/stats/heatmap")
-    def get_heatmap(year: int = Query(..., ge=1900, le=3000)) -> dict:
-        """Per-day page totals for the heatmap."""
-        start, last = heatmap.year_window(year)
-        rows = repo.reading_days(start.isoformat(), last.isoformat())
-        return {**heatmap.build(rows, start=start, end=last), "year": year}
 
     return router

@@ -1,86 +1,84 @@
-import AccordionFilter from '../components/AccordionFilter.jsx'
-import ReadingHeatmap from '../components/ReadingHeatmap.jsx'
-import StatsCarousel from '../components/StatsCarousel.jsx'
-import { monthOptions } from '../constants.js'
-import { formatCompactNumber } from '../utils.js'
-import useHeatmap from '../hooks/useHeatmap.js'
+import { useMemo } from 'react'
+import BookCard from '../components/BookCard.jsx'
+import StatsBarChart from '../components/StatsBarChart.jsx'
+import StatsYearSelect from '../components/StatsYearSelect.jsx'
+import { formatCompactNumber, normaliseBook } from '../utils.js'
 import useStats from '../hooks/useStats.js'
 
 function StatsView() {
-  const { summary, loading, error, year, month, setYear, setMonth } = useStats()
-  const years = summary?.available_years || []
-  const hasBooks = (summary?.books_read || 0) > 0
+  const { summary, loading, error, year, setYear } = useStats()
+  const books = useMemo(() => (summary?.books || []).map(normaliseBook), [summary])
 
-  // The grid is a calendar year, so "All years" has to resolve to one: the most
-  // recent year with finished books, falling back to the current one. The month
-  // filter is deliberately ignored — a single month is not a heatmap.
-  const heatmapYear = Number(year) || years[0] || new Date().getFullYear()
-  const { heatmap } = useHeatmap(hasBooks ? heatmapYear : null)
+  if (loading && !summary) {
+    return <div className="emptyState"><p>Loading stats…</p></div>
+  }
+
+  if (error) {
+    return <div className="emptyState"><h2>Could not load stats</h2><p>{error}</p></div>
+  }
+
+  const years = summary?.available_years || []
+
+  if (!summary || years.length === 0) {
+    return (
+      <div className="emptyState statsEmptyState">
+        <h2>No finished books yet</h2>
+        <p>Finish a book in Obsidian or in the finished books store to see stats here.</p>
+      </div>
+    )
+  }
+
+  // The chart is a calendar year of months either way; over all time it stacks
+  // every January together, so the subtitle has to say which reading it is.
+  const scope = year || 'all time'
+
+  const tiles = [
+    { value: String(summary.books_read), label: 'books read' },
+    { value: formatCompactNumber(summary.pages_read), label: 'pages read' },
+    { value: String(summary.genres_covered), label: 'genres covered' },
+    { value: String(summary.days_reading), label: 'days reading' },
+  ]
 
   return (
     <div className="stack statsPage">
-      <div className="statsFilters">
-        <AccordionFilter
-          label="Year"
-          value={year}
-          emptyLabel="All years"
-          options={years.map((value) => ({ value: String(value), label: String(value) }))}
-          onChange={setYear}
-        />
-        <AccordionFilter
-          label="Month"
-          value={month}
-          emptyLabel="All months"
-          options={monthOptions}
-          onChange={setMonth}
-        />
-      </div>
+      <section className="statTiles" aria-label={`Totals for ${scope}`}>
+        {tiles.map((tile) => (
+          <div className="statTile" key={tile.label}>
+            <strong>{tile.value}</strong>
+            <span>{tile.label}</span>
+          </div>
+        ))}
+      </section>
 
-      {loading ? (
-        <div className="emptyState">
-          <p>Loading stats...</p>
-        </div>
-      ) : error ? (
-        <div className="emptyState">
-          <h2>Could not load stats</h2>
-          <p>{error}</p>
-        </div>
-      ) : summary && hasBooks ? (
-        <>
-          <section className="heroCard statsHeroCard">
-            <div className="statsHeroCopy">
-              <h2>Reading at a glance</h2>
-              <p>Minimal stats pulled from your finished books and Obsidian snapshot.</p>
-            </div>
-            <div className="statsSummary">
-              <div className="statsMetric">
-                <strong>{summary.books_read}</strong>
-                <span>Books read</span>
-              </div>
-              <div className="statsMetric">
-                <strong>{formatCompactNumber(summary.pages_read)}</strong>
-                <span>Pages read</span>
-              </div>
-              <div className="statsMetric">
-                <strong>{summary.genres_covered}</strong>
-                <span>Genres covered</span>
-              </div>
-            </div>
-            <div className="statsMetaRow">
-              <span>{summary.most_time_spent_days ? `${summary.most_time_spent_days} days longest read` : 'No long reads tracked yet'}</span>
-              {summary.genre_list?.length > 0 ? <span>{summary.genre_list.slice(0, 4).join(' · ')}</span> : null}
-            </div>
-          </section>
+      <section className="statsSection">
+        <header className="statsSectionHeader">
+          <div>
+            <h2>Reading by year</h2>
+            <p>
+              {year
+                ? 'Your reading activity, month by month.'
+                : 'Every year you have read, stacked month by month.'}
+            </p>
+          </div>
+          <StatsYearSelect value={year} years={years} onChange={setYear} />
+        </header>
+        <StatsBarChart months={summary.months} label={scope} />
+      </section>
 
-          {heatmap && <ReadingHeatmap data={heatmap} year={heatmapYear} />}
-
-          <StatsCarousel featured={summary.featured || []} />
-        </>
-      ) : (
-        <div className="emptyState statsEmptyState">
-          <h2>No finished books yet</h2>
-          <p>Finish a book in Obsidian or in the finished books store to see stats here.</p>
-        </div>
+      {books.length > 0 && (
+        <section className="statsSection">
+          <header className="statsSectionHeader">
+            <div>
+              <h2>Books read</h2>
+              <p>{year ? "All the books you've read this year." : "All the books you've ever read."}</p>
+            </div>
+          </header>
+          <div className="statsBookScroll" tabIndex={0} role="group" aria-label="Books read">
+            {books.map((book) => (
+              <BookCard key={book.id} book={book} />
+            ))}
+          </div>
+        </section>
       )}
     </div>
   )

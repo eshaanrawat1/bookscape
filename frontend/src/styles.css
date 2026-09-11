@@ -29,11 +29,6 @@
   --status-not-started: oklch(0.69 0.05 85);
   --status-finished: #7dbf85;
   --status-dnf: oklch(0.66 0.07 20);
-  --heat-0: #dfdeda;
-  --heat-1: #fbd59b;
-  --heat-2: #ddb571;
-  --heat-3: #b78137;
-  --heat-4: #6b4719;
   --shadow-tint: 60, 40, 20;
   --shadow-warm: 0 14px 30px -12px rgba(var(--shadow-tint), 0.55);
   --shadow-panel: 0 18px 40px -20px rgba(var(--shadow-tint), 0.5);
@@ -90,8 +85,7 @@ svg {
    "Show scroll bars: Always" is set in System Settings. */
 .shelfScroll,
 .dialogSimilarScroll,
-.statsFocusScroll,
-.heatmapScroll,
+.statsBookScroll,
 .goalSlots {
   overscroll-behavior-x: contain;
   scrollbar-width: none;
@@ -99,8 +93,7 @@ svg {
 
 .shelfScroll::-webkit-scrollbar,
 .dialogSimilarScroll::-webkit-scrollbar,
-.statsFocusScroll::-webkit-scrollbar,
-.heatmapScroll::-webkit-scrollbar,
+.statsBookScroll::-webkit-scrollbar,
 .goalSlots::-webkit-scrollbar {
   display: none;
 }
@@ -775,7 +768,6 @@ svg {
   gap: 2.2rem;
 }
 
-.carouselButton:hover,
 .dialogIconButton:hover:not(:disabled) {
   background: var(--secondary);
   transform: translateY(-1px);
@@ -1035,37 +1027,6 @@ svg {
 .dialogIconButton.dialogClose svg {
   width: 1.2rem;
   height: 1.2rem;
-}
-
-/* ========================================================================== */
-/* Reading Now / Hero                                                       */
-/* ========================================================================== */
-
-.heroCard {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 3.1rem;
-  background-color: var(--card);
-  padding: 3.4rem;
-}
-
-.carouselButton {
-  display: grid;
-  width: 2.8rem;
-  height: 2.8rem;
-  place-items: center;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--card);
-  color: var(--foreground);
-  cursor: pointer;
-  transition: background 160ms ease, transform 160ms ease;
-}
-
-.carouselButton svg {
-  width: 1.4rem;
-  height: 1.4rem;
 }
 
 /* ========================================================================== */
@@ -3018,136 +2979,152 @@ svg {
 /* ========================================================================== */
 
 .statsPage {
-  gap: 1.7rem;
+  gap: 3.2rem;
 }
 
-.statsHeroCard {
-  position: relative;
-  overflow: hidden;
+/* Summary tiles ------------------------------------------------------------- */
+
+.statTiles {
   display: grid;
-  gap: 1.6rem;
-  align-items: start;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.5rem;
 }
 
-.statsHeroCopy {
-  position: relative;
+.statTile {
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
+  gap: 0.6rem;
+  justify-content: center;
+  /* Squarer than the content needs: the four tiles are the page's opening
+     gesture, and a tight band of them reads as a toolbar rather than a summary.
+     min-height rather than aspect-ratio so the row keeps its footing when a
+     label wraps at the narrow breakpoints. */
+  min-height: 9.5rem;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 1.6rem;
+  background: var(--card);
+  padding: 2rem 2.1rem;
 }
 
-.statsHeroCopy h2 {
-  margin: 0;
+.statTile strong {
   font-family: var(--font-serif);
-  font-size: clamp(2.4rem, 3.8vw, 3.5rem);
+  font-size: 3.6rem;
   font-weight: 500;
   letter-spacing: -0.02em;
-  line-height: 1.05;
+  line-height: 1;
   color: var(--foreground);
 }
 
-.statsHeroCopy p {
-  margin: 0;
-  max-width: 42rem;
+.statTile span {
   color: var(--muted-foreground);
-  font-size: 1.18rem;
-  line-height: 1.55;
+  font-size: 1.08rem;
+  letter-spacing: 0.005em;
 }
 
-.statsFilters {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-}
+/* Section headers ----------------------------------------------------------- */
 
-.statsFilter,
-.searchHeader {
+.statsSection {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 1.5rem;
+  min-width: 0;
 }
 
-.statsFilter span {
-  color: var(--muted-foreground);
-  font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.statsFilterAccordion {
-  position: relative;
-  border: 1px solid var(--border);
-  border-radius: 1.2rem;
-  background: color-mix(in oklch, var(--card) 94%, white);
-  padding: 1rem;
-  box-shadow: 0 10px 20px -18px rgba(var(--shadow-tint), 0.28);
-}
-
-.statsFilterTrigger {
+.statsSectionHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  width: 100%;
-  min-height: 3.4rem;
-  border: 0;
-  border-radius: 0.95rem;
-  background: color-mix(in oklch, var(--secondary) 68%, white);
+  gap: 1.5rem;
+}
+
+.statsSectionHeader h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 2rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  /* Body's 1.5 leaves close to a rem of leading under a 2rem line, which reads
+     as a gap between the title and its subtitle rather than as part of either. */
+  line-height: 1.15;
   color: var(--foreground);
-  padding: 0.85rem 1rem;
-  cursor: pointer;
-  text-align: left;
 }
 
-.statsFilterTrigger strong {
+.statsSectionHeader p {
+  margin: 0.35rem 0 0;
+  color: var(--muted-foreground);
   font-size: 1.08rem;
-  font-weight: 600;
+  letter-spacing: 0.005em;
 }
 
-.statsFilterTrigger:focus-visible,
-.searchClearButton:focus-visible {
+/* Year picker --------------------------------------------------------------- */
+
+.yearSelect {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.yearSelectTrigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.2rem;
+  min-width: 8.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: var(--card);
+  color: var(--foreground);
+  padding: 0.75rem 1rem;
+  font-size: 1.08rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.yearSelectTrigger:hover {
+  border-color: color-mix(in oklch, var(--foreground) 22%, transparent);
+}
+
+.yearSelectTrigger:focus-visible {
   outline: 0;
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 18%, transparent);
 }
 
-.statsFilterChevron {
+.yearSelectChevron {
   width: 1.25rem;
   height: 1.25rem;
-  flex: 0 0 auto;
+  color: var(--muted-foreground);
   transition: transform 160ms ease;
 }
 
-.statsFilterAccordion.isOpen .statsFilterChevron {
-  transform: rotate(90deg);
+.yearSelect.isOpen .yearSelectChevron {
+  transform: rotate(180deg);
 }
 
-.statsFilterPanel {
+.yearSelectPanel {
   position: absolute;
-  inset-inline: 0;
-  top: calc(100% + 0.6rem);
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 30;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0.45rem;
-  min-width: 18rem;
+  gap: 0.2rem;
+  min-width: 100%;
   max-height: min(26rem, calc(100vh - 18rem));
-  overflow: hidden;
   overflow-y: auto;
   opacity: 0;
   pointer-events: none;
   visibility: hidden;
   transform: translateY(-0.35rem) scale(0.985);
-  transform-origin: top center;
+  transform-origin: top right;
   border: 1px solid var(--border);
   border-radius: 1rem;
-  background: color-mix(in oklch, var(--card) 96%, white);
-  padding: 0.65rem;
+  background: var(--card);
+  padding: 0.5rem;
   box-shadow: 0 22px 40px -22px rgba(var(--shadow-tint), 0.45);
   transition: opacity 160ms ease, transform 160ms ease, visibility 0s linear 160ms;
-  z-index: 30;
 }
 
-.statsFilterAccordion.isOpen .statsFilterPanel {
+.yearSelect.isOpen .yearSelectPanel {
   opacity: 1;
   pointer-events: auto;
   visibility: visible;
@@ -3155,413 +3132,176 @@ svg {
   transition: opacity 160ms ease, transform 160ms ease, visibility 0s;
 }
 
-.statsFilterOption {
-  border: 1px solid transparent;
-  border-radius: 0.9rem;
-  background: color-mix(in oklch, var(--background) 80%, white);
-  color: var(--foreground);
-  padding: 0.75rem 0.9rem;
-  cursor: pointer;
-  text-align: left;
-  transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
-}
-
-.statsFilterOption:hover {
-  background: color-mix(in oklch, var(--secondary) 74%, white);
-  transform: translateY(-1px);
-}
-
-.statsFilterOption.active {
-  border-color: color-mix(in oklch, var(--primary) 38%, transparent);
-  background: color-mix(in oklch, var(--accent) 72%, white);
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent);
-}
-
-.statsSummary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
-  min-width: 0;
-}
-
-.statsMetric,
-.statsFocusCard {
-  border: 1px solid var(--border);
-  border-radius: 1.6rem;
-  background: color-mix(in oklch, var(--card) 92%, white);
-}
-
-.statsMetric {
-  padding: 1.15rem 1.2rem;
-}
-
-.statsMetric strong {
-  display: block;
-  font-family: var(--font-serif);
-  font-size: clamp(2.1rem, 3vw, 3rem);
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  line-height: 1;
-  color: var(--foreground);
-}
-
-.statsMetric span {
-  display: block;
-  margin-top: 0.35rem;
-  color: var(--muted-foreground);
-  font-size: 1.02rem;
-}
-
-.statsMetaRow {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 0.75rem;
-  color: var(--muted-foreground);
-  font-size: 1.05rem;
-}
-
-/* In focus carousel --------------------------------------------------------- */
-
-.statsFocus {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-  min-width: 0;
-}
-
-.statsFocusHeader,
-.shelfHeader {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.statsFocusHeader h2 {
-  margin: 0;
-  font-family: var(--font-serif);
-  font-size: 1.8rem;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
-}
-
-.statsFocusControls {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.statsFocusControls .carouselButton {
-  width: 2.4rem;
-  height: 2.4rem;
-}
-
-.statsFocusControls .carouselButton:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.statsFocusScroll {
-  /* Cards are sized off the visible row rather than a fixed width so exactly
-     this many sit across it, with the rest scrolling. Stepped down at the
-     narrow breakpoints below. */
-  --focus-cards: 3;
-  display: flex;
-  gap: 1.4rem;
-  overflow-x: auto;
-  /* The cards carry a shadow and a focus ring, so the padding is what keeps
-     both from being clipped by the scroll container's own bounds. */
-  padding: 0.3rem 0.2rem 1.1rem;
-  scroll-snap-type: x mandatory;
-}
-
-.statsFocusScroll:focus-visible {
-  outline: 2px solid var(--ring, var(--border));
-  outline-offset: 4px;
-  border-radius: 1.6rem;
-}
-
-.statsFocusCard {
-  flex: 0 0 calc((100% - (var(--focus-cards) - 1) * 1.4rem) / var(--focus-cards));
-  /* Covers are 2:3, so an uncapped card on a single-up phone layout would be
-     taller than the viewport. */
-  max-width: 26rem;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-  padding: 0.9rem;
-  scroll-snap-align: start;
-  transition: transform 160ms ease, border-color 160ms ease;
-}
-
-.statsFocusCard:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in oklch, var(--foreground) 22%, transparent);
-}
-
-.statsFocusCover {
+.yearSelectOption {
   border: 0;
-  padding: 0;
+  border-radius: 0.7rem;
   background: transparent;
+  color: var(--foreground);
+  padding: 0.6rem 0.9rem;
+  font-size: 1.08rem;
+  text-align: left;
   cursor: pointer;
+  transition: background 150ms ease;
 }
 
-.statsFocusBody {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+.yearSelectOption:hover {
+  background: var(--secondary);
 }
 
-.statsFocusLabel {
-  margin: 0;
-  color: var(--muted-foreground);
-  font-size: 0.78rem;
+.yearSelectOption.active {
+  background: var(--accent);
+  color: var(--accent-foreground);
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
-.statsFocusValue {
-  display: block;
-  margin-top: 0.4rem;
-  font-family: var(--font-serif);
-  font-size: 2.4rem;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  line-height: 1;
-  color: var(--foreground);
+/* Reading by year chart ----------------------------------------------------- */
+
+.barChart {
+  /* The axis column is sized here rather than by content so the gridlines and
+     the month labels below them share one left edge whatever the tick digits
+     come out to. */
+  --chart-axis: 3.2rem;
+  --chart-height: 13rem;
+  --chart-bar: 1.15rem;
+  display: grid;
+  grid-template-columns: var(--chart-axis) minmax(0, 1fr);
+  grid-template-rows: var(--chart-height) auto;
+  gap: 0 1rem;
+  /* No card around the plot: the gridlines already bound it, and a border here
+     would be a second frame drawn just inside the section's own whitespace. */
+  margin: 0;
+  padding: 0.5rem 0 0;
 }
 
-.statsFocusUnit {
-  margin: 0.3rem 0 0;
-  color: var(--muted-foreground);
-  font-size: 0.98rem;
-  line-height: 1.3;
+.barChartTicks {
+  position: relative;
 }
 
-.statsFocusTitle,
-.statsFocusAuthor {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.statsFocusTitle {
-  margin-top: 0.7rem;
-  color: var(--foreground);
-  font-size: 1.02rem;
-  font-weight: 500;
-}
-
-.statsFocusAuthor {
-  margin-top: 0.15rem;
+.barChartTicks span {
+  position: absolute;
+  right: 0;
+  transform: translateY(50%);
   color: var(--muted-foreground);
   font-size: 0.95rem;
-}
-
-.statsFocusTitle:hover,
-.statsFocusAuthor:not(:disabled):hover {
-  text-decoration: underline;
-}
-
-.statsFocusAuthor:disabled {
-  cursor: default;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .statsFocusCard {
-    transition: none;
-  }
-
-  .statsFocusCard:hover {
-    transform: none;
-  }
-}
-
-/* Reading heatmap ------------------------------------------------------------ */
-
-.statsHeatmap {
-  /* 53 weeks at 1rem + 0.22rem gap is ~710px, which clears the 787px content
-     column — so the grid fills the card without scrolling at full width, and
-     .heatmapScroll catches the narrow breakpoints. */
-  --heatmap-cell: 1rem;
-  --heatmap-gap: 0.22rem;
-  /* Containing block for .heatmapTooltip. */
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-  padding: 1.3rem 1.4rem 1.15rem;
-  border: 1px solid var(--border);
-  border-radius: 1.6rem;
-  background: color-mix(in oklch, var(--card) 92%, white);
-}
-
-.heatmapHeader {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  padding-bottom: 0.9rem;
-  border-bottom: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
-}
-
-.heatmapHeader h2 {
-  margin: 0;
-  font-family: var(--font-serif);
-  font-size: 1.8rem;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
-}
-
-.heatmapHeader p {
-  margin: 0;
-  color: var(--muted-foreground);
-  font-size: 1.02rem;
-  white-space: nowrap;
-}
-
-/* The grid is the one thing here allowed to scroll: a year of weeks has a floor
-   width, and squeezing the cells to fit would break the square marks. */
-.heatmapScroll {
-  overflow-x: auto;
-  padding-bottom: 0.2rem;
-}
-
-.heatmapGrid {
-  display: grid;
-  grid-template-columns: auto min-content;
-  grid-template-rows: auto auto;
-  column-gap: 0.55rem;
-  row-gap: 0.45rem;
-}
-
-.heatmapMonths,
-.heatmapWeekdays,
-.heatmapCells {
-  gap: var(--heatmap-gap);
-}
-
-.heatmapMonths {
-  grid-area: 1 / 2;
-  display: grid;
-  grid-template-columns: repeat(var(--heatmap-weeks), var(--heatmap-cell));
-}
-
-.heatmapMonths span {
-  grid-row: 1;
-  white-space: nowrap;
-  color: var(--muted-foreground);
-  font-size: 0.86rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.heatmapWeekdays {
-  grid-area: 2 / 1;
-  display: grid;
-  grid-template-rows: repeat(7, var(--heatmap-cell));
-  align-items: center;
-  justify-items: end;
-  color: var(--muted-foreground);
-  font-size: 0.86rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
-/* Column-flow over seven fixed rows is what makes a week a column. The backend
-   aligns start to a Sunday, so cell 0 lands on the Sunday row and the weekday
-   gutter stays true for the whole year. */
-.heatmapCells {
-  grid-area: 2 / 2;
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(7, var(--heatmap-cell));
-  grid-auto-columns: var(--heatmap-cell);
+.barChartPlot {
+  position: relative;
 }
 
-.heatmapCell {
-  border-radius: 0.3rem;
-  background: var(--heat-0);
-}
-
-.heatmapCell[data-level='1'] { background: var(--heat-1); }
-.heatmapCell[data-level='2'] { background: var(--heat-2); }
-.heatmapCell[data-level='3'] { background: var(--heat-3); }
-.heatmapCell[data-level='4'] { background: var(--heat-4); }
-
-/* Padding days from the neighbouring years hold their column without drawing a
-   cell, so the first and last weeks stay full-height without lying about dates. */
-.heatmapPad {
-  background: none;
-}
-
-.heatmapCells .heatmapCell:hover {
-  outline: 1.5px solid color-mix(in oklch, var(--foreground) 55%, transparent);
-  outline-offset: 1px;
-}
-
-/* Sits above the hovered cell, centred on it. pointer-events: none keeps it from
-   stealing the mouseover that positioned it, which would flicker it away. */
-.heatmapTooltip {
+/* Recessive on purpose: the grid is there to let you read a bar off the axis,
+   not to be read itself. */
+.barChartGridline {
   position: absolute;
-  z-index: 4;
-  transform: translate(-50%, calc(-100% - 0.45rem));
+  inset-inline: 0;
+  height: 1px;
+  background: color-mix(in oklch, var(--border) 70%, transparent);
+}
+
+.barChartBars {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: end;
+}
+
+.barChartColumn {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  padding: 0.4rem 0.65rem 0.45rem;
-  border: 1px solid var(--border);
-  border-radius: 0.7rem;
-  background: var(--card);
-  box-shadow: var(--shadow-warm);
-  white-space: nowrap;
+  height: 100%;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.barChartBar {
+  position: relative;
+  width: var(--chart-bar);
+  height: var(--bar-height);
+  border-radius: 0.4rem 0.4rem 0 0;
+  background: color-mix(in oklch, var(--primary) 62%, var(--ember-soft));
+  transition: background 160ms ease;
+}
+
+.barChartColumn:hover .barChartBar {
+  background: var(--primary);
+}
+
+.barChartTip {
+  position: absolute;
+  bottom: calc(100% + 0.6rem);
+  left: 50%;
+  z-index: 10;
+  transform: translateX(-50%);
+  opacity: 0;
   pointer-events: none;
+  white-space: nowrap;
+  border-radius: 0.7rem;
+  background: var(--foreground);
+  color: var(--card);
+  padding: 0.45rem 0.7rem;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  box-shadow: 0 12px 24px -14px rgba(var(--shadow-tint), 0.6);
+  transition: opacity 140ms ease;
 }
 
-.heatmapTooltip strong {
-  font-size: 1rem;
+.barChartColumn:hover .barChartTip {
+  opacity: 1;
+}
+
+.barChartMonths {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  padding-top: 0.9rem;
+}
+
+.barChartMonths span {
+  color: var(--muted-foreground);
+  font-size: 0.88rem;
   font-weight: 600;
-  line-height: 1.2;
+  letter-spacing: 0.1em;
+  text-align: center;
+  text-transform: uppercase;
 }
 
-.heatmapTooltip span {
-  color: var(--muted-foreground);
-  font-size: 0.86rem;
-  line-height: 1.2;
-}
+/* Books read row ------------------------------------------------------------ */
 
-.heatmapLegend {
+.statsBookScroll {
   display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  color: var(--muted-foreground);
-  font-size: 1rem;
+  gap: 1.6rem;
+  overflow-x: auto;
+  /* The covers lift on hover, so the padding is what keeps the top of the card
+     and its focus ring from being clipped by the scroller's own bounds. */
+  padding: 0.4rem 0.1rem 0.6rem;
+  scroll-snap-type: x proximity;
 }
 
-.heatmapLegendScale {
-  display: flex;
-  gap: var(--heatmap-gap);
+.statsBookScroll:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+  border-radius: 1.4rem;
 }
 
-.heatmapLegendScale .heatmapCell {
-  width: var(--heatmap-cell);
-  height: var(--heatmap-cell);
+.statsBookScroll .bookCard {
+  flex: 0 0 11.5rem;
+  width: 11.5rem;
+  scroll-snap-align: start;
 }
 
 .statsEmptyState {
   padding-top: 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barChartBar,
+  .barChartTip,
+  .yearSelectChevron {
+    transition: none;
+  }
 }
 
 /* ========================================================================== */
@@ -4823,11 +4563,6 @@ svg {
     font-size: 1rem;
   }
 
-  .heroCard {
-    border-radius: 2rem;
-    padding: 2.1rem;
-  }
-
   .dialogTop,
   .goalTop {
     grid-template-columns: 1fr;
@@ -4851,16 +4586,8 @@ svg {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .statsFilters {
-    grid-template-columns: 1fr;
-  }
-
-  .statsFilterPanel {
-    min-width: 0;
-  }
-
-  .statsSummary {
-    grid-template-columns: 1fr;
+  .statTiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -4902,23 +4629,47 @@ svg {
     gap: 2rem 1.2rem;
   }
 
-  .statsFilter {
-    flex-basis: 100%;
+  .statsPage {
+    gap: 2.4rem;
   }
 
-  .statsFocusHeader {
+  .statTile {
+    min-height: 7.5rem;
+    padding: 1.5rem 1.6rem;
+  }
+
+  .statTile strong {
+    font-size: 2.6rem;
+  }
+
+  /* The arrows and the year picker drop under their heading rather than squeeze
+     it, so a two-line subtitle still gets the full width. */
+  .statsSectionHeader {
     align-items: start;
     flex-direction: column;
+    gap: 1rem;
   }
 
-  /* A fractional count leaves the next card peeking, so the row still reads as
-     scrollable once the arrows drop below the heading here. */
-  .statsFocusScroll {
-    --focus-cards: 1.25;
+  /* Twelve uppercase labels is what runs out of room first, so the axis gutter,
+     the bars and the tracking all give some back before the row wraps. */
+  .barChart {
+    --chart-axis: 2.4rem;
+    --chart-height: 11rem;
+    --chart-bar: 0.9rem;
   }
 
-  .statsHeroCopy h2 {
-    font-size: 2.1rem;
+  .barChartMonths span {
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+  }
+
+  .statsBookScroll {
+    gap: 1.2rem;
+  }
+
+  .statsBookScroll .bookCard {
+    flex: 0 0 10rem;
+    width: 10rem;
   }
 
   .shelfScroll {

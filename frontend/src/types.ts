@@ -135,50 +135,22 @@ export interface RawGenreSection {
   books: RawBookPayload[]
 }
 
-// One carousel card: a superlative, the number that earned it, and the book that
-// won. The backend picks these and never repeats a book across cards, so the
-// list is already display-ready and can be shorter than the six specs.
+// `books` are raw payloads like every other endpoint's, not Books: the view runs
+// them through normaliseBook() so this page builds a book exactly the way the
+// rest of the app does, rather than trusting a second hand-rolled shape.
 //
-// `book` is a raw payload like every other endpoint's, not a Book: the card runs
-// it through normaliseBook() so this page builds a book exactly the way the rest
-// of the app does, rather than trusting a second hand-rolled shape.
-export interface FeaturedStat {
-  key: string
-  label: string
-  value: number
-  unit: string
-  book: RawBookPayload
-}
-
+// `months` is always twelve entries, January first — the chart draws a full year,
+// so a month with nothing finished is a zero-height bar, not a missing column.
 export interface StatsSummary {
+  year: number | null
   available_years: number[]
   books_read: number
   pages_read: number
   genres_covered: number
   genre_list: string[]
-  most_time_spent_days: number
-  featured: FeaturedStat[]
-}
-
-export interface HeatmapDay {
-  date: string
-  pages: number
-  books: number
-  level: number
-}
-
-// Only days with reading are listed — the grid's empty cells are filled in from
-// start/end, so a year does not ship ~370 mostly-zero objects.
-export interface ReadingHeatmap {
-  start: string
-  end: string
-  year: number | null
-  days: HeatmapDay[]
-  levels: number
-  total_pages: number
-  days_read: number
-  best_day: HeatmapDay | null
-  streak: { longest: number }
+  days_reading: number
+  months: number[]
+  books: RawBookPayload[]
 }
 
 // One series you have started and not finished, as /series-progress reports it.

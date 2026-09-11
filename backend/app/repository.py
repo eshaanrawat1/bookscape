@@ -211,30 +211,6 @@ class DataRepository:
         if remainder > 0:
             self._add_reading_day(conn, uid, target, remainder, total, source="finish")
 
-    def reading_days(self, start: str, end: str) -> list[dict]:
-        """Daily page totals across the inclusive range, omitting empty days.
-
-        Non-positive nets are filtered rather than clamped to zero, which keeps
-        the book count honest too: a day whose only movement was a restart is
-        not "a day you read one book".
-        """
-        with transaction(self.root) as conn:
-            rows = conn.execute(
-                "SELECT day, SUM(pages) AS pages, COUNT(*) AS books "
-                "FROM reading_days "
-                "WHERE pages > 0 AND day BETWEEN ? AND ? "
-                "GROUP BY day ORDER BY day",
-                (start, end),
-            ).fetchall()
-        return [
-            {
-                "date": row["day"],
-                "pages": int(row["pages"] or 0),
-                "books": int(row["books"] or 0),
-            }
-            for row in rows
-        ]
-
     def books_with_reading_days(self) -> set[str]:
         """Uids that already have day history — the backfill's skip list."""
         with transaction(self.root) as conn:

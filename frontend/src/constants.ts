@@ -11,16 +11,11 @@ interface NavItem {
   icon: LucideIcon
 }
 
-interface SelectOption {
-  value: string
-  label: string
-}
-
 const viewMeta: Record<string, ViewMetaEntry> = {
   'reading-now': { title: 'Reading Now', subtitle: 'Pick up where you left off.' },
   library: { title: 'Library', subtitle: 'Everything on your shelves.' },
   search: { title: 'Search', subtitle: 'Find a book by title or author.' },
-  stats: { title: 'Statistics', subtitle: 'A quick read on your finished books.' },
+  stats: { title: 'Statistics', subtitle: 'A quick look at your reading journey.' },
   highlights: { title: 'Highlights', subtitle: 'Passages worth keeping.' },
   'want-to-read': { title: 'Want to Read', subtitle: 'Saved for the right moment.' },
   finished: { title: 'Finished', subtitle: "Books you've loved and closed." },
@@ -48,9 +43,7 @@ function shortcutLabel(key: string): string {
   return isMac ? `⌘${key}` : `Ctrl+${key}`
 }
 
-// ⌘1–⌘7 follow the sidebar top to bottom, so the numbering and the hints
-// rendered next to each row stay in sync with whatever order these two lists
-// happen to be in.
+// ⌘1–⌘7 follow the sidebar top to bottom
 const navOrder: string[] = [...mainNav, ...shelfNav].map((item) => item.id)
 
 function navShortcut(viewId: string): string | null {
@@ -62,19 +55,12 @@ function navShortcut(viewId: string): string | null {
   return shortcutLabel(String(index + 1))
 }
 
-const monthOptions: SelectOption[] = [
-  { value: '1', label: 'January' },
-  { value: '2', label: 'February' },
-  { value: '3', label: 'March' },
-  { value: '4', label: 'April' },
-  { value: '5', label: 'May' },
-  { value: '6', label: 'June' },
-  { value: '7', label: 'July' },
-  { value: '8', label: 'August' },
-  { value: '9', label: 'September' },
-  { value: '10', label: 'October' },
-  { value: '11', label: 'November' },
-  { value: '12', label: 'December' },
+// January first, matching the order the stats endpoint returns its month counts
+// in. Short here and uppercased in CSS, so the twelve axis labels fit the chart
+// without rotating or dropping every other one.
+const monthLabels: string[] = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ]
 
-export { viewMeta, mainNav, shelfNav, monthOptions, isMac, shortcutLabel, navOrder, navShortcut }
+export { viewMeta, mainNav, shelfNav, monthLabels, isMac, shortcutLabel, navOrder, navShortcut }
