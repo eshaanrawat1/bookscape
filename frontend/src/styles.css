@@ -1389,6 +1389,16 @@ svg {
   gap: 0.9rem;
 }
 
+/* Baseline-ish alignment rather than centre: "See all" should sit level with
+   the heading's foot, not float against a heading that is two lines taller than
+   it. */
+.shelfHeader {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .shelfHeader h2 {
   font-family: var(--font-serif);
   font-weight: 500;
@@ -3317,6 +3327,12 @@ svg {
 /* Search                                                                   */
 /* ========================================================================== */
 
+.searchHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
 .searchLanding {
   display: flex;
   flex-direction: column;
@@ -3393,6 +3409,11 @@ svg {
 .searchClearButton:hover {
   color: var(--primary);
   transform: translateY(-1px);
+}
+
+.searchClearButton:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 18%, transparent);
 }
 
 .searchClearButton svg {
