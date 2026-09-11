@@ -2987,39 +2987,42 @@ svg {
 .statTiles {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1.5rem;
+  gap: 2rem;
 }
 
 .statTile {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 1rem;
+  align-items: center;
   justify-content: center;
-  /* Squarer than the content needs: the four tiles are the page's opening
-     gesture, and a tight band of them reads as a toolbar rather than a summary.
-     min-height rather than aspect-ratio so the row keeps its footing when a
-     label wraps at the narrow breakpoints. */
-  min-height: 9.5rem;
+  /* Near-square, and driven by the column width so the four stay in proportion
+     at every breakpoint. Height stays auto, so the ratio is a floor: a label
+     that wraps on a narrow screen pushes the tile taller rather than spilling
+     out of it. */
+  aspect-ratio: 7 / 5;
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: 1.6rem;
   background: var(--card);
-  padding: 2rem 2.1rem;
+  padding: 1.6rem;
+  text-align: center;
 }
 
 .statTile strong {
   font-family: var(--font-serif);
-  font-size: 3.6rem;
+  font-size: 3.8rem;
   font-weight: 500;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   line-height: 1;
   color: var(--foreground);
 }
 
 .statTile span {
   color: var(--muted-foreground);
-  font-size: 1.08rem;
+  font-size: 1.25rem;
   letter-spacing: 0.005em;
+  line-height: 1.25;
 }
 
 /* Section headers ----------------------------------------------------------- */
@@ -4633,13 +4636,23 @@ svg {
     gap: 2.4rem;
   }
 
+  /* Two up, so each tile keeps roughly the width it had at four across a full
+     pane — and with it the ratio and the type sizes above. */
+  .statTiles {
+    gap: 1.4rem;
+  }
+
   .statTile {
-    min-height: 7.5rem;
-    padding: 1.5rem 1.6rem;
+    gap: 0.7rem;
+    padding: 1.2rem;
   }
 
   .statTile strong {
-    font-size: 2.6rem;
+    font-size: 3rem;
+  }
+
+  .statTile span {
+    font-size: 1.12rem;
   }
 
   /* The arrows and the year picker drop under their heading rather than squeeze
