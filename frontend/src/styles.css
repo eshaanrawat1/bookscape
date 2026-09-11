@@ -2583,6 +2583,27 @@ svg {
   min-height: auto !important;
 }
 
+/* Icon-only link sitting at the end of the scraper dialog's intro line. It is a
+   flex item of .dialogAuthor, so the gap does the spacing and the inherited
+   underline has to be cancelled. */
+.scraperIntroLink {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.4rem;
+  color: inherit;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.scraperIntroLink svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.scraperIntroLink:hover {
+  color: var(--primary);
+}
+
 .confirmDialog {
   width: min(32rem, calc(100vw - 2rem)) !important;
   max-height: none !important;

@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { X, RefreshCcw, ChevronRight } from 'lucide-react'
+import { X, RefreshCcw, ChevronRight, ExternalLink } from 'lucide-react'
 import { apiFetch, apiFetchStream } from '../api.js'
 import useModalLayer from '../hooks/useModalLayer.js'
 import type { RawBookPayload } from '../types.js'
+
+const GOODREADS_URL = 'https://www.goodreads.com/'
 
 interface ScraperDialogProps {
   onClose: () => void
@@ -112,6 +114,18 @@ function ScraperDialog({ onClose, onSuccess }: ScraperDialogProps) {
 
   const reset = () => setStage({ kind: 'idle' })
 
+  // The webview would navigate away from the app if it followed the href itself,
+  // so hand the URL to the system browser instead.
+  const openGoodreads = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    try {
+      const { open } = await import('@tauri-apps/api/shell')
+      await open(GOODREADS_URL)
+    } catch {
+      window.open(GOODREADS_URL, '_blank', 'noopener,noreferrer')
+    }
+  }
+
   return (
     <div className="dialogScrim" onClick={onClose}>
       <article className="bookDialog scraperDialog" onClick={(e) => e.stopPropagation()}>
@@ -121,7 +135,16 @@ function ScraperDialog({ onClose, onSuccess }: ScraperDialogProps) {
 
         <h2>Add Book to Library</h2>
         <p className="dialogAuthor" style={{ marginBottom: '1.5rem' }}>
-          Enter a Goodreads URL to import it into your Bookscape library.
+          Enter a Goodreads URL to import it into your Bookscape library
+          <a
+            href={GOODREADS_URL}
+            onClick={openGoodreads}
+            className="scraperIntroLink"
+            title="Open Goodreads"
+            aria-label="Open Goodreads in your browser"
+          >
+            <ExternalLink />
+          </a>
         </p>
 
         {stage.kind === 'idle' || stage.kind === 'error' || stage.kind === 'fetching' ? (
