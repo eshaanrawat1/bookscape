@@ -1,5 +1,6 @@
 import BookCard from './BookCard.jsx'
 import BookCover from './BookCover.jsx'
+import CoverProgress from './CoverProgress.jsx'
 import ProgressRing from './ProgressRing.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
 import { normaliseBook } from '../utils.js'
@@ -87,6 +88,13 @@ function SeriesCard({ entry }: { entry: SeriesProgress }) {
               and was only ever on the series cards, which read as arbitrary.
               Silence now means mid-book, and the flag marks the exception. */}
           {nextBook ? <BookCover book={nextBook} /> : <div className="seriesCardNoCover" />}
+          {/* The cover is a book's cover, so it carries that book's page
+              progress exactly as it would on a shelf of loose books. Without
+              this, starting a series made your bar disappear: the book card got
+              folded into this one, and this one only ever counted whole books.
+              The two markers never collide — "Up next" means nothing is open,
+              and a bar only appears when something is. */}
+          <CoverProgress book={nextBook} />
           {nextBook && !reading && <span className="seriesCardFlag isNextUp">Up next</span>}
         </div>
       </button>

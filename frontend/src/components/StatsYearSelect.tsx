@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { BarChart3, ChevronDown } from 'lucide-react'
 import useModalLayer from '../hooks/useModalLayer.js'
 
 interface StatsYearSelectProps {
@@ -42,17 +42,11 @@ function StatsYearSelect({ value, years, onChange }: StatsYearSelectProps) {
         aria-label={`Year: ${value || ALL_TIME}`}
         onClick={() => setOpen((current) => !current)}
       >
-        {value || ALL_TIME}
+        <BarChart3 className="yearSelectIcon" />
+        <span className="yearSelectValue">{value || ALL_TIME}</span>
         <ChevronDown className="yearSelectChevron" />
       </button>
       <div className="yearSelectPanel" aria-hidden={!open}>
-        <button
-          type="button"
-          className={`yearSelectOption${value === '' ? ' active' : ''}`}
-          onClick={() => choose('')}
-        >
-          {ALL_TIME}
-        </button>
         {years.map((year) => (
           <button
             key={year}
@@ -63,6 +57,15 @@ function StatsYearSelect({ value, years, onChange }: StatsYearSelectProps) {
             {year}
           </button>
         ))}
+        {/* All time sits under the years rather than above them: the picker
+            opens on a year, so the years are what the eye lands on first. */}
+        <button
+          type="button"
+          className={`yearSelectOption${value === '' ? ' active' : ''}`}
+          onClick={() => choose('')}
+        >
+          {ALL_TIME}
+        </button>
       </div>
     </div>
   )

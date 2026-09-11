@@ -3083,25 +3083,25 @@ svg {
   flex: 0 0 auto;
 }
 
+/* Chromeless on purpose: the chart glyph and the caret are enough to read as a
+   control, and a boxed button here competed with the section heading beside it. */
 .yearSelectTrigger {
   display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1.2rem;
-  min-width: 8.4rem;
-  border: 1px solid var(--border);
-  border-radius: 0.9rem;
-  background: var(--card);
+  gap: 0.6rem;
+  border: 0;
+  border-radius: 0.7rem;
+  background: transparent;
   color: var(--foreground);
-  padding: 0.75rem 1rem;
-  font-size: 1.08rem;
-  font-weight: 500;
+  padding: 0.4rem 0.5rem;
+  font-size: 1.35rem;
+  font-weight: 400;
   cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease;
+  transition: background 160ms ease;
 }
 
 .yearSelectTrigger:hover {
-  border-color: color-mix(in oklch, var(--foreground) 22%, transparent);
+  background: var(--secondary);
 }
 
 .yearSelectTrigger:focus-visible {
@@ -3109,9 +3109,19 @@ svg {
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 18%, transparent);
 }
 
+.yearSelectIcon {
+  width: 1.35rem;
+  height: 1.35rem;
+  color: var(--primary);
+}
+
+.yearSelectValue {
+  letter-spacing: 0.005em;
+}
+
 .yearSelectChevron {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.35rem;
+  height: 1.35rem;
   color: var(--muted-foreground);
   transition: transform 160ms ease;
 }
@@ -3127,7 +3137,7 @@ svg {
   z-index: 30;
   display: grid;
   gap: 0.2rem;
-  min-width: 100%;
+  min-width: max(100%, 14rem);
   max-height: min(26rem, calc(100vh - 18rem));
   overflow-y: auto;
   opacity: 0;
@@ -3156,8 +3166,8 @@ svg {
   border-radius: 0.7rem;
   background: transparent;
   color: var(--foreground);
-  padding: 0.6rem 0.9rem;
-  font-size: 1.08rem;
+  padding: 0.7rem 0.9rem;
+  font-size: 1.3rem;
   text-align: left;
   cursor: pointer;
   transition: background 150ms ease;
@@ -3167,10 +3177,11 @@ svg {
   background: var(--secondary);
 }
 
+/* The selected row is tinted rather than filled: at this type size a solid
+   accent block reads as a button pressed into the menu. */
 .yearSelectOption.active {
-  background: var(--accent);
-  color: var(--accent-foreground);
-  font-weight: 600;
+  background: color-mix(in oklch, var(--primary) 8%, var(--card));
+  color: var(--primary);
 }
 
 /* Reading by year chart ----------------------------------------------------- */

@@ -1,6 +1,6 @@
 import { X } from 'lucide-react'
 import BookCover from './BookCover.jsx'
-import Progress from './Progress.jsx'
+import CoverProgress from './CoverProgress.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
 import type { Book } from '../types.js'
 
@@ -18,11 +18,7 @@ function BookCard({ book, showRemoveButton = false, removeLabel = '', onRemove }
       <button type="button" className="bookCardButton" onClick={() => onOpen(book)}>
         <div className="coverWrap">
           <BookCover book={book} />
-          {book.progress > 0 && book.progress < 100 && (
-            <div className="coverProgress">
-              <Progress value={book.progress} />
-            </div>
-          )}
+          <CoverProgress book={book} />
         </div>
         <strong>{book.title}</strong>
       </button>
