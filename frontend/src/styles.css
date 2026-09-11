@@ -2984,32 +2984,35 @@ svg {
 
 /* Summary tiles ------------------------------------------------------------- */
 
-/* Four figures divided by hairlines rather than boxed: the rules do the same
-   separating work a border does, without drawing four frames the eye has to
-   read past to reach the numbers. Column one keeps no rule and no inset, so its
-   figure starts on the same left margin as every heading down the page. */
 .statTiles {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2.5rem;
 }
 
 .statTile {
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
+  gap: 0.85rem;
+  justify-content: center;
+  /* A wide rectangle, driven by the column width so the four keep their
+     proportion at every breakpoint. Height stays auto, so the ratio is a floor:
+     a label that wraps on a narrow screen pushes the tile taller rather than
+     spilling out of it. */
+  aspect-ratio: 2 / 1;
   min-width: 0;
-  border-left: 1px solid var(--border);
-  padding: 0.3rem 1.8rem 0.4rem 2.2rem;
-}
-
-.statTile:first-child {
-  border-left: 0;
-  padding-left: 0;
+  border: 1px solid var(--border);
+  border-radius: 1.1rem;
+  /* Transparent rather than a colour picked to match: the fill is then the page
+     itself, exactly, whatever the page is — so the tile is only ever its
+     hairline, and it cannot drift if --background is ever retuned. */
+  background: transparent;
+  padding: 0 1.5rem;
 }
 
 .statTile strong {
   font-family: var(--font-serif);
-  font-size: 3.6rem;
+  font-size: 3.1rem;
   /* Regular, not the 500 the serif headings carry: at this size the number is
      already the loudest thing on the page, and the extra weight only coarsens
      the letterforms. */
@@ -4590,15 +4593,9 @@ svg {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  /* Two up, so the hairline moves to whichever tile now opens a row. */
   .statTiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    row-gap: 2.4rem;
-  }
-
-  .statTile:nth-child(odd) {
-    border-left: 0;
-    padding-left: 0;
+    gap: 1.8rem;
   }
 }
 
@@ -4645,15 +4642,16 @@ svg {
   }
 
   .statTiles {
-    row-gap: 2rem;
+    gap: 1.4rem;
   }
 
   .statTile {
-    padding: 0.2rem 1rem 0.3rem 1.4rem;
+    gap: 0.6rem;
+    padding: 0 1.2rem;
   }
 
   .statTile strong {
-    font-size: 2.9rem;
+    font-size: 2.6rem;
   }
 
   /* The arrows and the year picker drop under their heading rather than squeeze
