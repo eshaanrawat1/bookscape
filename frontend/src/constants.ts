@@ -43,21 +43,15 @@ function shortcutLabel(key: string): string {
   return isMac ? `⌘${key}` : `Ctrl+${key}`
 }
 
-// ⌘1–⌘7 follow the sidebar top to bottom
+// ⌘1–⌘8 follow the sidebar top to bottom
 const navOrder: string[] = [...mainNav, ...shelfNav].map((item) => item.id)
 
 function navShortcut(viewId: string): string | null {
   const index = navOrder.indexOf(viewId)
-  // The 9 pairs with the /^[1-9]$/ test in useAppHotkeys: unreachable at the
-  // current 8 nav rows, but it is what stops a 10th from rendering a "⌘10"
-  // hint for a chord the handler will never fire.
   if (index === -1 || index >= 9) return null
   return shortcutLabel(String(index + 1))
 }
 
-// January first, matching the order the stats endpoint returns its month counts
-// in. Short here and uppercased in CSS, so the twelve axis labels fit the chart
-// without rotating or dropping every other one.
 const monthLabels: string[] = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
