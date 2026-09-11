@@ -6,7 +6,10 @@
   color-scheme: light;
   --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-serif: 'Newsreader', Georgia, serif;
-  --background: oklch(0.96 0.012 80);
+  /* Page and card are one colour on purpose: a card is drawn by its border and
+     the space around it, not by a second shade of cream. Anything that needs to
+     sit visibly *on* the page reaches for --secondary or --muted instead. */
+  --background: oklch(0.98 0.01 84);
   --foreground: oklch(0.26 0.024 50);
   --card: oklch(0.98 0.01 84);
   --primary: oklch(0.55 0.13 55);
@@ -3012,7 +3015,10 @@ svg {
 .statTile strong {
   font-family: var(--font-serif);
   font-size: 3.8rem;
-  font-weight: 500;
+  /* Regular, not the 500 the serif headings carry: at this size the number is
+     already the loudest thing on the page, and the extra weight only coarsens
+     the letterforms. */
+  font-weight: 400;
   letter-spacing: -0.01em;
   line-height: 1;
   color: var(--foreground);
