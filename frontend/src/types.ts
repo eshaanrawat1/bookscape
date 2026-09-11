@@ -150,7 +150,16 @@ export interface StatsSummary {
   genre_list: string[]
   days_reading: number
   months: number[]
+  // Oldest first, one entry per calendar year including the empty ones in
+  // between, capped to the most recent twelve. Empty unless this is the
+  // all-time summary, which is the only view drawn year by year.
+  year_counts: YearCount[]
   books: RawBookPayload[]
+}
+
+export interface YearCount {
+  year: number
+  count: number
 }
 
 // One series you have started and not finished, as /series-progress reports it.
@@ -245,6 +254,8 @@ export interface NavigationContextValue {
   onOpenAuthor: (author: string) => void
   onOpenSeries: (series: string) => void
   onOpenGenre: (genre: string) => void
+  // The stats page's Books read drilldown. '' is all time, as on the stats page.
+  onOpenBooksRead: (year: string) => void
   onOpenWantToRead: () => void
   // Opens the reading-goal dialog. A dialog rather than a view, like onOpen, so
   // the card and the sidebar widget can both raise it without either owning it.

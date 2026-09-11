@@ -3,10 +3,13 @@ import BookCard from '../components/BookCard.jsx'
 import StatsBarChart from '../components/StatsBarChart.jsx'
 import StatsYearSelect from '../components/StatsYearSelect.jsx'
 import { formatCompactNumber, normaliseBook } from '../utils.js'
+import { monthLabels } from '../constants.js'
+import { useNavigation } from '../context/NavigationContext.jsx'
 import useStats from '../hooks/useStats.js'
 
 function StatsView() {
   const { summary, loading, error, year, setYear } = useStats()
+  const { onOpenBooksRead } = useNavigation()
   const books = useMemo(() => (summary?.books || []).map(normaliseBook), [summary])
 
   if (loading && !summary) {
@@ -28,9 +31,21 @@ function StatsView() {
     )
   }
 
-  // The chart is a calendar year of months either way; over all time it stacks
-  // every January together, so the subtitle has to say which reading it is.
   const scope = year || 'all time'
+
+  // A chosen year is drawn month by month; all time is drawn year by year,
+  // because stacking every January together would say which months you read in
+  // but nothing about which years. The month labels are mapped rather than the
+  // payload trusted, so a short `months` still draws a full twelve.
+  const bars = year
+    ? monthLabels.map((month, index) => ({
+      label: month,
+      count: Number(summary.months?.[index]) || 0,
+    }))
+    : (summary.year_counts || []).map((entry) => ({
+      label: String(entry.year),
+      count: entry.count,
+    }))
 
   const tiles = [
     { value: String(summary.books_read), label: 'books read' },
@@ -57,12 +72,12 @@ function StatsView() {
             <p>
               {year
                 ? 'Your reading activity, month by month.'
-                : 'Every year you have read, stacked month by month.'}
+                : 'Books finished, year by year.'}
             </p>
           </div>
           <StatsYearSelect value={year} years={years} onChange={setYear} />
         </header>
-        <StatsBarChart months={summary.months} label={scope} />
+        <StatsBarChart bars={bars} unit={year ? 'month' : 'year'} label={scope} />
       </section>
 
       {books.length > 0 && (
@@ -72,6 +87,11 @@ function StatsView() {
               <h2>Books read</h2>
               <p>{year ? "All the books you've read this year." : "All the books you've ever read."}</p>
             </div>
+            {/* The row is a scroller; this opens the same books as a full page
+                for whichever year the picker above is on. */}
+            <button type="button" className="statsSeeAll" onClick={() => onOpenBooksRead(year)}>
+              See all
+            </button>
           </header>
           <div className="statsBookScroll" tabIndex={0} role="group" aria-label="Books read">
             {books.map((book) => (

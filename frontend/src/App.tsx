@@ -16,6 +16,8 @@ import {
   seriesNameFromView,
   genreViewId,
   genreNameFromView,
+  booksReadViewId,
+  booksReadYearFromView,
 } from './utils.js'
 import { viewMeta, shortcutLabel } from './constants.js'
 import { buildCommands } from './commands.js'
@@ -47,6 +49,7 @@ import HighlightsView from './views/HighlightsView.jsx'
 import AuthorView from './views/AuthorView.jsx'
 import SeriesView from './views/SeriesView.jsx'
 import GenreView from './views/GenreView.jsx'
+import BooksReadView from './views/BooksReadView.jsx'
 import CollectionView from './views/CollectionView.jsx'
 import type { Book, Collection, GenreSection, RawBookPayload, RawList } from './types.js'
 
@@ -154,6 +157,7 @@ export default function App() {
   const activeAuthorName = authorNameFromView(view)
   const activeSeriesName = seriesNameFromView(view)
   const activeGenreName = genreNameFromView(view)
+  const activeBooksReadYear = booksReadYearFromView(view)
   const meta: { title?: string; subtitle?: string; name?: string } | undefined = activeCollection
     ? { ...activeCollection, subtitle: 'Kept together on purpose.' }
     : view.startsWith('author:')
@@ -162,7 +166,14 @@ export default function App() {
         ? { title: activeSeriesName || 'Series' }
         : view.startsWith('genre:')
           ? { title: activeGenreName || 'Genre' }
-          : viewMeta[view]
+          : view.startsWith('books-read:')
+            ? {
+              title: 'Books read',
+              subtitle: activeBooksReadYear
+                ? `Everything you finished in ${activeBooksReadYear}.`
+                : "Everything you've ever finished.",
+            }
+            : viewMeta[view]
 
   const openBookDialog = (book: Book) =>
     setSelected((prev) => ({ book, isNavigation: prev !== null }))
@@ -201,6 +212,18 @@ export default function App() {
   }
   const goBackFromGenre = () => {
     setView(previousView && !previousView.startsWith('genre:') ? previousView : 'library')
+    setMobileNav(false)
+  }
+  // Reached from the stats page's Books read row, so it falls back to 'stats'
+  // rather than to the library the other drilldowns return to.
+  const openBooksReadPage = (year: string) => {
+    setPreviousView((current) => (view.startsWith('books-read:') ? current : view))
+    setSelected(null)
+    setMobileNav(false)
+    setView(booksReadViewId(year))
+  }
+  const goBackFromBooksRead = () => {
+    setView(previousView && !previousView.startsWith('books-read:') ? previousView : 'stats')
     setMobileNav(false)
   }
   // 'want-to-read' is a sidebar destination rather than a drilldown, so this
@@ -379,6 +402,7 @@ export default function App() {
     onOpenAuthor: openAuthorPage,
     onOpenSeries: openSeriesPage,
     onOpenGenre: openGenrePage,
+    onOpenBooksRead: openBooksReadPage,
     onOpenWantToRead: openWantToRead,
     onEditReadingGoal: () => setShowGoalDialog(true),
     goTo,
@@ -455,6 +479,12 @@ export default function App() {
                     )}
                     {view.startsWith('series:') && (
                       <button type="button" className="kickerLink" onClick={goBackFromSeries}>
+                        <ArrowLeft size={14} />
+                        Back
+                      </button>
+                    )}
+                    {view.startsWith('books-read:') && (
+                      <button type="button" className="kickerLink" onClick={goBackFromBooksRead}>
                         <ArrowLeft size={14} />
                         Back
                       </button>
@@ -542,6 +572,9 @@ function ViewContent({ view }: { view: string }) {
       }
       if (view.startsWith('genre:')) {
         return <GenreView genre={genreNameFromView(view)} />
+      }
+      if (view.startsWith('books-read:')) {
+        return <BooksReadView year={booksReadYearFromView(view)} />
       }
       return null
   }

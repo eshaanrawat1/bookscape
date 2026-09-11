@@ -53,6 +53,30 @@ def _months(books_list: list[dict]) -> list[int]:
     return counts
 
 
+# The same column count the month view draws, so the all-time chart keeps the
+# shape of the one it replaces rather than growing a column per year read.
+YEAR_SPAN = 12
+
+
+def _year_counts(books_list: list[dict]) -> list[dict]:
+    """Books finished per calendar year, oldest first.
+
+    Only for the all-time view, where stacking every January together says
+    which months you read in but nothing about which years. A contiguous run
+    rather than only the years with books, so a year off reads as a gap instead
+    of closing up, and capped to the most recent YEAR_SPAN of them.
+    """
+    counts: dict[int, int] = {}
+    for book in books_list:
+        if finish := parse_iso_date(book.get("reading_finish_date")):
+            counts[finish.year] = counts.get(finish.year, 0) + 1
+    if not counts:
+        return []
+    newest = max(counts)
+    oldest = max(min(counts), newest - YEAR_SPAN + 1)
+    return [{"year": y, "count": counts.get(y, 0)} for y in range(oldest, newest + 1)]
+
+
 def create_router(root: Path, repo: DataRepository) -> APIRouter:
     router = APIRouter()
 
@@ -102,6 +126,9 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
             "genre_list": sorted(genres),
             "days_reading": _days_reading(books_list),
             "months": _months(books_list),
+            # Empty when a single year is asked for: that view is drawn month
+            # by month, and one bar for the year it already names says nothing.
+            "year_counts": _year_counts(books_list) if year is None else [],
             "books": books_list,
         }
 

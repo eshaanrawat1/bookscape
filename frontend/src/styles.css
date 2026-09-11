@@ -3076,6 +3076,21 @@ svg {
   letter-spacing: 0.005em;
 }
 
+/* Matches the shelves' "See all", down to sitting level with the heading's foot
+   rather than centred against the two lines beside it. */
+.statsSeeAll {
+  align-self: end;
+  flex: 0 0 auto;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 1.02rem;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  cursor: pointer;
+}
+
 /* Year picker --------------------------------------------------------------- */
 
 .yearSelect {
@@ -3234,7 +3249,10 @@ svg {
   position: absolute;
   inset: 0;
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+  /* Twelve for a year of months, one per year read over all time — the chart
+     sets it inline. Equal fractions either way, so the columns stay evenly
+     spaced across the same plot however many there are. */
+  grid-template-columns: repeat(var(--chart-columns, 12), minmax(0, 1fr));
   align-items: end;
 }
 
@@ -3257,6 +3275,21 @@ svg {
 
 .barChartColumn:hover .barChartBar {
   background: var(--primary);
+}
+
+/* Years can be as few as one or two columns where months are always twelve, and
+   a 1.9rem bar marooned in half the plot reads as a rendering fault. So the year
+   variant takes a share of whatever column it lands in, floored at the month
+   width and capped before it turns into a slab. */
+.barChart[data-scale="years"] .barChartBar {
+  width: clamp(var(--chart-bar), 45%, 4.5rem);
+}
+
+/* Four digits where the months get three letters: the tracking that spaces out
+   JAN closes up here so a dozen years still clear each other. */
+.barChart[data-scale="years"] .barChartMonths span {
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
 }
 
 .barChartTip {
@@ -3285,7 +3318,7 @@ svg {
 .barChartMonths {
   grid-column: 2;
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--chart-columns, 12), minmax(0, 1fr));
   padding-top: 0.9rem;
 }
 
@@ -4707,6 +4740,12 @@ svg {
   .barChartMonths span {
     font-size: 0.8rem;
     letter-spacing: 0.02em;
+  }
+
+  /* Twelve four-digit years in a phone-width plot is the one place these labels
+     genuinely run out of room. */
+  .barChart[data-scale="years"] .barChartMonths span {
+    font-size: 0.72rem;
   }
 
   .statsBookScroll {

@@ -1,5 +1,4 @@
 import { type CSSProperties } from 'react'
-import { monthLabels } from '../constants.js'
 
 /** Axis tops worth landing on, scaled by powers of ten. */
 const NICE_STEPS = [1, 2, 5, 10]
@@ -21,22 +20,34 @@ function niceScale(max: number): { top: number; step: number } {
   return { top: step * INTERVALS, step }
 }
 
+interface ChartBar {
+  label: string
+  count: number
+}
+
 interface StatsBarChartProps {
-  /** Counts, January first. Padded to twelve here rather than trusted. */
-  months: number[] | undefined
+  /** One column each, left to right. Twelve months, or a run of years. */
+  bars: ChartBar[]
+  /** What a column stands for — names the axis in the spoken summary. */
+  unit: 'month' | 'year'
   label: string
 }
 
-function StatsBarChart({ months, label }: StatsBarChartProps) {
-  // The plot is a calendar year whatever arrives, so the twelve columns are
-  // built here: a short or missing list draws an empty year rather than
-  // taking the page down with it.
-  const counts = Array.from({ length: 12 }, (_, index) => Number(months?.[index]) || 0)
-  const { top, step } = niceScale(Math.max(...counts))
+function StatsBarChart({ bars, unit, label }: StatsBarChartProps) {
+  const { top, step } = niceScale(Math.max(0, ...bars.map((bar) => bar.count)))
   const ticks = Array.from({ length: INTERVALS + 1 }, (_, index) => index * step)
+  // The columns are driven from here rather than fixed at twelve in CSS, since
+  // the all-time chart is one column per year read. The floor of 1 is only to
+  // keep `repeat()` valid on an empty payload, which draws a bare grid.
+  const plotStyle = { '--chart-columns': Math.max(bars.length, 1) } as CSSProperties
 
   return (
-    <figure className="barChart" role="img" aria-label={summarise(counts, label)}>
+    <figure
+      className="barChart"
+      data-scale={unit === 'year' ? 'years' : 'months'}
+      role="img"
+      aria-label={summarise(bars, unit, label)}
+    >
       <div className="barChartTicks" aria-hidden="true">
         {ticks.map((tick) => (
           <span key={tick} style={{ bottom: `${(tick / top) * 100}%` }}>{tick}</span>
@@ -52,12 +63,12 @@ function StatsBarChart({ months, label }: StatsBarChartProps) {
             aria-hidden="true"
           />
         ))}
-        <div className="barChartBars">
-          {counts.map((count, index) => (
-            <div className="barChartColumn" key={monthLabels[index]}>
-              <div className="barChartBar" style={{ '--bar-height': `${(count / top) * 100}%` } as CSSProperties}>
+        <div className="barChartBars" style={plotStyle}>
+          {bars.map((bar) => (
+            <div className="barChartColumn" key={bar.label}>
+              <div className="barChartBar" style={{ '--bar-height': `${(bar.count / top) * 100}%` } as CSSProperties}>
                 <span className="barChartTip">
-                  {monthLabels[index]} · {count === 1 ? '1 book' : `${count} books`}
+                  {bar.label} · {bar.count === 1 ? '1 book' : `${bar.count} books`}
                 </span>
               </div>
             </div>
@@ -65,22 +76,23 @@ function StatsBarChart({ months, label }: StatsBarChartProps) {
         </div>
       </div>
 
-      <div className="barChartMonths" aria-hidden="true">
-        {monthLabels.map((month) => <span key={month}>{month}</span>)}
+      <div className="barChartMonths" style={plotStyle} aria-hidden="true">
+        {bars.map((bar) => <span key={bar.label}>{bar.label}</span>)}
       </div>
     </figure>
   )
 }
 
-function summarise(months: number[], label: string): string {
-  const total = months.reduce((sum, count) => sum + count, 0)
+function summarise(bars: ChartBar[], unit: 'month' | 'year', label: string): string {
+  const total = bars.reduce((sum, bar) => sum + bar.count, 0)
   if (total === 0) return `No books finished in ${label}.`
-  const best = months.indexOf(Math.max(...months))
+  const best = bars.reduce((peak, bar) => (bar.count > peak.count ? bar : peak))
   return (
-    `Books finished by month in ${label}: `
-    + months.map((count, index) => `${monthLabels[index]} ${count}`).join(', ')
-    + `. Busiest month ${monthLabels[best]}.`
+    `Books finished by ${unit} in ${label}: `
+    + bars.map((bar) => `${bar.label} ${bar.count}`).join(', ')
+    + `. Busiest ${unit} ${best.label}.`
   )
 }
 
 export default StatsBarChart
+export type { ChartBar }

@@ -192,6 +192,18 @@ function genreNameFromView(view: string): string {
   }
 }
 
+// The stats page's year filter is '' for all time; the view id spells that as
+// 'all' so the drilldown reads as a destination rather than as a bare prefix.
+function booksReadViewId(year: string): string {
+  return `books-read:${String(year || '').trim() || 'all'}`
+}
+
+function booksReadYearFromView(view: string): string {
+  if (!String(view || '').startsWith('books-read:')) return ''
+  const raw = String(view).slice('books-read:'.length)
+  return raw === 'all' ? '' : raw
+}
+
 // Shared by the search view and the command palette. The backend clamps limit
 // to 50 (backend/app/routes/catalog.py), and searches the whole catalog rather
 // than only owned books.
@@ -222,4 +234,6 @@ export {
   seriesNameFromView,
   genreViewId,
   genreNameFromView,
+  booksReadViewId,
+  booksReadYearFromView,
 }
