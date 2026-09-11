@@ -6,10 +6,7 @@
   color-scheme: light;
   --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-serif: 'Newsreader', Georgia, serif;
-  /* Page and card are one colour on purpose: a card is drawn by its border and
-     the space around it, not by a second shade of cream. Anything that needs to
-     sit visibly *on* the page reaches for --secondary or --muted instead. */
-  --background: oklch(0.98 0.01 84);
+  --background: oklch(0.96 0.012 80);
   --foreground: oklch(0.26 0.024 50);
   --card: oklch(0.98 0.01 84);
   --primary: oklch(0.55 0.13 55);
@@ -2987,34 +2984,32 @@ svg {
 
 /* Summary tiles ------------------------------------------------------------- */
 
+/* Four figures divided by hairlines rather than boxed: the rules do the same
+   separating work a border does, without drawing four frames the eye has to
+   read past to reach the numbers. Column one keeps no rule and no inset, so its
+   figure starts on the same left margin as every heading down the page. */
 .statTiles {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 2rem;
 }
 
 .statTile {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  align-items: center;
-  justify-content: center;
-  /* Near-square, and driven by the column width so the four stay in proportion
-     at every breakpoint. Height stays auto, so the ratio is a floor: a label
-     that wraps on a narrow screen pushes the tile taller rather than spilling
-     out of it. */
-  aspect-ratio: 7 / 5;
+  gap: 0.7rem;
   min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: 1.6rem;
-  background: var(--card);
-  padding: 1.6rem;
-  text-align: center;
+  border-left: 1px solid var(--border);
+  padding: 0.3rem 1.8rem 0.4rem 2.2rem;
+}
+
+.statTile:first-child {
+  border-left: 0;
+  padding-left: 0;
 }
 
 .statTile strong {
   font-family: var(--font-serif);
-  font-size: 3.8rem;
+  font-size: 3.6rem;
   /* Regular, not the 500 the serif headings carry: at this size the number is
      already the loudest thing on the page, and the extra weight only coarsens
      the letterforms. */
@@ -3026,7 +3021,7 @@ svg {
 
 .statTile span {
   color: var(--muted-foreground);
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   letter-spacing: 0.005em;
   line-height: 1.25;
 }
@@ -3171,7 +3166,7 @@ svg {
      come out to. */
   --chart-axis: 3.2rem;
   --chart-height: 13rem;
-  --chart-bar: 1.15rem;
+  --chart-bar: 1.9rem;
   display: grid;
   grid-template-columns: var(--chart-axis) minmax(0, 1fr);
   grid-template-rows: var(--chart-height) auto;
@@ -3206,7 +3201,7 @@ svg {
   position: absolute;
   inset-inline: 0;
   height: 1px;
-  background: color-mix(in oklch, var(--border) 70%, transparent);
+  background: color-mix(in oklch, var(--border) 22%, transparent);
 }
 
 .barChartBars {
@@ -4595,8 +4590,15 @@ svg {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  /* Two up, so the hairline moves to whichever tile now opens a row. */
   .statTiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 2.4rem;
+  }
+
+  .statTile:nth-child(odd) {
+    border-left: 0;
+    padding-left: 0;
   }
 }
 
@@ -4642,23 +4644,16 @@ svg {
     gap: 2.4rem;
   }
 
-  /* Two up, so each tile keeps roughly the width it had at four across a full
-     pane — and with it the ratio and the type sizes above. */
   .statTiles {
-    gap: 1.4rem;
+    row-gap: 2rem;
   }
 
   .statTile {
-    gap: 0.7rem;
-    padding: 1.2rem;
+    padding: 0.2rem 1rem 0.3rem 1.4rem;
   }
 
   .statTile strong {
-    font-size: 3rem;
-  }
-
-  .statTile span {
-    font-size: 1.12rem;
+    font-size: 2.9rem;
   }
 
   /* The arrows and the year picker drop under their heading rather than squeeze
@@ -4674,7 +4669,7 @@ svg {
   .barChart {
     --chart-axis: 2.4rem;
     --chart-height: 11rem;
-    --chart-bar: 0.9rem;
+    --chart-bar: 1.4rem;
   }
 
   .barChartMonths span {
