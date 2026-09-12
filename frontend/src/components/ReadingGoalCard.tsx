@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Star, Target } from 'lucide-react'
+import { Target } from 'lucide-react'
 import BookCover from './BookCover.jsx'
 import Progress from './Progress.jsx'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
@@ -11,25 +11,21 @@ import type { Book } from '../types.js'
 // invitation to keep going rather than a second target you are behind on.
 const BONUS_SLOTS = 5
 
-// The open end of the row: what is still to go. Below the goal that is one
-// numbered slot per book left, counting up to the target; at or past it, the
-// bonus run. Never both — an unmet goal should show what is left and nothing
-// else, so the gold only ever appears once the target is actually behind you.
-type GoalSlot =
-  | { kind: 'open'; key: string; number: number }
-  | { kind: 'bonus'; key: string }
+// The open end of the row: what is still to go. Below the goal that is one slot
+// per book left, counting up to the target; at or past it, the bonus run. Never
+// both — an unmet goal should show what is left and nothing else, so the gold
+// only ever appears once the target is actually behind you. Both kinds are the
+// same numbered slot, so the count runs unbroken across the goal and the only
+// thing the bonus run changes is its colour.
+type GoalSlot = { key: string; number: number; bonus: boolean }
 
 function openSlots(booksRead: number, target: number): GoalSlot[] {
-  if (booksRead >= target) {
-    return Array.from({ length: BONUS_SLOTS }, (_, index) => ({
-      kind: 'bonus',
-      key: `bonus-${index}`,
-    }))
-  }
-  return Array.from({ length: target - booksRead }, (_, index) => ({
-    kind: 'open',
+  const met = booksRead >= target
+  const count = met ? BONUS_SLOTS : target - booksRead
+  return Array.from({ length: count }, (_, index) => ({
     key: `slot-${booksRead + index + 1}`,
     number: booksRead + index + 1,
+    bonus: met,
   }))
 }
 
@@ -111,10 +107,10 @@ function ReadingGoalCard() {
           <div
             key={slot.key}
             ref={index === 0 ? boundaryRef : undefined}
-            className={slot.kind === 'bonus' ? 'goalSlot goalSlotEmpty goalSlotBonus' : 'goalSlot goalSlotEmpty'}
+            className={slot.bonus ? 'goalSlot goalSlotEmpty goalSlotBonus' : 'goalSlot goalSlotEmpty'}
             aria-hidden="true"
           >
-            {slot.kind === 'bonus' ? <Star fill="currentColor" /> : <span>{slot.number}</span>}
+            <span>{slot.number}</span>
           </div>
         ))}
       </div>
