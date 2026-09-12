@@ -9,8 +9,7 @@ any directory, and all write straight into `bookscape.db` through the same
 database is the single source of truth.
 
 ```
-python backend/scripts/scraper.py               --seed <url>
-python backend/scripts/backfill_reading_days.py --apply
+python backend/scripts/scraper.py --seed <url>
 ```
 
 `scraper.py` needs a Chromium that Playwright can drive, and installs one itself
@@ -64,39 +63,3 @@ Each book is committed as it is scraped. A rate-limit shutdown (HTTP 429 / 502 /
 
 Scraping is slow on purpose: 12–20s between every outbound request, applied
 uniformly to page loads and GraphQL calls alike.
-
----
-
-## backfill_reading_days.py
-
-Seeds `reading_days` — the table behind the stats heatmap — from books already
-marked finished.
-
-Reading is recorded forward from the moment of the edit: every write that moves
-a book's `current_page` also writes a row for that local calendar day, so the
-delta is captured where it is actually known rather than reconstructed later.
-That is the right mechanism and it has one obvious gap — on an existing library
-it knows nothing about the past, so the calendar renders empty for months and
-looks broken rather than new.
-
-For finished books we do have `start_date`, `finish_date` and `total_pages`, so
-this spreads each book's pages evenly across the days it was open. That is
-invented detail, and it is labelled as such: every row is written with
-`source = 'backfill'`, so it can be styled differently in the UI, audited, or
-removed wholesale.
-
-```sql
-DELETE FROM reading_days WHERE source = 'backfill';
-```
-
-| Flag | What it does |
-|---|---|
-| *(none)* | Dry run — prints the plan and writes nothing |
-| `--apply` | Commit the rows |
-| `--force` | Also backfill books that already have day history |
-
-Books that already have rows are skipped, so a guess never overwrites a real
-recorded day and re-running is a no-op. Books without a finish date or a page
-count are skipped and counted in the summary — there is no day to attribute
-their pages to, and inventing one would be a lie the heatmap can't distinguish
-from data.
