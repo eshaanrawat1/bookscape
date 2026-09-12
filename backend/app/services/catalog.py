@@ -24,8 +24,6 @@ BOOK_COLUMNS = {
 }
 
 
-# Goodreads renders an expand link inside the genre list that matches the same
-# tag selector as real genres, so filter it out wherever genres get written.
 NON_GENRE_NAMES = {"...more", "…more", "more"}
 
 
@@ -58,27 +56,8 @@ def _states_map(conn) -> dict[str, dict]:
 
 
 def reading_overlay(state: dict | None, page_count: object = 0) -> dict:
-    """The reading-row half of a book payload, in the shape the client reads.
+    """The reading-row half of a book payload"""
 
-    A book is two rows — the catalog row (what the edition *is*) and the
-    user_book_state row (where *you* are in it) — and the card that renders a
-    book wants both. Keeping the overlay in one function, applied at the single
-    point where a catalog row becomes a dict, is what makes progress show up on
-    every page that lists books rather than only the ones whose endpoint
-    remembered to join the reading row. It used to be the latter, which is why
-    a book you were halfway through rendered as an untouched one everywhere
-    except Reading Now.
-
-    The keys are prefixed `reading_` because both rows carry a page count and
-    they mean different things: the reading row's is the edition in your hands,
-    the catalog's `page_count` is whatever was scraped. The client prefers the
-    former, so an untracked book falls back to the latter here — the same rule
-    GET /reading-progress/{id} already applies when it seeds a fresh tracking
-    panel, and the reason opening one lands on "0 of 412" rather than "0 of 0".
-
-    Every book gets the full set, zeroed and "not_started" when there is no
-    reading row, so no consumer has to test for presence.
-    """
     state = state or {}
     total_pages = int(state.get("total_pages") or 0)
     if total_pages <= 0:
@@ -104,9 +83,7 @@ def _row_to_book(
     book["genres"] = (
         genres_map.get(uid, []) if genres_map is not None else _genres_for_uid(conn, uid)
     )
-    # The maps are the bulk path: callers listing more than one book build them
-    # once up front so attaching genres and reading state stays two queries
-    # rather than two per book.
+
     state = states_map.get(uid) if states_map is not None else _state_for_uid(conn, uid)
     book.update(reading_overlay(state, book.get("page_count")))
     return book
@@ -469,27 +446,10 @@ SUGGESTION_EXCLUDED_STATUSES = frozenset({"done", "reading", "dnf"})
 def get_suggested_books(
     root: Path, limit: int = 20, sources: int = 8, per_source: int = 4
 ) -> list[dict]:
-    """Books to read next, drawn from what you most recently finished.
-
-    Each source book carries Goodreads' own similar-books list, kept in the
-    order it was scraped in — that order is the relevance ranking, so candidates
-    are taken from the front rather than re-sorted by rating or popularity.
-
-    The picking is round-robin, one book per source per round, so the row leads
-    with your latest finish and every source is represented before any source
-    gets a second slot. Taking all of one source's picks before moving on would
-    hand the first third of the row to a single book.
-
-    Ids that no longer resolve to a catalog row are dropped: the scraper stores
-    whatever Goodreads listed, and most of those neighbours were never imported.
-    That is also why `per_source` is a ceiling rather than a quota — a source
-    whose pool runs dry just stops contributing, and the rounds keep going.
-    """
+    """Books to read next, drawn from what you most recently finished."""
     with transaction(root) as conn:
         recent = conn.execute(
-            # Undated finishes are excluded rather than sorted last: an empty
-            # string sorts above every real date, so a book finished at an
-            # unknown time would otherwise claim the "most recent" slot.
+            # Undated finishes are excluded
             "SELECT books.uid AS uid, books.similar_book_ids AS similar_book_ids "
             "FROM user_book_state JOIN books ON books.uid = user_book_state.uid "
             "WHERE user_book_state.status = 'done' AND TRIM(user_book_state.finish_date) <> '' "
