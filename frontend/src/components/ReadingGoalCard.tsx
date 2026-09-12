@@ -1,10 +1,37 @@
 import { useEffect, useRef } from 'react'
-import { Target } from 'lucide-react'
+import { Star, Target } from 'lucide-react'
 import BookCover from './BookCover.jsx'
 import Progress from './Progress.jsx'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
 import type { Book } from '../types.js'
+
+// How many bonus slots sit past a met goal. They are never filled — read 25
+// against a goal of 20 and there are still five ahead of you — so the run is an
+// invitation to keep going rather than a second target you are behind on.
+const BONUS_SLOTS = 5
+
+// The open end of the row: what is still to go. Below the goal that is one
+// numbered slot per book left, counting up to the target; at or past it, the
+// bonus run. Never both — an unmet goal should show what is left and nothing
+// else, so the gold only ever appears once the target is actually behind you.
+type GoalSlot =
+  | { kind: 'open'; key: string; number: number }
+  | { kind: 'bonus'; key: string }
+
+function openSlots(booksRead: number, target: number): GoalSlot[] {
+  if (booksRead >= target) {
+    return Array.from({ length: BONUS_SLOTS }, (_, index) => ({
+      kind: 'bonus',
+      key: `bonus-${index}`,
+    }))
+  }
+  return Array.from({ length: target - booksRead }, (_, index) => ({
+    kind: 'open',
+    key: `slot-${booksRead + index + 1}`,
+    number: booksRead + index + 1,
+  }))
+}
 
 // The year's goal, at the top of Reading Now: a heading, a meter, and the year
 // so far. With no goal set it is one line, since an empty progress bar would
@@ -19,16 +46,12 @@ function ReadingGoalCard() {
   // The strip runs oldest to newest and can be a whole year long, so it rests
   // on the boundary between read and unread: the books just finished on the
   // left, the next open slots on the right. Both ends are worse views — the
-  // start is January, and the far end is nothing but empty boxes.
+  // start is January, and the far end is nothing but empty boxes. There is
+  // always a boundary to rest on, since a met goal still has its bonus slots.
   useEffect(() => {
     const strip = stripRef.current
-    if (!strip) return
     const boundary = boundaryRef.current
-    if (!boundary) {
-      // Goal met: no slots left, so the newest covers are the end of the row.
-      strip.scrollLeft = strip.scrollWidth
-      return
-    }
+    if (!strip || !boundary) return
     // Measured rather than derived from offsetLeft, which is relative to
     // whichever ancestor happens to be positioned.
     const offsetInContent =
@@ -55,11 +78,10 @@ function ReadingGoalCard() {
   }
 
   const percent = Math.min(100, Math.round((booksRead / target) * 100))
-  const remaining = Math.max(0, target - booksRead)
-  // The whole year, in order: a cover for every book read, then a numbered slot
-  // for every one still to go, ending at the target. Covers load lazily so a
-  // long row costs what is on screen rather than the full year of images.
-  const slots = Array.from({ length: remaining }, (_, index) => booksRead + index + 1)
+  // The whole year, in order: a cover for every book read, then the slots still
+  // open ahead of it. Covers load lazily so a long row costs what is on screen
+  // rather than the full year of images.
+  const slots = openSlots(booksRead, target)
 
   return (
     <section className="goalCard">
@@ -81,23 +103,21 @@ function ReadingGoalCard() {
         </div>
       </div>
 
-      {(read.length > 0 || slots.length > 0) && (
-        <div className="goalSlots" ref={stripRef}>
-          {read.map((book) => (
-            <GoalCover key={book.id} book={book} />
-          ))}
-          {slots.map((number, index) => (
-            <div
-              key={`slot-${number}`}
-              ref={index === 0 ? boundaryRef : undefined}
-              className="goalSlot goalSlotEmpty"
-              aria-hidden="true"
-            >
-              <span>{number}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="goalSlots" ref={stripRef}>
+        {read.map((book) => (
+          <GoalCover key={book.id} book={book} />
+        ))}
+        {slots.map((slot, index) => (
+          <div
+            key={slot.key}
+            ref={index === 0 ? boundaryRef : undefined}
+            className={slot.kind === 'bonus' ? 'goalSlot goalSlotEmpty goalSlotBonus' : 'goalSlot goalSlotEmpty'}
+            aria-hidden="true"
+          >
+            {slot.kind === 'bonus' ? <Star fill="currentColor" /> : <span>{slot.number}</span>}
+          </div>
+        ))}
+      </div>
     </section>
   )
 }

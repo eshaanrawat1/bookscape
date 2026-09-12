@@ -1174,6 +1174,21 @@ svg {
   font-weight: 400;
 }
 
+/* Past the goal: the same empty slot, gold, with a star where the number was.
+   It borrows the accent the target mark at the top of the card already uses, so
+   the bonus run reads as part of the card rather than a new colour arriving.
+   Carried a little louder than the numerals — an unnumbered slot has only the
+   star to say what it is. */
+.goalSlotBonus {
+  background: color-mix(in oklch, var(--accent) 55%, transparent);
+}
+
+.goalSlotBonus svg {
+  width: 2rem;
+  height: 2rem;
+  color: color-mix(in oklch, var(--accent-foreground) 45%, transparent);
+}
+
 /* Sidebar widget                                                            */
 
 .goalWidget {
