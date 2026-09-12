@@ -197,7 +197,7 @@ function SearchHeader({
           value={draft}
           onChange={(event) => onDraftChange(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Search for a book, author, or genre…"
+          placeholder=""
           aria-label="Search books"
           aria-expanded={showPreview}
           aria-autocomplete="list"
