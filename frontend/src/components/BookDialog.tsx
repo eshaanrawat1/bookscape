@@ -577,6 +577,17 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
 
                 <div className="dialogActionPanel">
                   <div className="dialogActionRow">
+                    <button
+                      type="button"
+                      className={isSavedToWantToRead ? 'dialogIconButton dialogSaveButton saved' : 'dialogIconButton dialogSaveButton'}
+                      onClick={handleSave}
+                      disabled={!bookId || savingToRead}
+                      aria-label={isSavedToWantToRead ? 'Remove from Want to read' : 'Save to Want to read'}
+                      title={isSavedToWantToRead ? 'Remove from Want to read' : 'Save to Want to read'}
+                    >
+                      <Heart fill={isSavedToWantToRead ? 'currentColor' : 'none'} />
+                    </button>
+
                     <div className={collectionMenuOpen ? 'collectionMenuAnchor open' : 'collectionMenuAnchor'}>
                       <button
                         type="button"
@@ -606,17 +617,6 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
                         </div>
                       )}
                     </div>
-
-                    <button
-                      type="button"
-                      className={isSavedToWantToRead ? 'dialogIconButton dialogSaveButton saved' : 'dialogIconButton dialogSaveButton'}
-                      onClick={handleSave}
-                      disabled={!bookId || savingToRead}
-                      aria-label={isSavedToWantToRead ? 'Remove from Want to read' : 'Save to Want to read'}
-                      title={isSavedToWantToRead ? 'Remove from Want to read' : 'Save to Want to read'}
-                    >
-                      <Heart fill={isSavedToWantToRead ? 'currentColor' : 'none'} />
-                    </button>
 
                     <button
                       type="button"
