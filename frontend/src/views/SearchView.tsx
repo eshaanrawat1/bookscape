@@ -1,13 +1,13 @@
 import { useEffect, useRef, type FormEvent, type RefObject } from 'react'
 import { ChevronRight, Clock, Search, X } from 'lucide-react'
-import BookCover from '../components/BookCover.jsx'
-import BookGrid from '../components/BookGrid.jsx'
+import BookCover from '../components/books/BookCover.jsx'
+import BookGrid from '../components/books/BookGrid.jsx'
 import { formatCompactNumber } from '../utils.js'
 import useSearch from '../hooks/useSearch.js'
 import useRecentSearches from '../hooks/useRecentSearches.js'
 import useListNavigation from '../hooks/useListNavigation.js'
 import { useNavigation } from '../context/NavigationContext.jsx'
-import type { Book } from '../types.js'
+import type { Book, NavigationContextValue } from '../types.js'
 
 function SearchView() {
   const {
@@ -39,9 +39,7 @@ function SearchView() {
     await search(draft)
   }
 
-  // Opening a book from the preview is a finished search too — it just ends in
-  // the dialog rather than in the grid, so the row it leaves behind is the book
-  // you landed on rather than the half-typed string that found it.
+  // Opening a book counts as a finished search, recording the book rather than the draft.
   const openBook = (book: Book) => {
     addRecent(book.title)
     onOpen(book)
@@ -86,9 +84,6 @@ function SearchView() {
     )
   }
 
-  // Recents hold the space under the field for as long as nothing better is
-  // there to fill it — an empty field, or a draft the preview has not answered
-  // yet — so the page is never a lone search bar over blank paper.
   return (
     <div className="stack">
       {header}
@@ -124,8 +119,7 @@ function RecentSearches({ recents, onSelect, onRemove, onClear }: RecentSearches
       </div>
       <ul className="recentSearchList">
         {recents.map((entry) => (
-          // The row and its dismiss are siblings rather than nested: one button
-          // inside another is not something the browser will let you click.
+          // Siblings, not nested: a button inside a button isn't clickable.
           <li key={entry} className="recentSearchRow">
             <button type="button" className="recentSearchItem" onClick={() => onSelect(entry)}>
               <Clock />
@@ -146,14 +140,12 @@ function RecentSearches({ recents, onSelect, onRemove, onClear }: RecentSearches
   )
 }
 
-interface SearchHeaderProps {
+interface SearchHeaderProps extends Pick<SearchPreviewDropdownProps, 'onOpen' | 'onSubmit'> {
   draft: string
   previewResults?: Book[]
   previewLoading?: boolean
   showPreview?: boolean
   onDraftChange: (value: string) => void
-  onSubmit: (event: FormEvent) => void
-  onOpen?: (book: Book) => void
   inputRef: RefObject<HTMLInputElement>
 }
 
@@ -172,8 +164,7 @@ function SearchHeader({
     inputRef?.current?.select?.()
   }, [])
 
-  // -1 so nothing is highlighted until the user actually arrows into the list —
-  // a bare Enter has always meant "search the full catalog" and still does.
+  // -1 so a bare Enter still searches the full catalog.
   const { activeIndex, setActiveIndex, handleKeyDown } = useListNavigation(
     showPreview ? previewResults.length : 0,
     {
@@ -229,12 +220,11 @@ function SearchHeader({
   )
 }
 
-interface SearchPreviewDropdownProps {
+interface SearchPreviewDropdownProps extends Partial<Pick<NavigationContextValue, 'onOpen'>> {
   results: Book[]
   loading: boolean
   activeIndex: number
   onHover: (index: number) => void
-  onOpen?: (book: Book) => void
   onSubmit: (event: FormEvent) => void
 }
 

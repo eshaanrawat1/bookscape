@@ -1,53 +1,4 @@
-"""
-scraper.py
-──────────
-Single-threaded, rate-limited Goodreads book scraper — Playwright edition.
-
-WHY PLAYWRIGHT:
-  Goodreads now sits behind AWS WAF with a JavaScript challenge
-  (x-amzn-waf-action: challenge). Plain HTTP clients like httpx can
-  never pass this — only a real browser that executes JS can. Playwright
-  drives real Chromium, which solves the challenge automatically the
-  same way your normal browser does.
-
-Data sources (in order of preference), parsed from the rendered page:
-  1. apolloState JSON  — embedded in __NEXT_DATA__, clean structured data
-  2. JSON-LD           — <script type="application/ld+json">
-  3. OpenGraph meta    — <meta property="og:...">
-  4. DOM selectors     — last resort fallback
-
-Similar books:
-  Fetched via Goodreads' internal AppSync GraphQL endpoint, called
-  in-page via page.evaluate() so it automatically carries the same
-  browser fingerprint / cookies that solved the WAF challenge.
-  The API key + endpoint are extracted from the JS bundle on first run.
-
-Scraped books are written straight into bookscape.db via the app's own
-upsert_book(), so the crawler and the desktop app share one source of truth.
-
-Usage:
-    python scraper.py                        # run from existing frontier
-    python scraper.py --seed <url>           # add one URL and run (recursive)
-    python scraper.py --seed-file <file>     # bulk seed from text file (recursive)
-    python scraper.py --single <url>         # scrape ONE book + its similar
-                                              #   books to ONE level only, then stop
-    python scraper.py --import-one <url>     # scrape and save ONE book only
-    python scraper.py --parse-one <url>      # fetch/parse one book, print, don't save
-    python scraper.py --fetch-one <url>      # fetch/parse one book + similar books,
-                                              #   emit @@STAGE@@/@@RESULT@@/@@ERROR@@
-                                              #   markers on stdout, don't save
-                                              #   (used by the app's live import flow)
-    python scraper.py --stats                # print frontier stats and exit
-    python scraper.py --headed               # show the browser window (debugging)
-
-Output (all written to backend/data/, regardless of cwd):
-    bookscape.db — the catalog itself (books/genres), shared with the app
-    frontier.db  — SQLite queue (survives restarts, tracks crawl depth)
-
-Install:
-    pip install playwright beautifulsoup4 lxml
-    playwright install chromium   # optional: done automatically on first use
-"""
+"""Rate-limited Goodreads scraper using Playwright, since the site's AWS WAF needs a real browser."""
 
 import argparse
 import json
@@ -68,9 +19,7 @@ from typing import Optional
 from bs4 import BeautifulSoup
 from playwright.sync_api import Error as PlaywrightError, sync_playwright, Page
 
-# This script lives in backend/scripts/; the app package lives alongside it at
-# backend/app/. Put the repo root on sys.path so the crawler can reuse the very
-# same upsert path the desktop app uses, rather than re-implementing the schema.
+# Put the repo root on sys.path to reuse the app's upsert path.
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -81,8 +30,6 @@ from backend.app.services.catalog import resolve_book, upsert_book  # noqa: E402
 MIN_DELAY    = 12.0
 MAX_DELAY    = 20.0
 
-# This script lives in backend/scripts/; its data lives in backend/data/.
-# Anchor to __file__ so the paths hold no matter what cwd it is run from.
 DATA_DIR     = Path(__file__).resolve().parents[1] / "data"
 FRONTIER_DB  = str(DATA_DIR / "frontier.db")
 SIMILAR_CAP  = 20
@@ -110,8 +57,6 @@ query getSimilarBooks($id: ID!, $limit: Int!) {
 """
 
 
-# ── Data model ───────────────────────────────────────────────────────────────
-
 @dataclass
 class Book:
     uid:              str       = ""
@@ -127,20 +72,13 @@ class Book:
     series:           str       = ""
     series_number:    str       = ""
     similar_book_ids: list[str] = field(default_factory=list)
-    source_url:       str       = ""
     scraped_at:       str       = ""
 
-
-# ── AppSync config (extracted once, cached for session) ──────────────────────
 
 _appsync_cache: Optional[dict] = None   # {"endpoint": ..., "api_key": ...}
 
 def _get_appsync_config(page: Page) -> Optional[dict]:
-    """
-    Extract the AppSync endpoint + API key from Goodreads' _app JS chunk,
-    fetched through the browser's own context (so it carries the same
-    cookies/headers that passed the WAF challenge).
-    """
+    """Extract the AppSync endpoint and API key from Goodreads' _app JS chunk, via the browser's context."""
     global _appsync_cache
     if _appsync_cache:
         return _appsync_cache
@@ -160,8 +98,6 @@ def _get_appsync_config(page: Page) -> Optional[dict]:
             if not src or "doubleclick" in src:
                 continue
             try:
-                # Fetch the JS chunk through the page's own fetch(), so it
-                # uses the same browser context / cookies as the main page.
                 js = page.evaluate(
                     """async (url) => {
                         const res = await fetch(url);
@@ -175,12 +111,7 @@ def _get_appsync_config(page: Page) -> Optional[dict]:
             if not js or "appsync" not in js.lower():
                 continue
 
-            # The bundle carries one of these blocks per environment; the prod
-            # one is identified by publishWebVitalMetrics:true a little further
-            # along. The span between the two must be matched with [\s\S], not
-            # [^"]: Goodreads injects "waf":{"challengeScriptUrl":""} in that
-            # gap, and its quotes silently broke a quote-free run — which cost
-            # every book scraped afterwards its similar-books list.
+            # Match the gap with [\s\S], not [^"]: Goodreads injects quoted WAF config between the two markers.
             block_re = re.compile(
                 r'"graphql"\s*:\s*\{[^}]*"apiKey"\s*:\s*"([^"]+)"'
                 r'[^}]*"endpoint"\s*:\s*"([^"]+)"[^}]*\}'
@@ -207,13 +138,7 @@ def _get_appsync_config(page: Page) -> Optional[dict]:
 
 
 def fetch_similar_books(kca_id: str, page: Page, limiter_fn) -> list[str]:
-    """
-    Call the AppSync getSimilarBooks query from inside the browser page via
-    page.evaluate(), so the request automatically carries the same cookies
-    / fingerprint that solved the WAF challenge for the main page load.
-
-    kca_id: the "kca://book/amzn1.gr.book.v3.XXXX" string from apolloState.
-    """
+    """Call AppSync getSimilarBooks in-page so it carries the WAF-cleared cookies."""
     config = _get_appsync_config(page)
     if not config or not kca_id:
         return []
@@ -274,17 +199,8 @@ def fetch_similar_books(kca_id: str, page: Page, limiter_fn) -> list[str]:
         return []
 
 
-# ── Frontier ─────────────────────────────────────────────────────────────────
-
 class Frontier:
-    """
-    SQLite-backed URL queue. States: pending → done | failed.
-
-    Each entry also tracks a `depth` (0 = original seed). This lets the
-    crawl optionally be capped at a maximum depth — used by single-book
-    mode to scrape a seed book plus its similar books (depth 1) but no
-    further.
-    """
+    """SQLite-backed URL queue (pending -> done | failed) with a crawl depth per entry."""
 
     def __init__(self, db_path: str = FRONTIER_DB):
         self.db_path = db_path
@@ -344,14 +260,8 @@ class Frontier:
         return {r[0]: r[1] for r in rows}
 
 
-# ── Rate limiter ─────────────────────────────────────────────────────────────
-
 class RateLimiter:
-    """
-    Shared rate limiter. `wait()` is called before *every* outbound request
-    (book page navigation and GraphQL), so the floor/ceiling delay applies
-    uniformly.
-    """
+    """Shared rate limiter; `wait()` runs before every outbound request."""
 
     def __init__(self):
         self._last = 0.0
@@ -366,25 +276,14 @@ class RateLimiter:
         self._last = time.monotonic()
 
 
-# ── Fatal error ──────────────────────────────────────────────────────────────
-
 class FatalHTTPError(Exception):
     def __init__(self, status_code: int):
         self.status_code = status_code
         super().__init__(f"Fatal HTTP {status_code} — shutting down immediately")
 
 
-# ── Page fetch (Playwright) ───────────────────────────────────────────────────
-
 def fetch_page(url: str, page: Page) -> Optional[str]:
-    """
-    Navigate to a book page using a real browser. Playwright/Chromium
-    automatically executes the AWS WAF JS challenge if one is served,
-    the same way a normal browser visit would.
-
-    Retries a couple of times if the response still looks like a
-    challenge page (very short body, no __NEXT_DATA__) before giving up.
-    """
+    """Load a book page in Chromium, retrying while it still looks like a WAF challenge."""
     for attempt in range(1, WAF_RETRY_LIMIT + 2):
         try:
             response = page.goto(url, wait_until="domcontentloaded", timeout=30000)
@@ -424,21 +323,13 @@ def fetch_page(url: str, page: Page) -> Optional[str]:
     return None
 
 
-# ── Parser ───────────────────────────────────────────────────────────────────
-
 def parse_book(html: str, url: str) -> Optional[tuple]:
-    """
-    Parse a Goodreads book page.
-    Returns a (Book, kca_id) tuple — kca_id is needed for the GraphQL call.
-    Priority: apolloState > JSON-LD > OpenGraph > DOM selectors.
-    """
+    """Parse a book page into (Book, kca_id). Priority: apolloState > JSON-LD > OpenGraph > DOM."""
     soup = BeautifulSoup(html, "lxml")
 
-    # ── UID from URL ─────────────────────────────────────────────────────────
     uid_match = re.search(r"/book/show/(\d+)", url)
     uid = uid_match.group(1) if uid_match else ""
 
-    # ── apolloState (richest source) ─────────────────────────────────────────
     apollo      = {}
     book_node   = {}
     work_node   = {}
@@ -466,7 +357,6 @@ def parse_book(html: str, url: str) -> Optional[tuple]:
         if key.startswith("Work:"):
             work_node = val
 
-    # ── JSON-LD (fallback) ───────────────────────────────────────────────────
     ld: dict = {}
     for tag in soup.find_all("script", type="application/ld+json"):
         try:
@@ -477,7 +367,6 @@ def parse_book(html: str, url: str) -> Optional[tuple]:
         except (json.JSONDecodeError, TypeError):
             pass
 
-    # ── Title ────────────────────────────────────────────────────────────────
     title = (
         book_node.get("title")
         or ld.get("name")
@@ -485,7 +374,6 @@ def parse_book(html: str, url: str) -> Optional[tuple]:
         or _text(soup, 'h1[data-testid="bookTitle"]')
     )
 
-    # ── Author ───────────────────────────────────────────────────────────────
     author = ""
     contrib_edge = book_node.get("primaryContributorEdge") or {}
     contrib_ref  = contrib_edge.get("node") or {}
@@ -501,14 +389,12 @@ def parse_book(html: str, url: str) -> Optional[tuple]:
     if not author:
         author = _text(soup, ".ContributorLink__name")
 
-    # ── Cover image ──────────────────────────────────────────────────────────
     image_url = (
         book_node.get("imageUrl")
         or _og(soup, "og:image")
         or ld.get("image", "")
     )
 
-    # ── Ratings ──────────────────────────────────────────────────────────────
     work_stats  = work_node.get("stats") or {}
     stats_ref   = work_stats.get("__ref", "")
     stats_node  = apollo.get(stats_ref, {}) if stats_ref else work_stats
@@ -534,9 +420,7 @@ def parse_book(html: str, url: str) -> Optional[tuple]:
         or _text(soup, '[data-testid="reviewsCount"]')
     )
 
-    # ── Genres ───────────────────────────────────────────────────────────────
-    # The trailing "...more" expand link shares the .Button--tag class with the
-    # real genre chips, so drop it rather than storing it as a genre.
+    # The "...more" link shares .Button--tag with the real genre chips.
     genres = [
         text
         for el in soup.select(
@@ -547,7 +431,6 @@ def parse_book(html: str, url: str) -> Optional[tuple]:
         and text.lower().lstrip(".…").strip() != "more"
     ]
 
-    # ── Description ──────────────────────────────────────────────────────────
     raw_desc = book_node.get("description", "")
     if raw_desc:
         description = BeautifulSoup(raw_desc, "lxml").get_text(" ", strip=True)
@@ -563,7 +446,6 @@ def parse_book(html: str, url: str) -> Optional[tuple]:
             else ld.get("description", "")
         )
 
-    # ── Page count ───────────────────────────────────────────────────────────
     page_count = _parse_int(
         book_node.get("details", {}).get("numPages")
         or ld.get("numberOfPages")
@@ -575,7 +457,6 @@ def parse_book(html: str, url: str) -> Optional[tuple]:
         if m:
             page_count = _parse_int(m.group(1))
 
-    # ── Series ───────────────────────────────────────────────────────────────
     series = series_number = ""
     series_tag = (
         soup.select_one('[data-testid="seriesName"]')
@@ -583,27 +464,12 @@ def parse_book(html: str, url: str) -> Optional[tuple]:
         or soup.select_one("h3 a[href*='/series/']")
     )
     if series_tag:
-        # Goodreads splits the label into separate text nodes either side of a
-        # React comment separator ("Bloodwing Academy", <!-- -->, " #1"), and
-        # get_text(strip=True) strips each node individually — which would eat
-        # the space between them and yield "Bloodwing Academy#1", defeating the
-        # match below. Join on a space and re-collapse instead.
+        # Join on a space: the label is split across nodes, and strip=True alone would yield "Name#1".
         raw = re.sub(r"\s+", " ", series_tag.get_text(" ", strip=True)).strip()
-        # Older Goodreads markup wraps the whole label in parentheses. Unwrap
-        # only when both ends are present — a bare .strip("()") would also eat
-        # the closing paren off a name that legitimately ends in one, turning
-        # "The Vampire Diaries (Digital First)" into "…(Digital First".
+        # Unwrap only when both ends match; .strip("()") would eat a paren that ends the name.
         if raw.startswith("(") and raw.endswith(")"):
             raw = raw[1:-1].strip()
-        # The number stays a string, and is matched as any non-space token
-        # rather than digits-only: Goodreads numbers novellas "#1.5" and
-        # omnibus editions "#1-3", and a digits-only pattern would reject the
-        # range, drop through to the else, and file "Night Angel #1-3" as its
-        # own one-book series alongside the real "Night Angel".
-        #
-        # Anchoring the number to the end with \S+ is what keeps a name that
-        # itself contains a "#" intact — the non-greedy name backtracks until
-        # what follows the last "#" is a single space-free token.
+        # \S+ allows "#1.5" and "#1-3"; anchoring to the end keeps a "#" inside the name intact.
         m = re.match(r'^(.+?),?\s*#\s*(\S+)$', raw)
         if m:
             series        = m.group(1).strip()
@@ -625,7 +491,6 @@ def parse_book(html: str, url: str) -> Optional[tuple]:
         series=series,
         series_number=series_number,
         similar_book_ids=[],   # filled in by GraphQL call
-        source_url=url,
         scraped_at=_now(),
     ), kca_id
 
@@ -653,8 +518,6 @@ def scrape_book_page(url: str, *, headed: bool = False, include_similar: bool = 
             browser.close()
 
 
-# ── DOM / parse helpers ───────────────────────────────────────────────────────
-
 def _text(soup: BeautifulSoup, selector: str) -> str:
     el = soup.select_one(selector)
     return el.get_text(strip=True) if el else ""
@@ -679,16 +542,8 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-# ── Catalog persistence ───────────────────────────────────────────────────────
-
 def save_book(book: Book) -> None:
-    """Write a scraped book into bookscape.db through the app's own upsert.
-
-    Deliberately reuses upsert_book() rather than issuing SQL here: it already
-    knows which columns exist, JSON-encodes similar_book_ids, and replaces the
-    genre rows. It also updates only the keys present, so a re-scrape never
-    clobbers a column it does not carry.
-    """
+    """Write a scraped book through the app's upsert, which only touches the keys present."""
     upsert_book(PROJECT_ROOT, asdict(book))
 
 
@@ -696,19 +551,10 @@ def already_scraped(uid: str) -> bool:
     return bool(uid) and resolve_book(PROJECT_ROOT, uid) is not None
 
 
-# ── Browser context helper ────────────────────────────────────────────────────
-
-# Playwright pins one exact Chromium build per package version and keeps it in a
-# per-user cache that lives outside both this repo and the app bundle
-# (~/Library/Caches/ms-playwright on macOS). So the browser can go missing for
-# reasons that have nothing to do with Bookscape: the cache was never populated,
-# a disk cleaner swept it, or `pip install -U playwright` moved the pin to a
-# build nobody has downloaded yet. Repairing that in place beats failing with a
-# command for the user to go run.
+# Playwright's browser cache lives outside the app and can go missing, so repair it in place.
 BROWSER_INSTALL_TIMEOUT = 900
 
-# One attempt per process: a genuinely broken install then surfaces as the real
-# launch error rather than looping on a download that will not fix it.
+# One attempt per process, so a broken install surfaces the real launch error.
 _browser_install_attempted = False
 
 
@@ -718,12 +564,7 @@ def _is_missing_browser(error: Exception) -> bool:
 
 
 def _install_chromium() -> bool:
-    """Download the Chromium build this Playwright pins. True if it worked.
-
-    The installer's output is captured rather than inherited: stdout carries the
-    @@STAGE@@/@@RESULT@@ protocol that backend/app/routes/scraper.py parses, and
-    progress bars in the middle of that are noise.
-    """
+    """Download Playwright's pinned Chromium. Output is captured to keep the stdout protocol clean."""
     print("@@STAGE@@ installing_browser", flush=True)
     print("Chromium is missing — downloading it (one-time, ~150MB)…", flush=True)
 
@@ -752,15 +593,7 @@ def _install_chromium() -> bool:
 
 
 def make_browser_context(playwright, headed: bool = False) -> tuple:
-    """
-    Launch Chromium and return (browser, page).
-    Caller is responsible for closing browser when done.
-
-    A missing browser binary is installed and the launch retried, rather than
-    raised — see _install_chromium above for why it goes missing on its own.
-    Set BOOKSCAPE_AUTO_INSTALL_BROWSER=0 to keep the failure instead, which is
-    what an offline or pre-provisioned environment wants.
-    """
+    """Return (browser, page), installing Chromium if missing unless BOOKSCAPE_AUTO_INSTALL_BROWSER=0."""
     global _browser_install_attempted
 
     try:
@@ -786,23 +619,13 @@ def make_browser_context(playwright, headed: bool = False) -> tuple:
     return browser, page
 
 
-# ── Main loop ─────────────────────────────────────────────────────────────────
-
 def run(
     frontier: Frontier,
     limiter: RateLimiter,
     max_depth: Optional[int] = None,
     headed: bool = False,
 ):
-    """
-    Drain the frontier, writing each scraped book straight into bookscape.db.
-
-    max_depth:
-        None  -> unlimited recursion (default multi-seed crawl behaviour).
-        N     -> only enqueue newly-discovered similar books whose depth
-                 would be <= N. Used by --single (N=1) to scrape one seed
-                 book plus its similar books, but not their similar books.
-    """
+    """Drain the frontier into bookscape.db; max_depth caps similar-book recursion (None is unlimited)."""
     scraped_count = 0
     shutdown = {"requested": False}
 
@@ -835,14 +658,12 @@ def run(
                 )
                 print(f"  → {url}  (depth={depth})")
 
-                # ── Skip if already in the catalog ───────────────────────────
                 uid_match = re.search(r"/book/show/(\d+)", url)
                 if uid_match and already_scraped(uid_match.group(1)):
                     print(f"  ⏭️  Already scraped — skipping")
                     frontier.mark_done(url)
                     continue
 
-                # ── Rate limit then fetch book page ──────────────────────────
                 limiter.wait()
 
                 try:
@@ -856,7 +677,6 @@ def run(
                     frontier.mark_failed(url)
                     continue
 
-                # ── Parse book data from page ─────────────────────────────────
                 result = parse_book(html, url)
                 if result is None:
                     print("  ⚠️  Parse failed — skipping")
@@ -870,7 +690,6 @@ def run(
                     frontier.mark_failed(url)
                     continue
 
-                # ── Fetch similar books via GraphQL ─────────────────────────
                 try:
                     similar_ids = fetch_similar_books(kca_id, page, limiter.wait)
                     book.similar_book_ids = similar_ids
@@ -879,7 +698,6 @@ def run(
                     browser.close()
                     sys.exit(1)
 
-                # ── Store ─────────────────────────────────────────────────────
                 save_book(book)
                 scraped_count += 1
                 frontier.mark_done(url)
@@ -901,7 +719,6 @@ def run(
                 else:
                     print("     ⚠️  No similar books retrieved")
 
-                # ── Enqueue similar books (respecting depth cap) ─────────────
                 child_depth = depth + 1
                 if book.similar_book_ids:
                     if max_depth is None or child_depth <= max_depth:
@@ -927,8 +744,6 @@ def run(
     )
 
 
-# ── CLI ───────────────────────────────────────────────────────────────────────
-
 def main():
     p = argparse.ArgumentParser(description="Goodreads book scraper (Playwright)")
     p.add_argument("--seed",      metavar="URL",  help="Add one book URL and run (recursive crawl)")
@@ -941,10 +756,7 @@ def main():
     p.add_argument("--headed",    action="store_true", help="Show the browser window (useful for debugging WAF challenges)")
     args = p.parse_args()
 
-    # ── Non-persisting modes first ───────────────────────────────────────────
-    # These touch neither the catalog nor the frontier. --fetch-one is the one
-    # the desktop app shells out to on every "Add Book", so it must stay free
-    # of side effects: no database is opened or created on its behalf.
+    # --fetch-one runs on every "Add Book", so these modes must not open or create a database.
     if args.parse_one:
         url = args.parse_one
         print(f"\n📖 Parsing single book: {url}\n")
@@ -978,7 +790,6 @@ def main():
         print(json.dumps(Frontier().stats(), indent=2))
         return
 
-    # ── Persisting modes: bring up the catalog and the crawl queue ───────────
     init_app_db(PROJECT_ROOT)
     frontier = Frontier()
     limiter  = RateLimiter()
@@ -1000,14 +811,12 @@ def main():
         print(f"✅ Imported {book.uid}: {book.title!r}")
         return
 
-    # ── Single-book mode: one seed, similar books to depth 1, then stop ──────
     if args.single:
         frontier.add(args.single, depth=0)
         print(f"Seeded (single-book mode, depth-limited to 1): {args.single}")
         run(frontier, limiter, max_depth=1, headed=args.headed)
         return
 
-    # ── Multi-book / recursive seeding ────────────────────────────────────────
     if args.seed:
         frontier.add(args.seed, depth=0)
         print(f"Seeded: {args.seed}")

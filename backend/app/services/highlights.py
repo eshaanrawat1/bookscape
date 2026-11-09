@@ -4,23 +4,16 @@ from pathlib import Path
 
 from ..db import transaction
 
-# A highlight is a snippet, not a chapter. The cap is generous enough for a long
-# passage and exists so a runaway paste cannot put a megabyte in a row that the
-# highlights page renders in full.
+# Stops a runaway paste; the highlights page renders this in full.
 MAX_TEXT_LENGTH = 5000
 MAX_NOTE_LENGTH = 5000
 
-# No book has a page zero, so 0 doubles as "no page recorded"; the ceiling is
-# only here to keep a mistyped number out of the column.
+# 0 means "no page recorded"; the ceiling only catches typos.
 MAX_PAGE = 100_000
 
 
 class HighlightStore:
-    """Snippets copied out of books, with the page and an optional note.
-
-    Shaped like ReadingListStore: the validation lives here so every caller gets
-    it, and the routes only translate the exceptions into status codes.
-    """
+    """Snippets copied out of books. Validation lives here; routes only translate exceptions."""
 
     def __init__(self, root: Path) -> None:
         self.root = root
@@ -56,14 +49,8 @@ class HighlightStore:
             "updated_at": str(row["updated_at"] or ""),
         }
 
-    # Reads
-
     def list_all(self) -> list[dict]:
-        """Every highlight, grouped by book, newest-highlighted book first.
-
-        One query rather than one per book: the page shows the whole corpus at
-        once, and the grouping is cheaper here than as N round trips.
-        """
+        """Every highlight grouped by book, newest-highlighted book first, in one query."""
         with transaction(self.root) as conn:
             rows = conn.execute(
                 "SELECT * FROM highlights ORDER BY created_at DESC, id DESC"
@@ -72,8 +59,7 @@ class HighlightStore:
         groups: dict[str, list[dict]] = {}
         for row in rows:
             groups.setdefault(str(row["uid"]), []).append(self._row_to_highlight(row))
-        # Dicts keep insertion order, and the rows arrived newest-first, so the
-        # book whose most recent highlight is newest is already first.
+        # Rows arrived newest-first and dicts keep insertion order, so books are already sorted.
         return [{"book_id": uid, "highlights": items} for uid, items in groups.items()]
 
     def list_for_book(self, uid: str) -> list[dict]:
@@ -91,8 +77,6 @@ class HighlightStore:
         if not row:
             raise KeyError("Highlight not found")
         return str(row["uid"])
-
-    # Writes
 
     def create(self, uid: str, text: object, page: object = 0) -> None:
         clean_uid = str(uid or "").strip()

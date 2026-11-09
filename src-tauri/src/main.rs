@@ -18,7 +18,7 @@ use tauri::Manager;
 const BACKEND_HOST: &str = "127.0.0.1";
 const BACKEND_PORT: u16 = 9876;
 const HEALTHCHECK_URL: &str = "http://127.0.0.1:9876/health";
-const EXPECTED_BACKEND_API_VERSION: u64 = 6;
+const EXPECTED_BACKEND_API_VERSION: u64 = 7;
 const TOKEN_ENV_VAR: &str = "BOOKSCAPE_API_TOKEN";
 const TOKEN_HEADER: &str = "X-Bookscape-Token";
 const TOKEN_LEN: usize = 43;
@@ -27,8 +27,7 @@ fn project_root() -> &'static Path {
   Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
 }
 
-/// The launch token, handed to the webview so its `fetch` calls can prove they
-/// come from the app rather than from any other program that knows the port.
+/// Handed to the webview so its fetches can prove they come from the app.
 struct ApiToken(String);
 
 #[tauri::command]
@@ -48,13 +47,7 @@ fn generate_token() -> String {
     .collect()
 }
 
-/// Read the shared launch token, creating it if we are the first to start.
-///
-/// Mirrors `read_or_create_token` in backend/app/auth.py — the two processes
-/// rendezvous through this file precisely because either may start first. The
-/// backend may already be running (started by hand, or left over from a
-/// previous launch), in which case it created the token and we must adopt it
-/// rather than mint a competing one.
+/// Read or create the launch token; mirrors `read_or_create_token` in backend/app/auth.py.
 fn read_or_create_token() -> std::io::Result<String> {
   let path = token_file_path();
   if let Some(parent) = path.parent() {
@@ -67,8 +60,7 @@ fn read_or_create_token() -> std::io::Result<String> {
       if !existing.is_empty() {
         return Ok(existing);
       }
-      // Present but empty: a crash caught mid-write. Clear it so create_new
-      // below is not refused forever over a file holding nothing.
+      // Empty means a crash mid-write; clear it or create_new refuses forever.
       let _ = fs::remove_file(&path);
     }
 
@@ -118,11 +110,7 @@ fn is_backend_listening() -> bool {
   TcpStream::connect_timeout(&backend_addr(), Duration::from_millis(200)).is_ok()
 }
 
-/// Whether the backend already listening on the port is one we can actually
-/// talk to: right API version, and accepting our token. A token mismatch means
-/// it started against a different secret, so it is stale for our purposes and
-/// the caller will recycle it — which is what keeps a deleted or rotated token
-/// file from bricking the app until the user finds the stray process.
+/// Whether the running backend has the right API version and accepts our token; stale ones get recycled.
 fn backend_is_current(token: &str) -> bool {
   let client = match Client::builder().timeout(Duration::from_secs(2)).build() {
     Ok(client) => client,
@@ -188,8 +176,7 @@ fn resolve_python() -> PathBuf {
     }
   }
 
-  // Fall back to PATH lookups so a local virtualenv is not the only way
-  // the desktop app can start the backend during development.
+  // Falls back to PATH so a local virtualenv isn't required in development.
   #[cfg(windows)]
   {
     PathBuf::from("python")
@@ -274,8 +261,7 @@ fn main() {
         let _ = window.hide();
       }
 
-      // Established before anything else: the backend is spawned with it, the
-      // health checks present it, and the webview asks for it over IPC.
+      // First, because the backend, health checks and webview all depend on it.
       let token = read_or_create_token()?;
       app.manage(ApiToken(token.clone()));
 

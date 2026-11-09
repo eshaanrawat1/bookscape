@@ -1,13 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Menu, Plus, File, Upload, Download, ArrowLeft } from 'lucide-react'
 
-// API & Utilities
 import { apiFetch, BOOTSTRAP_RETRIES, BOOTSTRAP_RETRY_DELAY_MS } from './api.js'
 import {
   sleep,
   loadBootstrapData,
-  collectionIdFromName,
-  mapReadingLists,
+  mapCollections,
   nextCollectionName,
   normaliseBook,
   authorViewId,
@@ -18,29 +16,28 @@ import {
   genreNameFromView,
   booksReadViewId,
   booksReadYearFromView,
+  errorMessage,
 } from './utils.js'
 import { viewMeta, shortcutLabel } from './constants.js'
 import { buildCommands } from './commands.js'
+import { selectShelves } from './selectors.js'
 
-// Context
 import { LibraryDataContext, useLibraryData } from './context/LibraryDataContext.jsx'
 import { NavigationContext } from './context/NavigationContext.jsx'
 import { useToast } from './context/ToastContext.jsx'
 
-// Hooks
 import useAppHotkeys from './hooks/useAppHotkeys.js'
 import useReadingGoal from './hooks/useReadingGoal.js'
 
-// Components
-import Sidebar from './components/Sidebar.jsx'
-import BookDialogStage, { type Selected } from './components/BookDialogStage.jsx'
-import ScraperDialog from './components/ScraperDialog.jsx'
-import SettingsDialog from './components/SettingsDialog.jsx'
-import ReadingGoalDialog from './components/ReadingGoalDialog.jsx'
-import CommandPalette from './components/CommandPalette.jsx'
-import BookGrid from './components/BookGrid.jsx'
+import Sidebar from './components/sidebar/Sidebar.jsx'
+import EmptyState from './components/ui/EmptyState.jsx'
+import BookDialogStage, { type Selected } from './components/dialogs/BookDialogStage.jsx'
+import ScraperDialog from './components/dialogs/ScraperDialog.jsx'
+import SettingsDialog from './components/dialogs/SettingsDialog.jsx'
+import ReadingGoalDialog from './components/dialogs/ReadingGoalDialog.jsx'
+import CommandPalette from './components/dialogs/CommandPalette.jsx'
+import BookGrid from './components/books/BookGrid.jsx'
 
-// Views
 import ReadingNow from './views/ReadingNow.jsx'
 import LibraryView from './views/LibraryView.jsx'
 import SearchView from './views/SearchView.jsx'
@@ -51,32 +48,36 @@ import SeriesView from './views/SeriesView.jsx'
 import GenreView from './views/GenreView.jsx'
 import BooksReadView from './views/BooksReadView.jsx'
 import CollectionView from './views/CollectionView.jsx'
-import type { Book, Collection, GenreSection, RawBookPayload, RawList } from './types.js'
+import type { Book, Collection, RawCollection, VaultAction } from './types.js'
+
+// Pages with a Back link and where it lands when there's no history.
+const DRILLDOWNS = [
+  { prefix: 'author:', fallback: 'library' },
+  { prefix: 'series:', fallback: 'library' },
+  { prefix: 'genre:', fallback: 'library' },
+  { prefix: 'books-read:', fallback: 'stats' },
+]
+
+const drilldownFor = (view: string) => DRILLDOWNS.find(({ prefix }) => view.startsWith(prefix))
 
 export default function App() {
-  const { showToast } = useToast()
+  const { showToast, showError } = useToast()
   const [view, setView] = useState('reading-now')
   const [previousView, setPreviousView] = useState('reading-now')
   const [mobileNav, setMobileNav] = useState(false)
   const [selected, setSelected] = useState<Selected | null>(null)
 
-  // Live data from the API
   const [books, setBooks] = useState<Book[]>([])
   const [collections, setCollections] = useState<Collection[]>([])
-  const [wantToReadBooks, setWantToReadBooks] = useState<Book[]>([])
-  const [globalLibrary, setGlobalLibrary] = useState<GenreSection[]>([])
-  const [dataVersion, setDataVersion] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [vaultBusy, setVaultBusy] = useState<'push' | 'pull' | null>(null)
+  const [vaultBusy, setVaultBusy] = useState<VaultAction | null>(null)
   const [showScraperDialog, setShowScraperDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
   const [showGoalDialog, setShowGoalDialog] = useState(false)
   const [showPalette, setShowPalette] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Temporary: A/B for the active-nav treatment, ⌥⌘G to cycle. Deliberately
-  // chorded with Alt, which useAppHotkeys drops on the floor. Delete this and
-  // the loser's CSS block once we've picked one.
+  // Temporary A/B of the active-nav style (⌥⌘G); delete this and the loser's CSS once picked.
   const [navStyle, setNavStyle] = useState<'rail' | 'ember'>('rail')
 
   useEffect(() => {
@@ -100,10 +101,8 @@ export default function App() {
             const data = await loadBootstrapData()
             if (cancelled) return
 
-            setBooks(data.books.map(normaliseBook))
-            setCollections(mapReadingLists(data.lists))
-            setWantToReadBooks(data.wantToReadBooks.map(normaliseBook))
-            setGlobalLibrary(data.globalLibrary)
+            setBooks(data.books)
+            setCollections(data.collections)
             setError(null)
             return
           } catch (err) {
@@ -115,7 +114,7 @@ export default function App() {
         }
 
         if (!cancelled) {
-          setError(lastError instanceof Error ? lastError.message : 'Could not load books.')
+          setError(errorMessage(lastError, 'Could not load books.'))
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -125,30 +124,29 @@ export default function App() {
     return () => { cancelled = true }
   }, [])
 
-  async function reloadAppData() {
+  async function reloadAppData(): Promise<Book[]> {
     const data = await loadBootstrapData()
 
-    setBooks(data.books.map(normaliseBook))
-    setCollections(mapReadingLists(data.lists))
-    setWantToReadBooks(data.wantToReadBooks.map(normaliseBook))
-    setGlobalLibrary(data.globalLibrary)
-    // Views that fetch their own books watch this rather than these lists, so
-    // one reload refreshes the whole app rather than only the shelves.
-    setDataVersion((version) => version + 1)
+    setBooks(data.books)
+    setCollections(data.collections)
+    return data.books
   }
 
-  // Derived views from live books
-  const bookById = new Map(books.map((b) => [b.id, b]))
-  const booksByIds = (ids: string[]): Book[] =>
-    ids.map((id) => bookById.get(id)).filter((b): b is Book => Boolean(b))
-  const currentlyReading = books.filter((b) => b.status === 'reading')
-  const wantToRead = wantToReadBooks
-  const finished = books.filter((b) => b.status === 'done')
-  const dnf = books.filter((b) => b.status === 'dnf')
+  const applyBook = useCallback((book: Book) => {
+    setBooks((current) => (
+      current.some((item) => item.id === book.id)
+        ? current.map((item) => (item.id === book.id ? book : item))
+        : [...current, book]
+    ))
+  }, [])
 
-  // Progress against the goal is counted from `finished` rather than fetched,
-  // so marking a book done moves the bar on the next render — the same list the
-  // goal card draws its covers from.
+  const bookById = useMemo(() => new Map(books.map((b) => [b.id, b])), [books])
+  const booksByIds = useCallback(
+    (ids: string[]): Book[] => ids.map((id) => bookById.get(id)).filter((b): b is Book => Boolean(b)),
+    [bookById],
+  )
+  const { currentlyReading, wantToRead, finished, dnf } = useMemo(() => selectShelves(books), [books])
+
   const readingGoal = useReadingGoal(finished)
 
   const activeCollection = view.startsWith('collection:')
@@ -178,67 +176,39 @@ export default function App() {
   const openBookDialog = (book: Book) =>
     setSelected((prev) => ({ book, isNavigation: prev !== null }))
 
-  const openAuthorPage = (author: string) => {
-    const cleanAuthor = String(author || '').trim()
-    if (!cleanAuthor) return
-    setPreviousView((current) => (view.startsWith('author:') ? current : view))
+  // Hopping between drilldowns keeps the original return target, so Back leaves the drilldown.
+  const openDrilldown = (target: string) => {
+    setPreviousView((current) => (drilldownFor(target) === drilldownFor(view) ? current : view))
     setSelected(null)
     setMobileNav(false)
-    setView(authorViewId(cleanAuthor))
+    setView(target)
   }
-  const goBackFromAuthor = () => {
-    setView(previousView && !previousView.startsWith('author:') ? previousView : 'library')
-    setMobileNav(false)
+  const openAuthorPage = (author: string) => {
+    const cleanAuthor = String(author || '').trim()
+    if (cleanAuthor) openDrilldown(authorViewId(cleanAuthor))
   }
   const openSeriesPage = (series: string) => {
     const cleanSeries = String(series || '').trim()
-    if (!cleanSeries) return
-    setPreviousView((current) => (view.startsWith('series:') ? current : view))
-    setSelected(null)
-    setMobileNav(false)
-    setView(seriesViewId(cleanSeries))
-  }
-  const goBackFromSeries = () => {
-    setView(previousView && !previousView.startsWith('series:') ? previousView : 'library')
-    setMobileNav(false)
+    if (cleanSeries) openDrilldown(seriesViewId(cleanSeries))
   }
   const openGenrePage = (genre: string) => {
     const cleanGenre = String(genre || '').trim()
-    if (!cleanGenre) return
-    setPreviousView((current) => (view.startsWith('genre:') ? current : view))
-    setSelected(null)
-    setMobileNav(false)
-    setView(genreViewId(cleanGenre))
+    if (cleanGenre) openDrilldown(genreViewId(cleanGenre))
   }
-  const goBackFromGenre = () => {
-    setView(previousView && !previousView.startsWith('genre:') ? previousView : 'library')
-    setMobileNav(false)
-  }
-  // Reached from the stats page's Books read row, so it falls back to 'stats'
-  // rather than to the library the other drilldowns return to.
-  const openBooksReadPage = (year: string) => {
-    setPreviousView((current) => (view.startsWith('books-read:') ? current : view))
-    setSelected(null)
-    setMobileNav(false)
-    setView(booksReadViewId(year))
-  }
-  const goBackFromBooksRead = () => {
-    setView(previousView && !previousView.startsWith('books-read:') ? previousView : 'stats')
+  const openBooksReadPage = (year: string) => openDrilldown(booksReadViewId(year))
+  const goBack = () => {
+    const drilldown = drilldownFor(view)
+    if (!drilldown) return
+    setView(previousView && !previousView.startsWith(drilldown.prefix) ? previousView : drilldown.fallback)
     setMobileNav(false)
   }
-  // 'want-to-read' is a sidebar destination rather than a drilldown, so this
-  // doesn't touch previousView — the back arrows belong to the author/series/
-  // genre pages, and landing here should leave their return target alone.
+  // A sidebar destination, not a drilldown, so previousView stays untouched.
   const openWantToRead = () => {
     setView('want-to-read')
     setMobileNav(false)
   }
 
-  // The generic jump used by the sidebar, the ⌘1–⌘7 chords and every palette
-  // navigate command. Like the sidebar it is a top-level destination rather
-  // than a drilldown, so it leaves previousView alone; it does dismiss whatever
-  // is open on top, since arriving at a new view behind a dialog reads as the
-  // shortcut having done nothing.
+  // Top-level jump: leaves previousView alone but dismisses anything open on top.
   const goTo = (viewId: string) => {
     setShowPalette(false)
     setSelected(null)
@@ -257,92 +227,50 @@ export default function App() {
     onNavigate: goTo,
   })
 
-  async function createCollection(): Promise<string> {
-    const name = nextCollectionName(collections)
-    const data = await apiFetch<{ lists?: RawList[] }>('/reading-lists', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+  // Every collection route answers with the full list, ids only, so this is
+  // cheap and leaves nothing to merge.
+  async function sendCollections(path: string, method: string, body?: object) {
+    const data = await apiFetch<{ id?: number; collections?: RawCollection[] }>(path, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
     })
-    const nextCollections = mapReadingLists(data.lists || [])
-    setCollections(nextCollections)
-    setView(`collection:${collectionIdFromName(name)}`)
-    return name
+    const next = mapCollections(data.collections)
+    setCollections(next)
+    return { createdId: String(data.id ?? ''), next }
   }
 
-  async function renameCollection(collection: Collection, name: string): Promise<string> {
-    const data = await apiFetch<{ lists?: RawList[] }>(`/reading-lists/${collectionIdFromName(collection.name)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+  async function createCollection(): Promise<Collection | undefined> {
+    const { createdId, next } = await sendCollections('/collections', 'POST', {
+      name: nextCollectionName(collections),
     })
-    const nextCollections = mapReadingLists(data.lists || [])
-    setCollections(nextCollections)
-    const oldView = `collection:${collection.id}`
-    const newView = `collection:${collectionIdFromName(name)}`
-    if (view === oldView) setView(newView)
-    return name
+    setView(`collection:${createdId}`)
+    return next.find((collection) => collection.id === createdId)
+  }
+
+  async function renameCollection(collection: Collection, name: string): Promise<void> {
+    await sendCollections(`/collections/${collection.id}`, 'PATCH', { name })
   }
 
   async function setCollectionIcon(collection: Collection, icon: string): Promise<void> {
-    const data = await apiFetch<{ lists?: RawList[] }>(
-      `/reading-lists/${collectionIdFromName(collection.name)}/icon`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ icon }),
-      },
-    )
-    setCollections(mapReadingLists(data.lists || []))
+    await sendCollections(`/collections/${collection.id}`, 'PATCH', { icon })
   }
 
   async function deleteCollection(collection: Collection): Promise<void> {
-    const data = await apiFetch<{ lists?: RawList[] }>(`/reading-lists/${collectionIdFromName(collection.name)}`, {
-      method: 'DELETE',
-    })
-    const nextCollections = mapReadingLists(data.lists || [])
-    setCollections(nextCollections)
+    await sendCollections(`/collections/${collection.id}`, 'DELETE')
     if (view === `collection:${collection.id}`) {
       setView('library')
     }
   }
 
-  async function addBookToCollection(collectionName: string, bookId: string): Promise<void> {
-    const data = await apiFetch<{ lists?: RawList[] }>(`/reading-lists/${collectionIdFromName(collectionName)}/books`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ book_id: bookId }),
-    })
-    setCollections(mapReadingLists(data.lists || []))
+  async function addBookToCollection(collectionId: string, bookId: string): Promise<void> {
+    await sendCollections(`/collections/${collectionId}/books`, 'POST', { book_id: bookId })
   }
 
-  async function removeBookFromCollection(collectionName: string, bookId: string): Promise<void> {
-    const data = await apiFetch<{ lists?: RawList[] }>(
-      `/reading-lists/${collectionIdFromName(collectionName)}/books/${bookId}`,
-      {
-        method: 'DELETE',
-      }
-    )
-    setCollections(mapReadingLists(data.lists || []))
+  async function removeBookFromCollection(collectionId: string, bookId: string): Promise<void> {
+    await sendCollections(`/collections/${collectionId}/books/${bookId}`, 'DELETE')
   }
 
-  async function toggleBookWantToRead(bookId: string, isSaved: boolean): Promise<void> {
-    const data = await apiFetch<{ books?: RawBookPayload[] }>(
-      isSaved ? `/want-to-read-books/${bookId}` : '/want-to-read-books',
-      {
-        method: isSaved ? 'DELETE' : 'POST',
-        headers: isSaved ? undefined : { 'Content-Type': 'application/json' },
-        body: isSaved ? undefined : JSON.stringify({ book_id: bookId }),
-      }
-    )
-    setWantToReadBooks((data.books || []).map(normaliseBook))
-    await reloadAppData()
-  }
-
-  // Both vault actions say "your library" where the per-book buttons in the
-  // book dialog name the book. They land in the same corner now, and "Pushed to
-  // vault." from two places that sync very different amounts of data was the
-  // one genuine ambiguity in moving these out of their own surfaces.
   async function pushToVault() {
     if (vaultBusy) return
     setVaultBusy('push')
@@ -350,10 +278,7 @@ export default function App() {
       await apiFetch('/sync/obsidian/push', { method: 'POST' })
       showToast('Pushed your library to the vault.', { key: 'vault:library' })
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not push to Obsidian vault.', {
-        tone: 'error',
-        key: 'vault:library',
-      })
+      showError(err, 'Could not push to Obsidian vault.', 'vault:library')
     } finally {
       setVaultBusy(null)
     }
@@ -367,30 +292,25 @@ export default function App() {
       await reloadAppData()
       showToast('Pulled your library from the vault.', { key: 'vault:library' })
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not pull from Obsidian vault.', {
-        tone: 'error',
-        key: 'vault:library',
-      })
+      showError(err, 'Could not pull from Obsidian vault.', 'vault:library')
     } finally {
       setVaultBusy(null)
     }
   }
 
   const libraryData = {
+    books,
     collections,
-    wantToReadBooks,
-    globalLibrary,
     currentlyReading,
     wantToRead,
     finished,
     dnf,
     readingGoal,
     booksByIds,
-    dataVersion,
+    applyBook,
     refreshLibrary: reloadAppData,
     addBookToCollection,
     removeBookFromCollection,
-    toggleBookWantToRead,
     createCollection,
     renameCollection,
     setCollectionIcon,
@@ -407,8 +327,7 @@ export default function App() {
     onEditReadingGoal: () => setShowGoalDialog(true),
   }
 
-  // Only assembled while the palette is on screen — several entries close over
-  // vault state that changes underneath it.
+  // Built only while the palette is open; several entries close over changing vault state.
   const commands = showPalette
     ? buildCommands({
       collections,
@@ -416,7 +335,7 @@ export default function App() {
       goTo,
       onAddBook: openScraperDialog,
       onNewCollection: async () => { await createCollection() },
-      onRefresh: reloadAppData,
+      onRefresh: async () => { await reloadAppData() },
       onVaultSettings: () => setShowSettingsDialog(true),
       onPush: pushToVault,
       onPull: pullFromVault,
@@ -464,26 +383,8 @@ export default function App() {
                     <Menu />
                   </button>
                   <div>
-                    {view.startsWith('genre:') && (
-                      <button type="button" className="kickerLink" onClick={goBackFromGenre}>
-                        <ArrowLeft size={14} />
-                        Back
-                      </button>
-                    )}
-                    {view.startsWith('author:') && (
-                      <button type="button" className="kickerLink" onClick={goBackFromAuthor}>
-                        <ArrowLeft size={14} />
-                        Back
-                      </button>
-                    )}
-                    {view.startsWith('series:') && (
-                      <button type="button" className="kickerLink" onClick={goBackFromSeries}>
-                        <ArrowLeft size={14} />
-                        Back
-                      </button>
-                    )}
-                    {view.startsWith('books-read:') && (
-                      <button type="button" className="kickerLink" onClick={goBackFromBooksRead}>
+                    {drilldownFor(view) && (
+                      <button type="button" className="kickerLink" onClick={goBack}>
                         <ArrowLeft size={14} />
                         Back
                       </button>
@@ -496,9 +397,9 @@ export default function App() {
 
               <div className="mainContent">
                 {loading ? (
-                  <div className="emptyState"><p>Loading your books…</p></div>
+                  <EmptyState message="Loading your books…" />
                 ) : error ? (
-                  <div className="emptyState"><h2>Could not load books</h2><p>{error}</p></div>
+                  <EmptyState title="Could not load books" message={error} />
                 ) : (
                   <ViewContent view={view} />
                 )}
@@ -512,10 +413,11 @@ export default function App() {
           {showScraperDialog && (
             <ScraperDialog
               onClose={() => setShowScraperDialog(false)}
-              onSuccess={async (newBook) => {
+              onSuccess={(newBook) => {
+                const book = normaliseBook(newBook)
                 setShowScraperDialog(false)
-                await reloadAppData()
-                setSelected({ book: normaliseBook(newBook) })
+                applyBook(book)
+                setSelected({ book })
               }}
             />
           )}

@@ -1,21 +1,12 @@
 const BASE = 'http://127.0.0.1:9876/api'
 const TOKEN_HEADER = 'X-Bookscape-Token'
-// The Tauri shell can take up to ~30.5s to finish launching the backend on a
-// cold first run (see wait_for_backend() in src-tauri/src/main.rs). Keep
-// retrying at least that long so we don't give up before the backend is up.
+// Outlasts the ~30.5s cold-start wait_for_backend() in src-tauri/src/main.rs.
 const BOOTSTRAP_RETRIES = 34
 const BOOTSTRAP_RETRY_DELAY_MS = 1000
 
 let tokenPromise: Promise<string> | null = null
 
-// The launch token proves a request came from this window rather than from any
-// other program that happens to know the port — the API is on loopback, which
-// every browser on the machine can also reach. It only exists inside the Tauri
-// shell, so loading the dev server in a plain browser fails here by design.
-//
-// A failed lookup clears the cache instead of memoising the failure: the IPC
-// bridge can be a beat behind on a cold start, and that is exactly the window
-// the bootstrap retry loop exists to ride out.
+// Proves a request came from this window. Failures aren't cached, since IPC can lag on cold start.
 function apiToken(): Promise<string> {
   if (!tokenPromise) {
     tokenPromise = import('@tauri-apps/api/tauri')
@@ -56,8 +47,7 @@ async function readErrorDetail(res: Response, path: string): Promise<Error> {
   return new Error(`API ${path} -> ${res.status}${detail}`)
 }
 
-// Streams newline-delimited JSON events from a POST endpoint, yielding each
-// parsed line as it arrives (used for the scraper's staged progress events).
+// Yields each parsed line of a newline-delimited JSON POST stream as it arrives.
 async function* apiFetchStream<T = unknown>(path: string, body: unknown): AsyncGenerator<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',

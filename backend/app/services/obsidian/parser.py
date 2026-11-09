@@ -9,12 +9,9 @@ from ...utils import clamp_my_rating, parse_iso_date_string
 
 
 def _normalize_name(value: object) -> str:
-    """Strip Obsidian wiki-link brackets and normalize unicode (preserve casing
-    and punctuation — titles/authors round-trip through Push, so periods,
-    apostrophes, and hyphens must survive a parse, not just accented letters)."""
+    """Strip wiki-link brackets and normalize unicode, preserving case and punctuation for round-trips."""
     text = str(value or "").strip()
     text = re.sub(r"\[\[|\]\]", "", text).strip()
-    # Normalize unicode but preserve original casing
     text = unicodedata.normalize("NFKD", text)
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
     return re.sub(r"\s+", " ", text).strip()
@@ -79,10 +76,7 @@ def parse_book(path: Path) -> dict | None:
         "start_date":       parse_iso_date_string(fm.get("start_date")),
         "finish_date":      parse_iso_date_string(fm.get("completed_date")),
         "image_url":        str(fm.get("image") or "").strip(),
-        # None, not 0, when the key is absent — every note written before
-        # my_rating existed lacks it, and a missing key has to read as "this
-        # file has nothing to say" rather than "rate this book zero". Pull
-        # skips the field entirely in that case; see _apply_parsed_book.
+        # None, not 0: a note without the key says nothing, rather than "rate this zero".
         "my_rating":        clamp_my_rating(fm["my_rating"]) if fm.get("my_rating") is not None else None,
         "rating":           float(fm.get("rating_value") or 0),
         "rating_count":     int(fm.get("rating_count") or 0),

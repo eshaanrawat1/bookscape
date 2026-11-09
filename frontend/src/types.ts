@@ -1,44 +1,31 @@
 import type { LucideIcon } from 'lucide-react'
 
-export type ReadingStatus = 'not_started' | 'reading' | 'done' | 'dnf'
+export type ReadingStatus = 'not_started' | 'want' | 'reading' | 'done' | 'dnf'
 
-// Raw payload shapes vary across endpoints (/my-books, /global-library, /search,
-// /author-books, /genre-books, /book/{id}); normaliseBook() is the single place
-// that coerces whichever fields are present into a Book.
+// Shapes vary by endpoint; normaliseBook() is the single place that coerces them into a Book.
 export interface RawBookPayload {
   id?: string
   uid?: string
   title?: string
   author?: string
   image_url?: string
-  linked_catalog_book?: {
-    series?: string
-    series_number?: string
-    avg_rating?: number | string
-    rating_count?: number | string
-    review_count?: number | string
-    page_count?: number
-  } | null
-  genre?: string
-  genres?: string[]
+  description?: string
+  avg_rating?: number
+  rating_count?: number
+  review_count?: number
+  page_count?: number
   series?: string
   series_number?: string
-  page_count?: number
-  total_pages?: number
-  reading_total_pages?: number
-  current_page?: number
-  reading_current_page?: number
-  start_date?: string
-  reading_start_date?: string
-  finish_date?: string
-  reading_finish_date?: string
-  avg_rating?: number | string
-  review_count?: number | string
-  rating_count?: number | string
-  reading_status?: ReadingStatus
+  genres?: string[]
+  similar_book_ids?: string[]
   status?: ReadingStatus
-  description?: string
-  similar_books?: RawBookPayload[]
+  current_page?: number
+  total_pages?: number
+  start_date?: string
+  finish_date?: string
+  my_rating?: number
+  notes?: string
+  updated_at?: string
   [key: string]: unknown
 }
 
@@ -49,9 +36,7 @@ export interface Book {
   cover: string
   genre: string
   genres: string[]
-  // Kept as two fields rather than one pre-joined "Name #2" string: the name is
-  // the identity a series is looked up by, and seriesNumber stays text because
-  // Goodreads numbers novellas "1.5" — parsing it to a number would lose that.
+  // seriesNumber stays text: Goodreads numbers novellas "1.5".
   series: string
   seriesNumber: string
   pages: number
@@ -65,15 +50,22 @@ export interface Book {
   progress: number
   status: ReadingStatus
   blurb: string
-  _raw: RawBookPayload
-  similar_books?: RawBookPayload[]
+  similarIds: string[]
+  // 0 is "not rated yet", as on the server.
+  myRating: number
+  notes: string
+  updatedAt: string
 }
 
-export interface RawList {
+export interface BookProps {
+  book: Book
+}
+
+export interface RawCollection {
+  id: number
   name: string
   icon?: string
   book_ids?: string[]
-  books?: RawBookPayload[]
 }
 
 export interface Collection {
@@ -82,7 +74,6 @@ export interface Collection {
   // A lucide name from collectionIcons.ts, or '' for the default dot.
   icon: string
   bookIds: string[]
-  books: Book[]
 }
 
 export interface GenreSection {
@@ -90,10 +81,7 @@ export interface GenreSection {
   books: Book[]
 }
 
-// A snippet copied out of a book. `page` is 0 for "no page recorded" — no book
-// has a page zero, so nothing has to distinguish a missing page from a real one
-// — and `note` is your own commentary on the snippet, distinct from the single
-// per-book notes field the reading panel writes.
+// `page` is 0 for "no page recorded"; `note` is separate from the per-book notes field.
 export interface RawHighlight {
   id: number
   book_id: string
@@ -116,13 +104,10 @@ export interface Highlight {
 
 export interface RawHighlightGroup {
   book_id: string
-  book: RawBookPayload | null
-  count: number
   highlights: RawHighlight[]
 }
 
-// One book's highlights, newest first. The backend drops any group whose
-// catalog row has gone, so `book` is always present by the time it reaches here.
+// Newest first; the backend drops groups whose catalog row is gone, so `book` is always present.
 export interface HighlightGroup {
   bookId: string
   book: Book
@@ -130,30 +115,17 @@ export interface HighlightGroup {
   highlights: Highlight[]
 }
 
-export interface RawGenreSection {
-  genre: string
-  books: RawBookPayload[]
-}
-
-// `books` are raw payloads like every other endpoint's, not Books: the view runs
-// them through normaliseBook() so this page builds a book exactly the way the
-// rest of the app does, rather than trusting a second hand-rolled shape.
-//
-// `months` is always twelve entries, January first — the chart draws a full year,
-// so a month with nothing finished is a zero-height bar, not a missing column.
+// `months` is always twelve entries, January first.
 export interface StatsSummary {
-  year: number | null
-  available_years: number[]
-  books_read: number
-  pages_read: number
-  genres_covered: number
-  days_reading: number
+  availableYears: number[]
+  booksRead: number
+  pagesRead: number
+  genresCovered: number
+  daysReading: number
   months: number[]
-  // Oldest first, one entry per calendar year including the empty ones in
-  // between, capped to the most recent twelve. Empty unless this is the
-  // all-time summary, which is the only view drawn year by year.
-  year_counts: YearCount[]
-  books: RawBookPayload[]
+  // Oldest first, including empty years, capped to twelve. Only set for all time.
+  yearCounts: YearCount[]
+  books: Book[]
 }
 
 interface YearCount {
@@ -161,30 +133,17 @@ interface YearCount {
   count: number
 }
 
-// One series you have started and not finished, as /series-progress reports it.
-// `read`/`reading` count books in that state; the rest of `total` are ones you
-// have not picked up or have set down. `next_book` is the one to read next —
-// the book you are in if there is one, otherwise the first unread in order. A
-// series with nothing left to read next is not in progress and never reaches
-// this list, so in practice it is always present; the type keeps it nullable
-// rather than have the shelf trust a guarantee it cannot see.
+// `next_book` is the book in progress, else the first unread; nullable though always set in practice.
 export interface SeriesProgress {
   series: string
   total: number
   read: number
   reading: number
-  next_book: RawBookPayload | null
+  dnf: number
+  nextBook: Book | null
 }
 
-// The year's reading goal, as the goal card, the sidebar widget and the edit
-// dialog all read it. `target` is 0 when no goal is set for the year — the one
-// state that means "no goal", so nothing has to distinguish a missing goal from
-// a goal of nothing.
-//
-// `read` is the books that count toward it, drawn from the finished list the app
-// already holds rather than from a second count on the server: the card puts
-// their covers on screen, so a number that disagreed with them would be visibly
-// wrong.
+// `target` is 0 when no goal is set; `read` comes from the client's finished list, not the server.
 export interface ReadingGoalState {
   year: number
   target: number
@@ -193,40 +152,34 @@ export interface ReadingGoalState {
   loading: boolean
   saving: boolean
   error: string | null
-  // Rejects rather than swallowing a failed write, so the dialog can stay open
-  // on the number you typed instead of closing over a goal that never saved.
+  // Rejects on failure so the dialog can stay open on the typed number.
   save: (target: number) => Promise<void>
   clear: () => Promise<void>
 }
 
 export interface LibraryDataContextValue {
+  // Every book in the catalog, each carrying your reading state. All the pages
+  // below are derived from this one list, so an edit reaches them all at once.
+  books: Book[]
   collections: Collection[]
-  wantToReadBooks: Book[]
-  globalLibrary: GenreSection[]
   currentlyReading: Book[]
   wantToRead: Book[]
   finished: Book[]
   dnf: Book[]
   readingGoal: ReadingGoalState
   booksByIds: (ids: string[]) => Book[]
-  // Bumped every time the app-level lists are reloaded. Views that fetch their
-  // own books (the author, series and genre drilldowns, and search) watch it so
-  // an edit made in the dialog reaches them too — the context lists refresh
-  // themselves, but those pages own their results and would otherwise go stale.
-  dataVersion: number
-  refreshLibrary: () => Promise<void>
-  addBookToCollection: (collectionName: string, bookId: string) => Promise<void>
-  removeBookFromCollection: (collectionName: string, bookId: string) => Promise<void>
-  toggleBookWantToRead: (bookId: string, isSaved: boolean) => Promise<void>
-  createCollection: () => Promise<string>
-  renameCollection: (collection: Collection, name: string) => Promise<string>
+  // Puts one changed book into the list, or adds it if it is new.
+  applyBook: (book: Book) => void
+  // Refetches everything and resolves with the fresh list of books.
+  refreshLibrary: () => Promise<Book[]>
+  addBookToCollection: (collectionId: string, bookId: string) => Promise<void>
+  removeBookFromCollection: (collectionId: string, bookId: string) => Promise<void>
+  createCollection: () => Promise<Collection | undefined>
+  renameCollection: (collection: Collection, name: string) => Promise<void>
   setCollectionIcon: (collection: Collection, icon: string) => Promise<void>
   deleteCollection: (collection: Collection) => Promise<void>
 }
 
-// Confirmations and action errors, shown in one fixed corner stack rather than
-// inline in whatever dialog fired them — a message about a save that closes
-// with the dialog is a message nobody reads.
 export type ToastTone = 'info' | 'error'
 
 export interface Toast {
@@ -237,15 +190,14 @@ export interface Toast {
 
 export interface ToastOptions {
   tone?: ToastTone
-  // Toasts sharing a key replace one another instead of stacking. Every action
-  // that can be repeated on the same target passes one — without it, flipping a
-  // book in and out of Want to read four times leaves four toasts on screen
-  // saying contradictory things.
+  // Toasts sharing a key replace one another instead of stacking.
   key?: string
 }
 
 export interface ToastContextValue {
   showToast: (message: string, options?: ToastOptions) => void
+  // A failed action: the thrown message if it has one, else `fallback`.
+  showError: (err: unknown, fallback: string, key?: ToastOptions['key']) => void
 }
 
 export interface NavigationContextValue {
@@ -256,10 +208,12 @@ export interface NavigationContextValue {
   // The stats page's Books read drilldown. '' is all time, as on the stats page.
   onOpenBooksRead: (year: string) => void
   onOpenWantToRead: () => void
-  // Opens the reading-goal dialog. A dialog rather than a view, like onOpen, so
-  // the card and the sidebar widget can both raise it without either owning it.
   onEditReadingGoal: () => void
 }
+
+export type VaultAction = 'push' | 'pull'
+
+type CommandAction = () => void | Promise<void>
 
 export type CommandGroup = 'Navigate' | 'Actions' | 'Collections'
 
@@ -272,17 +226,17 @@ export interface Command {
   hint?: string
   // Extra text folded into fuzzy matching but never shown.
   keywords?: string
-  run: () => void | Promise<void>
+  run: CommandAction
 }
 
 export interface CommandDeps {
   collections: Collection[]
-  vaultBusy: 'push' | 'pull' | null
+  vaultBusy: VaultAction | null
   goTo: (viewId: string) => void
   onAddBook: () => void
-  onNewCollection: () => void | Promise<void>
-  onRefresh: () => void | Promise<void>
+  onNewCollection: CommandAction
+  onRefresh: CommandAction
   onVaultSettings: () => void
-  onPush: () => void | Promise<void>
-  onPull: () => void | Promise<void>
+  onPush: CommandAction
+  onPull: CommandAction
 }

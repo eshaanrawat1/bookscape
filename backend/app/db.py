@@ -20,36 +20,25 @@ CREATE TABLE IF NOT EXISTS books (
   page_count        INTEGER NOT NULL DEFAULT 0,
   series            TEXT NOT NULL DEFAULT '',
   series_number     TEXT NOT NULL DEFAULT '',
+  -- Ordered JSON arrays: both are read whole, always alongside the book.
+  genres            TEXT NOT NULL DEFAULT '[]',
   similar_book_ids  TEXT NOT NULL DEFAULT '[]',
-  source_url        TEXT NOT NULL DEFAULT '',
-  color             TEXT NOT NULL DEFAULT '',
-  scraped_at        TEXT NOT NULL DEFAULT '',
-  updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  scraped_at        TEXT NOT NULL DEFAULT ''
 );
 
-CREATE TABLE IF NOT EXISTS genres (
-  id   INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE COLLATE NOCASE
-);
-
-CREATE TABLE IF NOT EXISTS book_genres (
-  uid       TEXT NOT NULL REFERENCES books(uid) ON DELETE CASCADE,
-  genre_id  INTEGER NOT NULL REFERENCES genres(id) ON DELETE CASCADE,
-  position  INTEGER NOT NULL DEFAULT 0,
-  PRIMARY KEY (uid, genre_id)
-);
-CREATE INDEX IF NOT EXISTS idx_bg_genre ON book_genres(genre_id);
-CREATE INDEX IF NOT EXISTS idx_bg_uid_pos ON book_genres(uid, position);
-
+-- What you say about a book, where `books` is what Goodreads says. No row means
+-- not started; a row left holding nothing is deleted rather than kept.
+--
+-- `total_pages` is your edition's length when it differs from the catalog's, and
+-- 0 otherwise.
 CREATE TABLE IF NOT EXISTS user_book_state (
   uid               TEXT PRIMARY KEY REFERENCES books(uid) ON DELETE CASCADE,
   status            TEXT NOT NULL DEFAULT 'not_started'
-                       CHECK (status IN ('not_started','reading','done','dnf')),
+                       CHECK (status IN ('not_started','want','reading','done','dnf')),
   current_page      INTEGER NOT NULL DEFAULT 0,
   total_pages       INTEGER NOT NULL DEFAULT 0,
   start_date        TEXT NOT NULL DEFAULT '',
   finish_date       TEXT NOT NULL DEFAULT '',
-  want_to_read      INTEGER NOT NULL DEFAULT 0 CHECK (want_to_read IN (0,1)),
   -- Your own score out of 5, distinct from books.avg_rating (the scraped crowd
   -- average). 0 is "not rated yet" rather than a literal zero, matching every
   -- display site's `rating > 0` gate — a book you actively hated is a 0.01.
@@ -88,8 +77,8 @@ CREATE INDEX IF NOT EXISTS idx_cb_uid ON collection_books(uid);
 -- reading of 0 — a highlight's page is either known or it isn't, and no book
 -- has a page zero to confuse it with.
 --
--- Bookscape-only, like collections and want_to_read: highlights never reach the
--- Obsidian vault in either direction.
+-- Bookscape-only, like collections: highlights never reach the Obsidian vault in
+-- either direction.
 CREATE TABLE IF NOT EXISTS highlights (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   uid        TEXT NOT NULL REFERENCES books(uid) ON DELETE CASCADE,
@@ -105,23 +94,6 @@ CREATE TABLE IF NOT EXISTS app_settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL DEFAULT ''
 );
-
--- One row per book whose cover we have tried to sample a color from. An empty
--- books.color cannot say whether a book is untried or permanently unsamplable,
--- so the color extractor would retry dead cover URLs forever. This table is
--- that missing bit, and the PRIMARY KEY makes "at most one attempt per book" a
--- constraint rather than a convention: a runner claims a book by inserting
--- 'pending' here *before* downloading, so a crash mid-fetch leaves a visible
--- claim instead of silently re-running later.
-CREATE TABLE IF NOT EXISTS cover_attempts (
-  uid          TEXT PRIMARY KEY REFERENCES books(uid) ON DELETE CASCADE,
-  status       TEXT NOT NULL DEFAULT 'pending'
-                  CHECK (status IN ('pending','ok','failed')),
-  reason       TEXT NOT NULL DEFAULT '',
-  detail       TEXT NOT NULL DEFAULT '',
-  attempted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-);
-CREATE INDEX IF NOT EXISTS idx_cover_attempts_status ON cover_attempts(status);
 """
 
 
@@ -154,17 +126,7 @@ def transaction(root: Path) -> Iterator[sqlite3.Connection]:
 
 
 def _add_missing_columns(conn: sqlite3.Connection) -> None:
-    """Bring an existing database up to SCHEMA_SQL's column list.
-
-    SCHEMA_SQL is all CREATE TABLE IF NOT EXISTS, so it describes a *fresh*
-    database and says nothing to one that already exists — a column added to it
-    reaches new installs only. Each entry here is the ALTER that catches the
-    existing file up, guarded by a table_info read so a restart is a no-op.
-
-    Only plain column adds belong here. A change to an existing column (the
-    status CHECK gaining 'dnf', say) needs a table rebuild, which is a migration
-    with a backup, not a startup step.
-    """
+    """Add columns missing from an existing database; changing a column needs a real migration."""
     for table, column, ddl in (
         (
             "user_book_state",

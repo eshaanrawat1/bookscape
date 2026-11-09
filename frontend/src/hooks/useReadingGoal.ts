@@ -1,19 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch, BOOTSTRAP_RETRIES, BOOTSTRAP_RETRY_DELAY_MS } from '../api.js'
-import { sleep } from '../utils.js'
+import { sleep, errorMessage } from '../utils.js'
 import type { Book, ReadingGoalState } from '../types.js'
 
-// A year is 365 days for pacing purposes. The dialog's two fields are a
-// conversion of one another ("52 books" is "one every 7 days"), and rounding a
-// leap year in would move the answer by less than the rounding already does.
 const DAYS_IN_YEAR = 365
 const MAX_READING_GOAL = 1000
 
-// How often you would have to finish a book to hit `target` in a year, and back
-// again. The pair does not round-trip exactly at the top of the range — 100
-// books is a book every 4 days, which is 91 books — so only the field you are
-// not typing in is ever recomputed. Converting both ways on every keystroke
-// would drag the number you just typed out from under you.
+// Not an exact round-trip (100 books -> every 4 days -> 91), so only the other field is recomputed.
 function daysPerBook(target: number): number {
   return target > 0 ? Math.max(1, Math.round(DAYS_IN_YEAR / target)) : 0
 }
@@ -22,9 +15,7 @@ function booksPerYear(days: number): number {
   return days > 0 ? Math.max(1, Math.min(MAX_READING_GOAL, Math.round(DAYS_IN_YEAR / days))) : 0
 }
 
-// The books that count toward the year's goal: everything finished with a date
-// in it. Finished-with-no-date is deliberately not counted — the goal is a
-// claim about a year, and a book with no finish date cannot be placed in one.
+// Undated finishes don't count: a book with no finish date can't be placed in a year.
 function finishedInYear(books: Book[], year: number): Book[] {
   const prefix = String(year)
   return books
@@ -32,27 +23,16 @@ function finishedInYear(books: Book[], year: number): Book[] {
     .sort((a, b) => a.finishDate.localeCompare(b.finishDate))
 }
 
-// The goal is two halves: the target, which lives in app settings, and the
-// progress, which is just the finished books the caller already has. Only the
-// target is fetched, so finishing a book moves the bar on the next render
-// without a round trip — the same list that feeds the card's covers feeds its
-// count.
+// Only the target is fetched; progress comes from finished books so the bar moves without a round trip.
 function useReadingGoal(finished: Book[]): ReadingGoalState {
-  // Pinned at mount rather than read per render: it is the key the target is
-  // fetched under, and a value that changes on its own would refetch against a
-  // year the loaded target does not belong to.
+  // Pinned at mount: it keys the fetched target, so it must not change on its own.
   const [year] = useState(() => new Date().getFullYear())
   const [target, setTarget] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Retried on the same schedule App's bootstrap uses, because this fetch races
-  // the very same cold start: the shell can take ~30s to get the backend
-  // answering, and a single refused connection at launch left a goal that is
-  // sitting in the database reading as "no goal set" until the next reload.
-  // `loading` stays true for the duration, so the card shows nothing rather
-  // than inviting you to set a target you already have.
+  // Retried like App's bootstrap: this races the same cold start, and a refusal would read as "no goal".
   useEffect(() => {
     let cancelled = false
 
@@ -74,7 +54,7 @@ function useReadingGoal(finished: Book[]): ReadingGoalState {
             if (cancelled) return
             continue
           }
-          setError(err instanceof Error ? err.message : 'Could not load your reading goal.')
+          setError(errorMessage(err, 'Could not load your reading goal.'))
           setLoading(false)
         }
       }
@@ -96,7 +76,7 @@ function useReadingGoal(finished: Book[]): ReadingGoalState {
       })
       setTarget(Math.max(0, Number(data.target) || 0))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save your reading goal.')
+      setError(errorMessage(err, 'Could not save your reading goal.'))
       throw err
     } finally {
       setSaving(false)

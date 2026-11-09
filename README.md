@@ -34,14 +34,13 @@ To run the pieces separately during development:
 ## Data
 
 - `backend/data/bookscape.db` — SQLite database: the scraped Goodreads catalog
-  (`books`, `genres`/`book_genres`), your personal reading state
-  (`user_book_state`: status, progress, notes, liked, want-to-read),
-  collections (`collections`/`collection_books`), and highlights
+  (`books`), your personal reading state (`user_book_state`: status, progress,
+  rating, notes), collections (`collections`/`collection_books`), and highlights
   (`highlights`: a passage, its page, and your note on it).
 
-There is no auth and no cloud sync; everything is local-only. `liked`,
-`want_to_read`, collection membership, and highlights are Bookscape-only
-concepts and never leave the database.
+There is no auth and no cloud sync; everything is local-only. Collection
+membership, highlights, and the `want` status are Bookscape-only concepts and
+never leave the database.
 
 ## Obsidian vault
 

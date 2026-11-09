@@ -12,20 +12,12 @@ _FORBIDDEN_TREES = (
     "/System", "/Library", "/Applications", "/private",
 )
 
-# iCloud Drive lives under ~/Library/Mobile Documents, and an iCloud-hosted
-# vault is a case this app deliberately supports (see the note in
-# routes/settings.py). So ~/Library is refused with this one carve-out rather
-# than refused outright.
+# iCloud vaults are supported, so ~/Library is refused with this one carve-out.
 _ICLOUD_TREE = ("Library", "Mobile Documents")
 
 
 def validate_vault_path(path: Path) -> None:
-    """Raise ValueError if `path` is not somewhere a vault may reasonably live.
-
-    Existence is deliberately not checked: a path on an unmounted drive or a
-    not-yet-downloaded iCloud folder must still be configurable. Callers about
-    to touch the disk check that separately.
-    """
+    """Raise ValueError if `path` isn't a plausible vault location; existence is deliberately not checked."""
     if not path.is_absolute():
         raise ValueError(f"Vault path must be an absolute path: {path}")
 

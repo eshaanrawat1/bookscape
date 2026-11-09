@@ -1,42 +1,41 @@
 import { useEffect, useState } from 'react'
-import { searchBooks } from '../utils.js'
+import { searchBookIds, errorMessage } from '../utils.js'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
-import type { Book } from '../types.js'
 
 const RESULT_LIMIT = 24
 const PREVIEW_LIMIT = 5
 
 function useSearch() {
-  const { dataVersion } = useLibraryData()
+  const { booksByIds } = useLibraryData()
   const [draft, setDraft] = useState('')
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<Book[]>([])
+  const [resultIds, setResultIds] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [previewResults, setPreviewResults] = useState<Book[]>([])
+  const [previewIds, setPreviewIds] = useState<string[]>([])
   const [previewLoading, setPreviewLoading] = useState(false)
 
   useEffect(() => {
     const nextQuery = draft.trim()
     const submittedQuery = query.trim()
     if (!nextQuery || nextQuery === submittedQuery) {
-      setPreviewResults([])
+      setPreviewIds([])
       setPreviewLoading(false)
       return undefined
     }
 
-    setPreviewResults([])
+    setPreviewIds([])
     setPreviewLoading(true)
 
     let cancelled = false
     const timer = window.setTimeout(async () => {
       try {
-        const results = await searchBooks(nextQuery, PREVIEW_LIMIT)
+        const ids = await searchBookIds(nextQuery, PREVIEW_LIMIT)
         if (cancelled) return
-        setPreviewResults(results)
+        setPreviewIds(ids)
       } catch {
         if (cancelled) return
-        setPreviewResults([])
+        setPreviewIds([])
       } finally {
         if (!cancelled) setPreviewLoading(false)
       }
@@ -48,32 +47,13 @@ function useSearch() {
     }
   }, [draft, query])
 
-  // Results are a snapshot of the catalog at the moment Enter was pressed, so an
-  // edit made in the dialog on top of them — a status change, a page update —
-  // would otherwise leave the card behind it showing the old reading state. This
-  // re-runs the submitted query quietly: no loading state, because the results
-  // are already on screen and only their reading half is stale.
-  useEffect(() => {
-    const submitted = query.trim()
-    if (!submitted) return undefined
-
-    let cancelled = false
-    searchBooks(submitted, RESULT_LIMIT)
-      .then((books) => {
-        if (!cancelled) setResults(books)
-      })
-      .catch(() => {})
-
-    return () => { cancelled = true }
-  }, [dataVersion])
-
   async function runSearch(rawQuery = draft) {
     const nextQuery = String(rawQuery || '').trim()
     setDraft(nextQuery)
     setQuery(nextQuery)
 
     if (!nextQuery) {
-      setResults([])
+      setResultIds([])
       setError(null)
       return
     }
@@ -81,10 +61,10 @@ function useSearch() {
     setLoading(true)
     setError(null)
     try {
-      setResults(await searchBooks(nextQuery, RESULT_LIMIT))
+      setResultIds(await searchBookIds(nextQuery, RESULT_LIMIT))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not search books.')
-      setResults([])
+      setError(errorMessage(err, 'Could not search books.'))
+      setResultIds([])
     } finally {
       setLoading(false)
     }
@@ -93,10 +73,10 @@ function useSearch() {
   return {
     draft,
     query,
-    results,
+    results: booksByIds(resultIds),
     loading,
     error,
-    previewResults,
+    previewResults: booksByIds(previewIds),
     previewLoading,
     setDraft,
     runSearch,

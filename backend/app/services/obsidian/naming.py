@@ -7,8 +7,7 @@ _WHITESPACE = re.compile(r"\s+")
 
 
 def safe_filename(title: str) -> str:
-    """Sanitize a book title into a filesystem-safe .md filename (used to derive
-    a filename before one has ever been recorded for a book)."""
+    """Sanitize a book title into a filesystem-safe .md filename."""
     clean = _INVALID_CHARS.sub("", str(title or "")).strip()
     clean = _WHITESPACE.sub(" ", clean)
     return f"{clean or 'Untitled'}.md"

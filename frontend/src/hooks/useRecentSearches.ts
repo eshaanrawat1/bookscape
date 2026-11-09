@@ -1,9 +1,6 @@
 import { useCallback, useState } from 'react'
 
-// Recent searches are a convenience, not library data: they belong to the
-// window you searched in, so they live in localStorage rather than behind the
-// API like the goal or the collections do. Every read and write is guarded —
-// a webview with storage disabled should cost you the list, not the page.
+// Per-window convenience, so localStorage; access is guarded for webviews without storage.
 const STORAGE_KEY = 'bookscape.recentSearches'
 const RECENT_LIMIT = 5
 
@@ -30,8 +27,7 @@ function writeStored(entries: string[]) {
 function useRecentSearches() {
   const [recents, setRecents] = useState<string[]>(readStored)
 
-  // Matching case-insensitively so "dune" typed after "Dune" moves the existing
-  // row to the top instead of stacking a near-duplicate next to it.
+  // Case-insensitive so "dune" after "Dune" moves the row instead of duplicating it.
   const addRecent = useCallback((query: string) => {
     const trimmed = query.trim()
     if (!trimmed) return

@@ -1,10 +1,7 @@
 import { useEffect, useState, type KeyboardEvent } from 'react'
 
 interface ListNavigationOptions {
-  // 0 highlights the first row as soon as there is one (the command palette,
-  // where Enter should always do something). -1 starts with nothing
-  // highlighted, so Enter keeps whatever the surrounding form does (the search
-  // view, where a bare Enter runs the full search).
+  // 0 highlights the first row so Enter always acts; -1 starts empty so Enter falls through to the form.
   initialIndex?: number
   onSelect?: (index: number) => void
 }
@@ -12,19 +9,15 @@ interface ListNavigationOptions {
 interface ListNavigation {
   activeIndex: number
   setActiveIndex: (index: number) => void
-  // Returns true when the key was consumed, so callers can fall through to
-  // their own handling otherwise.
+  // True when the key was consumed, so callers can fall through otherwise.
   handleKeyDown: (event: KeyboardEvent) => boolean
 }
 
-// Arrow-key movement over a flat list of rows, shared by the command palette
-// and the search view's preview dropdown so the two behave identically.
 function useListNavigation(count: number, options: ListNavigationOptions = {}): ListNavigation {
   const { initialIndex = 0, onSelect } = options
   const [activeIndex, setActiveIndex] = useState(count > 0 ? initialIndex : -1)
 
-  // Rows churn under the cursor as the query changes, so snap back rather than
-  // leaving the highlight pointing at a row that is no longer there.
+  // Rows churn as the query changes, so reset rather than point at a row that's gone.
   useEffect(() => {
     setActiveIndex(count > 0 ? initialIndex : -1)
   }, [count, initialIndex])

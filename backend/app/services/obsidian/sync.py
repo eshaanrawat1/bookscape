@@ -12,9 +12,7 @@ from .vault import resolve_vault_path
 
 
 class EmptyVaultScanError(Exception):
-    """Raised when a vault-level Pull scans zero .md files — this usually means
-    the vault folder is on an unmounted drive or not-yet-downloaded iCloud path,
-    not that the vault is genuinely empty. Never treat this as a normal result."""
+    """A vault-level Pull scanned zero .md files: likely an unmounted drive, not an empty vault."""
 
 
 @dataclass
@@ -27,8 +25,7 @@ class PullResult:
 
 
 def _apply_parsed_book(root: Path, book: dict, *, dry_run: bool) -> str:
-    """Upsert catalog + reading state for a parsed book dict.
-    Returns a rejection reason string, or '' if applied (or would be, for a dry run)."""
+    """Upsert a parsed book; returns a rejection reason, or '' if applied."""
     status = str(book.get("status") or "").strip().lower()
     if status not in EXPORTABLE_STATUSES:
         return f"status '{status or 'unknown'}' is not {'/'.join(sorted(EXPORTABLE_STATUSES))}"
@@ -40,21 +37,20 @@ def _apply_parsed_book(root: Path, book: dict, *, dry_run: bool) -> str:
     if dry_run:
         return ""
 
-    upsert_book(root, {
-        "uid": uid,
-        "title": book.get("title", ""),
-        "author": book.get("author", ""),
-        "image_url": book.get("image_url", ""),
-        "avg_rating": book.get("rating", 0),
-        "rating_count": book.get("rating_count", 0),
-        "review_count": book.get("review_count", 0),
-        "description": book.get("description", ""),
-        "genres": book.get("genres", []),
-    })
-    # Note: want_to_read/collections are absent by design — they never appear
-    # in the Obsidian markdown format, so Pull never touches them.
-    # Notes round-trip like every other field here: Push writes SQL -> file,
-    # Pull writes file -> SQL, last sync direction wins (same as status/dates).
+    # A note only fills in a book the catalog lacks; it must not overwrite a newer scrape.
+    if not resolve_book(root, uid):
+        upsert_book(root, {
+            "uid": uid,
+            "title": book.get("title", ""),
+            "author": book.get("author", ""),
+            "image_url": book.get("image_url", ""),
+            "avg_rating": book.get("rating", 0),
+            "rating_count": book.get("rating_count", 0),
+            "review_count": book.get("review_count", 0),
+            "description": book.get("description", ""),
+            "genres": book.get("genres", []),
+        })
+    # Notes round-trip like status and dates: the last sync direction wins.
     state_fields = {
         "status": status,
         "current_page": book.get("current_page", 0),
@@ -63,11 +59,7 @@ def _apply_parsed_book(root: Path, book: dict, *, dry_run: bool) -> str:
         "finish_date": book.get("finish_date", ""),
         "notes": book.get("notes", ""),
     }
-    # my_rating is the one field a note is allowed to stay silent about, and
-    # upsert_book_state only writes the keys it is handed — so omitting it
-    # leaves the stored rating alone. Every note written before this field
-    # existed lacks the key, and without this a vault-level Pull would clear
-    # every rating in the library on its first run.
+    # Omitted when absent so pulling older notes doesn't clear every rating.
     if book.get("my_rating") is not None:
         state_fields["my_rating"] = book["my_rating"]
 
@@ -107,10 +99,7 @@ def pull_one(root: Path, *, uid: str, dry_run: bool = False) -> dict:
 
 
 def run_obsidian_pull(root: Path, *, dry_run: bool = False) -> PullResult:
-    """Vault-level Pull: scan every .md file, importing any reading/done book found.
-    Never deletes Bookscape state based on a file being absent — that invariant is
-    intentional (protects against unmounted drives / partial vault availability) and
-    must not be "optimized away" by adding a delete-on-absence step here."""
+    """Import every reading/done note; never deletes on absence, which protects against unmounted drives."""
     vault_path = resolve_vault_path(root)
     if not vault_path.exists():
         raise FileNotFoundError(f"Obsidian vault not found at: {vault_path}")

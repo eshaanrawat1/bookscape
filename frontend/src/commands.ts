@@ -2,9 +2,6 @@ import { FilePlus2, FolderPlus, RefreshCw, Settings, Upload, Download, Bookmark 
 import { mainNav, shelfNav, navShortcut, shortcutLabel } from './constants.js'
 import type { Collection, Command, CommandDeps } from './types.js'
 
-// The palette's command list. Built in App, where every callback below is
-// already in scope, rather than pulled from context — several of these actions
-// (add book, vault sync) are App-local state that nothing else needs.
 function buildCommands(deps: CommandDeps): Command[] {
   const { collections, vaultBusy, goTo, onAddBook, onNewCollection, onRefresh, onVaultSettings, onPush, onPull } = deps
 
@@ -61,9 +58,7 @@ function buildCommands(deps: CommandDeps): Command[] {
       keywords: 'obsidian path folder preferences',
       run: onVaultSettings,
     },
-    // Hidden rather than disabled while a sync is in flight — the icon pill
-    // already disables its buttons, and a row you can highlight but not run
-    // reads as broken.
+    // Hidden rather than disabled during a sync: a row you can highlight but not run reads as broken.
     ...(vaultBusy === null
       ? ([
         {
@@ -89,9 +84,7 @@ function buildCommands(deps: CommandDeps): Command[] {
   return [...navCommands, ...actionCommands, ...collectionCommands]
 }
 
-// Cheap subsequence scorer — enough to make "gtst" find "Go to Statistics"
-// without pulling in a fuzzy-match dependency. Higher is better; 0 means no
-// match at all.
+// Subsequence scorer: higher is better, 0 is no match.
 function scoreCommand(command: Command, query: string): number {
   const needle = query.trim().toLowerCase()
   if (!needle) return 1
@@ -108,8 +101,7 @@ function scoreCommand(command: Command, query: string): number {
 
   if (haystack.includes(needle)) return 500
 
-  // Fall back to an in-order subsequence over the label, penalised by how
-  // spread out the matched characters are.
+  // Fall back to an in-order subsequence, penalised by how spread out the matches are.
   let index = -1
   let gaps = 0
   for (const char of needle) {

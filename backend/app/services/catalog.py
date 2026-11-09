@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from ..db import transaction
-from ..utils import normalize_text, split_author_field
+from ..utils import clamp_my_rating
 
 BOOK_COLUMNS = {
     "title",
@@ -18,11 +18,10 @@ BOOK_COLUMNS = {
     "page_count",
     "series",
     "series_number",
+    "genres",
     "similar_book_ids",
-    "source_url",
     "scraped_at",
 }
-
 
 NON_GENRE_NAMES = {"...more", "…more", "more"}
 
@@ -35,119 +34,53 @@ def _parse_json_list(value: object) -> list:
         return []
 
 
-def _genres_for_uid(conn, uid: str) -> list[str]:
-    rows = conn.execute(
-        "SELECT genres.name AS name FROM book_genres "
-        "JOIN genres ON genres.id = book_genres.genre_id "
-        "WHERE book_genres.uid = ? ORDER BY book_genres.position",
-        (uid,),
-    ).fetchall()
-    return [row["name"] for row in rows]
+def _clean_genres(names: list | None) -> list[str]:
+    """Drop scrape debris and repeats, keeping the order Goodreads lists them in."""
+    clean: list[str] = []
+    seen: set[str] = set()
+    for raw in names or []:
+        name = str(raw).strip()
+        key = name.casefold()
+        if name and key not in NON_GENRE_NAMES and key not in seen:
+            seen.add(key)
+            clean.append(name)
+    return clean
 
 
-def _state_for_uid(conn, uid: str) -> dict | None:
-    row = conn.execute("SELECT * FROM user_book_state WHERE uid = ?", (uid,)).fetchone()
-    return dict(row) if row else None
-
-
-def _states_map(conn) -> dict[str, dict]:
-    rows = conn.execute("SELECT * FROM user_book_state").fetchall()
-    return {row["uid"]: dict(row) for row in rows}
-
-
-def reading_overlay(state: dict | None, page_count: object = 0) -> dict:
-    """The reading-row half of a book payload"""
-
+def _to_book(row, state: dict | None) -> dict:
+    """The one shape a book takes: what Goodreads says plus what you say."""
     state = state or {}
-    total_pages = int(state.get("total_pages") or 0)
-    if total_pages <= 0:
-        total_pages = max(0, int(page_count or 0))
+    page_count = int(row["page_count"] or 0)
     return {
-        "reading_status": str(state.get("status") or "not_started"),
-        "reading_current_page": int(state.get("current_page") or 0),
-        "reading_total_pages": total_pages,
-        "reading_start_date": str(state.get("start_date") or ""),
-        "reading_finish_date": str(state.get("finish_date") or ""),
+        "id": row["uid"],
+        "title": row["title"],
+        "author": row["author"],
+        "image_url": row["image_url"],
+        "description": row["description"],
+        "avg_rating": float(row["avg_rating"] or 0),
+        "rating_count": int(row["rating_count"] or 0),
+        "review_count": int(row["review_count"] or 0),
+        "page_count": page_count,
+        "series": row["series"],
+        "series_number": row["series_number"],
+        "genres": _parse_json_list(row["genres"]),
+        "similar_book_ids": [str(sid) for sid in _parse_json_list(row["similar_book_ids"])],
+        "status": str(state.get("status") or "not_started"),
+        "current_page": int(state.get("current_page") or 0),
+        "total_pages": int(state.get("total_pages") or 0) or page_count,
+        "start_date": str(state.get("start_date") or ""),
+        "finish_date": str(state.get("finish_date") or ""),
+        "my_rating": clamp_my_rating(state.get("my_rating")),
+        "notes": str(state.get("notes") or ""),
+        "updated_at": str(state.get("updated_at") or ""),
     }
 
 
-def _row_to_book(
-    conn,
-    row,
-    genres_map: dict[str, list[str]] | None = None,
-    states_map: dict[str, dict] | None = None,
-) -> dict:
-    book = dict(row)
-    uid = book["uid"]
-    book["similar_book_ids"] = _parse_json_list(book.get("similar_book_ids"))
-    book["genres"] = (
-        genres_map.get(uid, []) if genres_map is not None else _genres_for_uid(conn, uid)
-    )
-
-    state = states_map.get(uid) if states_map is not None else _state_for_uid(conn, uid)
-    book.update(reading_overlay(state, book.get("page_count")))
-    return book
-
-
-def _load_all_books(conn) -> list[dict]:
-    book_rows = conn.execute("SELECT * FROM books").fetchall()
-    genre_rows = conn.execute(
-        "SELECT book_genres.uid AS uid, genres.name AS name FROM book_genres "
-        "JOIN genres ON genres.id = book_genres.genre_id "
-        "ORDER BY book_genres.uid, book_genres.position"
-    ).fetchall()
-    genres_map: dict[str, list[str]] = {}
-    for row in genre_rows:
-        genres_map.setdefault(row["uid"], []).append(row["name"])
-    states = _states_map(conn)
-    return [_row_to_book(conn, row, genres_map, states) for row in book_rows]
-
-
-def _replace_genres(conn, uid: str, genre_names: list) -> None:
-    conn.execute("DELETE FROM book_genres WHERE uid = ?", (uid,))
-    clean = [
-        name
-        for g in (genre_names or [])
-        if (name := str(g).strip()) and name.lower() not in NON_GENRE_NAMES
-    ]
-    for position, name in enumerate(clean):
-        conn.execute("INSERT INTO genres (name) VALUES (?) ON CONFLICT(name) DO NOTHING", (name,))
-        genre_row = conn.execute("SELECT id FROM genres WHERE name = ? COLLATE NOCASE", (name,)).fetchone()
-        conn.execute(
-            "INSERT INTO book_genres (uid, genre_id, position) VALUES (?, ?, ?)",
-            (uid, genre_row["id"], position),
-        )
-
-
-def upsert_book(root: Path, book: dict) -> None:
-    """Insert or partially update a catalog row. Only keys present in `book` are touched,
-    so a partial dict (e.g. from an Obsidian Pull) never nulls out scraper-only fields."""
-    uid = str(book.get("uid") or "").strip()
-    if not uid:
-        raise ValueError("book uid is required")
-
-    fields = {k: v for k, v in book.items() if k in BOOK_COLUMNS}
-    if "similar_book_ids" in fields:
-        fields["similar_book_ids"] = json.dumps(fields["similar_book_ids"] or [])
-
-    columns = list(fields.keys())
-    values = list(fields.values())
-    col_list = ", ".join(["uid", *columns])
-    placeholders = ", ".join(["?"] * (len(columns) + 1))
-    if columns:
-        update_clause = ", ".join(f"{c} = excluded.{c}" for c in columns)
-        update_clause += ", updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')"
-    else:
-        update_clause = "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')"
-
+def list_books(root: Path) -> list[dict]:
     with transaction(root) as conn:
-        conn.execute(
-            f"INSERT INTO books ({col_list}) VALUES ({placeholders}) "
-            f"ON CONFLICT(uid) DO UPDATE SET {update_clause}",
-            [uid, *values],
-        )
-        if "genres" in book:
-            _replace_genres(conn, uid, book.get("genres") or [])
+        rows = conn.execute("SELECT * FROM books").fetchall()
+        states = {row["uid"]: dict(row) for row in conn.execute("SELECT * FROM user_book_state")}
+    return [_to_book(row, states.get(row["uid"])) for row in rows]
 
 
 def resolve_book(root: Path, book_id: str) -> dict | None:
@@ -158,48 +91,54 @@ def resolve_book(root: Path, book_id: str) -> dict | None:
         row = conn.execute("SELECT * FROM books WHERE uid = ?", (book_id,)).fetchone()
         if not row:
             return None
-        return _row_to_book(conn, row)
+        state = conn.execute("SELECT * FROM user_book_state WHERE uid = ?", (book_id,)).fetchone()
+    return _to_book(row, dict(state) if state else None)
 
 
-def get_book_with_similar(root: Path, book_id: str) -> dict | None:
-    book = resolve_book(root, book_id)
-    if not book:
-        return None
+def upsert_book(root: Path, book: dict) -> None:
+    """Insert or partially update a catalog row. Only keys present in `book` are
+    touched, so a partial dict never blanks a field it does not carry."""
+    uid = str(book.get("uid") or "").strip()
+    if not uid:
+        raise ValueError("book uid is required")
 
-    similar_ids = [str(sid) for sid in (book.get("similar_book_ids") or []) if str(sid).strip()]
-    similar_books: list[dict] = []
-    if similar_ids:
-        with transaction(root) as conn:
-            placeholders = ", ".join(["?"] * len(similar_ids))
-            rows = conn.execute(f"SELECT * FROM books WHERE uid IN ({placeholders})", similar_ids).fetchall()
-            states = _states_map(conn)
-            by_uid = {row["uid"]: _row_to_book(conn, row, states_map=states) for row in rows}
-        similar_books = [by_uid[sid] for sid in similar_ids if sid in by_uid]
+    fields = {k: v for k, v in book.items() if k in BOOK_COLUMNS}
+    if "genres" in fields:
+        fields["genres"] = json.dumps(_clean_genres(fields["genres"]), ensure_ascii=False)
+    if "similar_book_ids" in fields:
+        fields["similar_book_ids"] = json.dumps(fields["similar_book_ids"] or [])
 
-    result = dict(book)
-    result["similar_books"] = similar_books
-    return result
+    columns = list(fields.keys())
+    col_list = ", ".join(["uid", *columns])
+    placeholders = ", ".join(["?"] * (len(columns) + 1))
+    conflict = (
+        "DO UPDATE SET " + ", ".join(f"{c} = excluded.{c}" for c in columns)
+        if columns
+        else "DO NOTHING"
+    )
+
+    with transaction(root) as conn:
+        conn.execute(
+            f"INSERT INTO books ({col_list}) VALUES ({placeholders}) ON CONFLICT(uid) {conflict}",
+            [uid, *fields.values()],
+        )
 
 
-def search_books(root: Path, query: str, limit: int = 10) -> list[dict]:
+def search_book_ids(root: Path, query: str, limit: int = 10) -> list[str]:
+    """Ids of the best matches, best first. The client already holds the books."""
     q = str(query or "").lower().strip()
     if not q:
         return []
 
-    with transaction(root) as conn:
-        books = _load_all_books(conn)
-
     scored = []
-    for point in books:
-        title = str(point.get("title", "")).strip()
-        title_lower = title.lower()
+    for book in list_books(root):
+        title_lower = book["title"].strip().lower()
         if not title_lower:
             continue
 
-        author_lower = str(point.get("author", "")).strip().lower()
-        genres = point.get("genres", [])
-        genres_text = " ".join(str(g) for g in genres) if isinstance(genres, list) else str(genres or "")
-        text_lower = f"{title_lower} {author_lower} {genres_text} {point.get('description', '')}".lower()
+        author_lower = book["author"].strip().lower()
+        genres_text = " ".join(str(g) for g in book["genres"])
+        text_lower = f"{title_lower} {author_lower} {genres_text} {book['description']}".lower()
 
         if title_lower.startswith(q):
             lex_score = 5
@@ -223,276 +162,7 @@ def search_books(root: Path, query: str, limit: int = 10) -> list[dict]:
         total_score = lex_score + fuzzy_score
 
         if total_score > 0:
-            scored.append((total_score, sim, point))
+            scored.append((total_score, sim, book["id"]))
 
     scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
-
-    out = []
-    seen = set()
-    for _, _, point in scored:
-        key = point.get("uid") or f"{point.get('title', '')}::{point.get('author', '')}"
-        if key not in seen:
-            seen.add(key)
-            out.append(point)
-            if len(out) >= limit:
-                break
-
-    return out
-
-
-def get_global_library(root: Path) -> list[dict]:
-    with transaction(root) as conn:
-        all_books = _load_all_books(conn)
-    if not all_books:
-        return []
-
-    top_genres = ["Romantasy", "Romance", "Classics", "Fantasy", "High Fantasy", "Dark Academia", "Science Fiction", "Historical Fiction", "Mystery", "Thriller", "Nonfiction", "Philosophy", "Psychology"]
-    top_genres_set = set(top_genres)
-
-    by_genre: dict[str, list[dict]] = {g: [] for g in top_genres}
-    for book in all_books:
-        genres = book.get("genres") or []
-        for g in genres:
-            if g in top_genres_set:
-                by_genre[g].append(book)
-
-    library = []
-    for genre in top_genres:
-        genre_books = by_genre[genre]
-        genre_books.sort(key=lambda x: int(x.get("rating_count", 0) or 0), reverse=True)
-        # Only the genre is overridden — a book filed under several should read
-        # as belonging to the shelf it is sitting on. Everything else is passed
-        # through as-is: this used to hand-pick a dozen keys and hardcode
-        # "not_started", which is how the Library page became the one place a
-        # book you were halfway through rendered as an untouched one.
-        mapped = [{**b, "genre": genre} for b in genre_books[:30]]
-        library.append({"genre": genre, "books": mapped})
-
-    return library
-
-
-def get_books_by_author(root: Path, author: str) -> list[dict]:
-    query = normalize_text(author)
-    if not query:
-        return []
-
-    with transaction(root) as conn:
-        all_books = _load_all_books(conn)
-
-    matched = []
-    seen: set[str] = set()
-    for book in all_books:
-        author_field = book.get("author", "")
-        candidates = [(author_field)] + [
-            normalize_text(part) for part in split_author_field(author_field)
-        ]
-        if any(c and (c == query or c in query or query in c) for c in candidates):
-            book_uid = str(book.get("uid") or "").strip()
-            if book_uid and book_uid not in seen:
-                seen.add(book_uid)
-                matched.append(book)
-
-    matched.sort(key=lambda item: (str(item.get("title") or "").lower(), str(item.get("uid") or "")))
-    return matched
-
-
-def series_sort_key(book: dict) -> tuple:
-    """Order a series the way a reader would shelve it: by number, ascending.
-
-    `series_number` is text because Goodreads numbers novellas "1.5", so it is
-    parsed here rather than sorted as a string — otherwise "10" would file
-    between "1" and "2". Anything unparseable (an omnibus "1-3", an empty
-    number on a prequel) sorts to the end rather than crashing or landing at
-    zero, where it would displace book one.
-    """
-    raw = str(book.get("series_number") or "").strip()
-    try:
-        return (0, float(raw), str(book.get("title") or "").lower())
-    except ValueError:
-        return (1, 0.0, str(book.get("title") or "").lower())
-
-
-def get_books_by_series(root: Path, series: str) -> list[dict]:
-    query = str(series or "").strip()
-    if not query:
-        return []
-
-    with transaction(root) as conn:
-        rows = conn.execute(
-            "SELECT * FROM books WHERE series = ? COLLATE NOCASE",
-            (query,),
-        ).fetchall()
-        states = _states_map(conn)
-        matched = [_row_to_book(conn, row, states_map=states) for row in rows]
-
-    matched.sort(key=series_sort_key)
-    return matched
-
-
-def get_books_by_genre(root: Path, genre: str, limit: int = 100) -> list[dict]:
-    query = str(genre or "").strip()
-    if not query:
-        return []
-
-    with transaction(root) as conn:
-        rows = conn.execute(
-            "SELECT DISTINCT books.* FROM books "
-            "JOIN book_genres ON book_genres.uid = books.uid "
-            "JOIN genres ON genres.id = book_genres.genre_id "
-            "WHERE genres.name = ? COLLATE NOCASE "
-            "ORDER BY books.rating_count DESC LIMIT ?",
-            (query, limit),
-        ).fetchall()
-        states = _states_map(conn)
-        matched = [_row_to_book(conn, row, states_map=states) for row in rows]
-
-    return matched
-
-
-def get_series_progress(root: Path) -> list[dict]:
-    """Every series you are partway through, with your position in it.
-
-    "Partway through" is two conditions, and both matter. At least one book read
-    or being read, so a series you merely own titles from is not a series you
-    started. And at least one book neither finished nor abandoned, so a series
-    you have settled every book in drops off the shelf the moment the last one
-    lands rather than lingering as a finished thing to keep looking at.
-
-    A one-book "series" is skipped outright: it is a series in the catalog's
-    sense but it has no reading order to be partway through, and the shelf reads
-    as noise with them in.
-
-    Only `next_book` is expanded into a full book payload. Counting statuses
-    needs the raw rows and nothing more, and this walks every book in the
-    catalog that belongs to a series — running the per-book genre lookup over
-    all 639 of them to render one cover apiece would be several hundred queries
-    for data no caller reads.
-    """
-    with transaction(root) as conn:
-        rows = conn.execute("SELECT * FROM books WHERE TRIM(series) <> ''").fetchall()
-        states = _states_map(conn)
-
-        # Grouped case-insensitively to match the lookup on the other side:
-        # /series-books resolves a name with COLLATE NOCASE, so a series split
-        # across two capitalisations here would send you to a page listing both.
-        groups: dict[str, list[dict]] = {}
-        for row in rows:
-            book = dict(row)
-            name = str(book.get("series") or "").strip()
-            groups.setdefault(name.casefold(), []).append(book)
-
-        progress = []
-        for books in groups.values():
-            books.sort(key=series_sort_key)
-            statuses = [
-                str((states.get(book["uid"]) or {}).get("status") or "not_started")
-                for book in books
-            ]
-            total = len(books)
-            if total < 2:
-                continue
-            read = statuses.count("done")
-            reading = statuses.count("reading")
-            dnf = statuses.count("dnf")
-            if read + reading == 0 or read + dnf == total:
-                continue
-
-            # The book in your hands is what you are next on; failing that, the
-            # first one in reading order you have not settled either way. A book
-            # you put down stays put down — next-up skips it rather than sending
-            # you back to the one you already decided against.
-            paired = list(zip(books, statuses))
-            next_book = next((book for book, status in paired if status == "reading"), None)
-            if next_book is None:
-                next_book = next((book for book, status in paired if status == "not_started"), None)
-
-            progress.append({
-                "series": str(books[0].get("series") or "").strip(),
-                "total": total,
-                "read": read,
-                "reading": reading,
-                "dnf": dnf,
-                "next_book": _row_to_book(conn, next_book) if next_book else None,
-            })
-
-    # A series you are actively reading comes first — this shelf sits on Reading
-    # Now, where the book open on your nightstand outranks the one you are
-    # merely closest to finishing. Everything else sorts by how little is left.
-    progress.sort(
-        key=lambda entry: (
-            0 if entry["reading"] else 1,
-            entry["total"] - entry["read"] - entry["dnf"],
-            entry["series"].lower(),
-        )
-    )
-    return progress
-
-
-# A settled book is one you have already made up your mind about, and none of
-# them belong in a row of things to read next — a finished book least of all,
-# since finishing it is what put its neighbours on the list in the first place.
-# `want_to_read` is deliberately not here: a saved book is a book you have not
-# read yet, and seeing it turn up again as a recommendation is a reminder, not a
-# repeat.
-SUGGESTION_EXCLUDED_STATUSES = frozenset({"done", "reading", "dnf"})
-
-
-def get_suggested_books(
-    root: Path, limit: int = 20, sources: int = 8, per_source: int = 4
-) -> list[dict]:
-    """Books to read next, drawn from what you most recently finished."""
-    with transaction(root) as conn:
-        recent = conn.execute(
-            # Undated finishes are excluded
-            "SELECT books.uid AS uid, books.similar_book_ids AS similar_book_ids "
-            "FROM user_book_state JOIN books ON books.uid = user_book_state.uid "
-            "WHERE user_book_state.status = 'done' AND TRIM(user_book_state.finish_date) <> '' "
-            "ORDER BY user_book_state.finish_date DESC, books.uid DESC LIMIT ?",
-            (sources,),
-        ).fetchall()
-        if not recent:
-            return []
-
-        states = _states_map(conn)
-        excluded = {
-            uid
-            for uid, state in states.items()
-            if str(state.get("status") or "") in SUGGESTION_EXCLUDED_STATUSES
-        }
-
-        # One membership query for the union of every source's candidates, so
-        # the cost stays flat in the number of sources rather than one lookup
-        # per suggested id.
-        candidates = [
-            [
-                sid
-                for raw in _parse_json_list(row["similar_book_ids"])
-                if (sid := str(raw).strip()) and sid not in excluded
-            ]
-            for row in recent
-        ]
-        wanted = {sid for pool in candidates for sid in pool}
-        if not wanted:
-            return []
-        wanted_list = list(wanted)
-        placeholders = ", ".join(["?"] * len(wanted_list))
-        rows = conn.execute(
-            f"SELECT * FROM books WHERE uid IN ({placeholders})", wanted_list
-        ).fetchall()
-        by_uid = {row["uid"]: row for row in rows}
-
-        picked: list[str] = []
-        seen: set[str] = set()
-        for _ in range(per_source):
-            if len(picked) >= limit:
-                break
-            for pool in candidates:
-                sid = next((s for s in pool if s not in seen and s in by_uid), None)
-                if sid is None:
-                    continue
-                seen.add(sid)
-                picked.append(sid)
-                if len(picked) >= limit:
-                    break
-
-        return [_row_to_book(conn, by_uid[sid], states_map=states) for sid in picked]
+    return [book_id for _, _, book_id in scored[:limit]]
