@@ -1,22 +1,23 @@
+import { useMemo } from 'react'
 import BookGrid from '../components/books/BookGrid.jsx'
 import CatalogPage from '../components/books/CatalogPage.jsx'
-import useGenreBooks from '../hooks/useGenreBooks.js'
+import { useLibraryData } from '../context/LibraryDataContext.jsx'
+import { selectGenreBooks } from '../selectors.js'
 
 interface GenreViewProps {
   genre: string
 }
 
 function GenreView({ genre }: GenreViewProps) {
-  const catalog = useGenreBooks(genre)
+  const { books: allBooks } = useLibraryData()
+  const books = useMemo(() => selectGenreBooks(allBooks, genre), [allBooks, genre])
   return (
     <CatalogPage
-      {...catalog}
-      loadingMessage="Loading genre books…"
-      errorTitle="Could not load genre"
+      books={books}
       emptyTitle="No books found"
       emptyMessage="We couldn't find any titles in the catalog for this genre."
     >
-      <BookGrid books={catalog.books} />
+      <BookGrid books={books} />
     </CatalogPage>
   )
 }

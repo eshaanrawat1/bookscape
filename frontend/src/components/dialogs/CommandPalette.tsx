@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 import BookCover from '../books/BookCover.jsx'
-import { searchBooks, formatCompactNumber } from '../../utils.js'
+import { searchBookIds, formatCompactNumber } from '../../utils.js'
 import { filterCommands } from '../../commands.js'
+import { useLibraryData } from '../../context/LibraryDataContext.jsx'
 import { useNavigation } from '../../context/NavigationContext.jsx'
 import Dialog, { type DialogCloseProps } from './Dialog.jsx'
 import useListNavigation from '../../hooks/useListNavigation.js'
@@ -21,8 +22,10 @@ interface CommandPaletteProps extends DialogCloseProps {
 
 function CommandPalette({ commands, onClose }: CommandPaletteProps) {
   const { onOpen } = useNavigation()
+  const { booksByIds } = useLibraryData()
   const [query, setQuery] = useState('')
-  const [books, setBooks] = useState<Book[]>([])
+  const [bookIds, setBookIds] = useState<string[]>([])
+  const books = useMemo(() => booksByIds(bookIds), [booksByIds, bookIds])
   const [booksLoading, setBooksLoading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const rowRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -35,7 +38,7 @@ function CommandPalette({ commands, onClose }: CommandPaletteProps) {
 
   useEffect(() => {
     if (!trimmed) {
-      setBooks([])
+      setBookIds([])
       setBooksLoading(false)
       return undefined
     }
@@ -44,11 +47,11 @@ function CommandPalette({ commands, onClose }: CommandPaletteProps) {
     let cancelled = false
     const timer = window.setTimeout(async () => {
       try {
-        const results = await searchBooks(trimmed, BOOK_LIMIT)
-        if (!cancelled) setBooks(results)
+        const ids = await searchBookIds(trimmed, BOOK_LIMIT)
+        if (!cancelled) setBookIds(ids)
       } catch {
         // A failed lookup just means no book rows; the commands still work.
-        if (!cancelled) setBooks([])
+        if (!cancelled) setBookIds([])
       } finally {
         if (!cancelled) setBooksLoading(false)
       }

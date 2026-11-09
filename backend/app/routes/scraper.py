@@ -10,7 +10,6 @@ from fastapi.responses import StreamingResponse
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..services.catalog import get_book_with_similar as load_book_with_similar
 from ..services.catalog import resolve_book, upsert_book
 from ..urls import canonical_book_url
 
@@ -38,7 +37,6 @@ class ScrapedBookIn(BaseModel):
     series: str = Field(default="", max_length=500)
     series_number: str = Field(default="", max_length=50)
     similar_book_ids: list[str] = Field(default_factory=list, max_length=100)
-    source_url: str = Field(default="", max_length=2000)
     scraped_at: str = Field(default="", max_length=64)
 
 
@@ -71,7 +69,7 @@ def create_router(root: Path) -> APIRouter:
                     yield json.dumps({
                         "stage": "duplicate",
                         "book": {
-                            "uid": existing.get("uid"),
+                            "uid": existing.get("id"),
                             "title": existing.get("title"),
                             "author": existing.get("author"),
                             "image_url": existing.get("image_url"),
@@ -168,7 +166,7 @@ def create_router(root: Path) -> APIRouter:
         uid = book["uid"]
 
         upsert_book(root, book)
-        saved = load_book_with_similar(root, uid)
+        saved = resolve_book(root, uid)
         if not saved:
             raise HTTPException(status_code=500, detail="Book was saved but could not be reloaded.")
         return {"ok": True, "book": saved}

@@ -1,30 +1,19 @@
-import { useMemo } from 'react'
 import BookCard from '../components/books/BookCard.jsx'
 import StatsBarChart from '../components/stats/StatsBarChart.jsx'
 import StatsYearSelect from '../components/stats/StatsYearSelect.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
 import SectionHeader from '../components/ui/SectionHeader.jsx'
-import { formatCompactNumber, normaliseBook } from '../utils.js'
+import { formatCompactNumber } from '../utils.js'
 import { monthLabels } from '../constants.js'
 import { useNavigation } from '../context/NavigationContext.jsx'
 import useStats from '../hooks/useStats.js'
 
 function StatsView() {
-  const { summary, loading, error, year, setYear } = useStats()
+  const { summary, year, setYear } = useStats()
   const { onOpenBooksRead } = useNavigation()
-  const books = useMemo(() => (summary?.books || []).map(normaliseBook), [summary])
+  const { books, availableYears: years } = summary
 
-  if (loading && !summary) {
-    return <EmptyState message="Loading stats…" />
-  }
-
-  if (error) {
-    return <EmptyState title="Could not load stats" message={error} />
-  }
-
-  const years = summary?.available_years || []
-
-  if (!summary || years.length === 0) {
+  if (years.length === 0) {
     return (
       <EmptyState
         className="statsEmptyState"
@@ -38,20 +27,14 @@ function StatsView() {
 
   // Months for a chosen year, years for all time; labels are mapped so a short `months` still draws twelve.
   const bars = year
-    ? monthLabels.map((month, index) => ({
-      label: month,
-      count: Number(summary.months?.[index]) || 0,
-    }))
-    : (summary.year_counts || []).map((entry) => ({
-      label: String(entry.year),
-      count: entry.count,
-    }))
+    ? monthLabels.map((month, index) => ({ label: month, count: summary.months[index] }))
+    : summary.yearCounts.map((entry) => ({ label: String(entry.year), count: entry.count }))
 
   const tiles = [
-    { value: String(summary.books_read), label: 'books read' },
-    { value: formatCompactNumber(summary.pages_read), label: 'pages read' },
-    { value: String(summary.genres_covered), label: 'genres covered' },
-    { value: String(summary.days_reading), label: 'days reading' },
+    { value: String(summary.booksRead), label: 'books read' },
+    { value: formatCompactNumber(summary.pagesRead), label: 'pages read' },
+    { value: String(summary.genresCovered), label: 'genres covered' },
+    { value: String(summary.daysReading), label: 'days reading' },
   ]
 
   return (

@@ -1,22 +1,29 @@
+import { useMemo } from 'react'
 import { BookList, BookListRow } from '../components/books/BookList.jsx'
 import CatalogPage from '../components/books/CatalogPage.jsx'
-import useSeriesBooks from '../hooks/useSeriesBooks.js'
+import { useLibraryData } from '../context/LibraryDataContext.jsx'
+import { selectSeriesBooks } from '../selectors.js'
 import type { Book, BookProps, ReadingStatus } from '../types.js'
 
 interface SeriesViewProps {
   series: string
 }
 
-// Mirrors get_series_progress() on the server, done locally since this page has every book.
+// Saving a book for later is not starting it.
+function isUntouched(status: ReadingStatus): boolean {
+  return status === 'not_started' || status === 'want'
+}
+
+// Where you are in the series, which is what the rows mark.
 function summariseSeries(books: Book[]) {
   // The book in hand, else the first unread; a book you put down is skipped.
   const nextUp =
     books.find((book) => book.status === 'reading') ||
-    books.find((book) => book.status === 'not_started') ||
+    books.find((book) => isUntouched(book.status)) ||
     null
   return {
     nextUp,
-    started: books.some((book) => book.status !== 'not_started'),
+    started: books.some((book) => !isUntouched(book.status)),
   }
 }
 
@@ -24,22 +31,21 @@ const ROW_MARKERS: Record<ReadingStatus, string> = {
   done: 'Read',
   reading: 'Reading',
   dnf: 'DNF',
+  want: 'Want to read',
   not_started: 'Not started',
 }
 
 function SeriesView({ series }: SeriesViewProps) {
-  const catalog = useSeriesBooks(series)
-  const { books } = catalog
+  const { books: allBooks } = useLibraryData()
+  const books = useMemo(() => selectSeriesBooks(allBooks, series), [allBooks, series])
 
   const numbered = books.filter((book) => book.seriesNumber).length
   const summary = summariseSeries(books)
 
   return (
     <CatalogPage
-      {...catalog}
+      books={books}
       className="authorPage"
-      loadingMessage="Loading series books…"
-      errorTitle="Could not load series"
       emptyTitle="No books found"
       emptyMessage="We couldn't find any titles in the catalog for this series."
     >
@@ -65,8 +71,8 @@ interface SeriesBookRowProps extends BookProps {
 }
 
 function SeriesBookRow({ book, isNextUp }: SeriesBookRowProps) {
-  // Only lands on untouched books, since one being read already says so.
-  const marker = book.status === 'not_started' && isNextUp ? 'Up next' : ROW_MARKERS[book.status]
+  // "Up next" replaces the marker, and only ever lands on an untouched book.
+  const marker = isUntouched(book.status) && isNextUp ? 'Up next' : ROW_MARKERS[book.status]
 
   return (
     <BookListRow

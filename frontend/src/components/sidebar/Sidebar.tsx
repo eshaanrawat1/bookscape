@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus, X, type LucideIcon } from 'lucide-react'
-import { collectionIdFromName, errorMessage } from '../../utils.js'
+import { errorMessage } from '../../utils.js'
 import { resolveCollectionIcon } from '../../collectionIcons.js'
 import { mainNav, shelfNav } from '../../constants.js'
 import { useLibraryData } from '../../context/LibraryDataContext.jsx'
@@ -95,9 +95,11 @@ function Sidebar({ active, onSelect }: SidebarProps) {
     setSaving(true)
     setCollectionError('')
     try {
-      const createdName = await onCreateCollection()
-      setEditingId(collectionIdFromName(createdName))
-      setDraftName(createdName)
+      const created = await onCreateCollection()
+      if (created) {
+        setEditingId(created.id)
+        setDraftName(created.name)
+      }
     } catch (err) {
       setCollectionError(errorMessage(err, 'Could not create collection.'))
     } finally {
@@ -143,7 +145,9 @@ function Sidebar({ active, onSelect }: SidebarProps) {
             const id = `collection:${collection.id}`
             const isActive = active === id
             const isEditing = editingId === collection.id
-            const bookCount = (collection.books?.length ?? collection.bookIds?.length ?? 0)
+            const bookCount = collection.bookIds.length
+            // An icon name the current lucide set no longer has resolves to
+            // null, and the row quietly falls back to the plain dot.
             const Icon = resolveCollectionIcon(collection.icon)
             const pickerOpen = iconPicker?.id === collection.id
             return (

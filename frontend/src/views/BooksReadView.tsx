@@ -1,6 +1,8 @@
+import { useMemo } from 'react'
 import BookGrid from '../components/books/BookGrid.jsx'
 import CatalogPage from '../components/books/CatalogPage.jsx'
-import useCatalogBooks from '../hooks/useCatalogBooks.js'
+import { useLibraryData } from '../context/LibraryDataContext.jsx'
+import { selectStats } from '../selectors.js'
 
 interface BooksReadViewProps {
   // '' is all time, matching the stats page's year filter.
@@ -8,20 +10,16 @@ interface BooksReadViewProps {
 }
 
 function BooksReadView({ year }: BooksReadViewProps) {
-  const catalog = useCatalogBooks(
-    year ? `/stats?year=${encodeURIComponent(year)}` : '/stats',
-    'Could not load the books you have read.',
-  )
+  const { books: allBooks } = useLibraryData()
+  const books = useMemo(() => selectStats(allBooks, year ? Number(year) : null).books, [allBooks, year])
 
   return (
     <CatalogPage
-      {...catalog}
-      loadingMessage="Loading books read…"
-      errorTitle="Could not load books read"
+      books={books}
       emptyTitle="No books read"
       emptyMessage={year ? `Nothing finished in ${year} yet.` : "You haven't finished a book yet."}
     >
-      <BookGrid books={catalog.books} />
+      <BookGrid books={books} />
     </CatalogPage>
   )
 }

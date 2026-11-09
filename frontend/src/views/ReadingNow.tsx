@@ -1,16 +1,16 @@
+import { useMemo } from 'react'
 import ContinueReading from '../components/books/ContinueReading.jsx'
 import ReadingGoalCard from '../components/goal/ReadingGoalCard.jsx'
 import Shelf from '../components/books/Shelf.jsx'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
-import useSeriesProgress from '../hooks/useSeriesProgress.js'
-import useSuggestedBooks from '../hooks/useSuggestedBooks.js'
+import { selectSeriesProgress, selectSuggestedBooks } from '../selectors.js'
 
 function ReadingNow() {
-  const { currentlyReading, wantToRead, collections, booksByIds } = useLibraryData()
+  const { books, currentlyReading, wantToRead, collections, booksByIds } = useLibraryData()
   const { onOpenWantToRead } = useNavigation()
-  const seriesInProgress = useSeriesProgress()
-  const suggested = useSuggestedBooks()
+  const seriesInProgress = useMemo(() => selectSeriesProgress(books), [books])
+  const suggested = useMemo(() => selectSuggestedBooks(books), [books])
   return (
     <div className="stack">
       <ReadingGoalCard />
@@ -27,13 +27,13 @@ function ReadingNow() {
         onSeeAll={onOpenWantToRead}
       />
       {collections
-        .filter((collection) => (collection.books?.length || collection.bookIds?.length || 0) > 0)
+        .filter((collection) => collection.bookIds.length > 0)
         .map((collection) => (
           <Shelf
             key={collection.id}
             title={collection.name}
             subtitle="Kept together on purpose."
-            books={collection.books?.length ? collection.books : booksByIds(collection.bookIds)}
+            books={booksByIds(collection.bookIds)}
           />
         ))}
     </div>

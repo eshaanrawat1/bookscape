@@ -1,12 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Menu, Plus, File, Upload, Download, ArrowLeft } from 'lucide-react'
 
 import { apiFetch, BOOTSTRAP_RETRIES, BOOTSTRAP_RETRY_DELAY_MS } from './api.js'
 import {
   sleep,
   loadBootstrapData,
-  collectionIdFromName,
-  mapReadingLists,
+  mapCollections,
   nextCollectionName,
   normaliseBook,
   authorViewId,
@@ -21,6 +20,7 @@ import {
 } from './utils.js'
 import { viewMeta, shortcutLabel } from './constants.js'
 import { buildCommands } from './commands.js'
+import { selectShelves } from './selectors.js'
 
 import { LibraryDataContext, useLibraryData } from './context/LibraryDataContext.jsx'
 import { NavigationContext } from './context/NavigationContext.jsx'
@@ -48,7 +48,7 @@ import SeriesView from './views/SeriesView.jsx'
 import GenreView from './views/GenreView.jsx'
 import BooksReadView from './views/BooksReadView.jsx'
 import CollectionView from './views/CollectionView.jsx'
-import type { Book, Collection, GenreSection, RawBookPayload, RawList, VaultAction } from './types.js'
+import type { Book, Collection, RawCollection, VaultAction } from './types.js'
 
 // Pages with a Back link and where it lands when there's no history.
 const DRILLDOWNS = [
@@ -69,9 +69,6 @@ export default function App() {
 
   const [books, setBooks] = useState<Book[]>([])
   const [collections, setCollections] = useState<Collection[]>([])
-  const [wantToReadBooks, setWantToReadBooks] = useState<Book[]>([])
-  const [globalLibrary, setGlobalLibrary] = useState<GenreSection[]>([])
-  const [dataVersion, setDataVersion] = useState(0)
   const [loading, setLoading] = useState(true)
   const [vaultBusy, setVaultBusy] = useState<VaultAction | null>(null)
   const [showScraperDialog, setShowScraperDialog] = useState(false)
@@ -104,10 +101,8 @@ export default function App() {
             const data = await loadBootstrapData()
             if (cancelled) return
 
-            setBooks(data.books.map(normaliseBook))
-            setCollections(mapReadingLists(data.lists))
-            setWantToReadBooks(data.wantToReadBooks.map(normaliseBook))
-            setGlobalLibrary(data.globalLibrary)
+            setBooks(data.books)
+            setCollections(data.collections)
             setError(null)
             return
           } catch (err) {
@@ -129,24 +124,28 @@ export default function App() {
     return () => { cancelled = true }
   }, [])
 
-  async function reloadAppData() {
+  async function reloadAppData(): Promise<Book[]> {
     const data = await loadBootstrapData()
 
-    setBooks(data.books.map(normaliseBook))
-    setCollections(mapReadingLists(data.lists))
-    setWantToReadBooks(data.wantToReadBooks.map(normaliseBook))
-    setGlobalLibrary(data.globalLibrary)
-    // Views that fetch their own books watch this, so one reload refreshes the whole app.
-    setDataVersion((version) => version + 1)
+    setBooks(data.books)
+    setCollections(data.collections)
+    return data.books
   }
 
-  const bookById = new Map(books.map((b) => [b.id, b]))
-  const booksByIds = (ids: string[]): Book[] =>
-    ids.map((id) => bookById.get(id)).filter((b): b is Book => Boolean(b))
-  const currentlyReading = books.filter((b) => b.status === 'reading')
-  const wantToRead = wantToReadBooks
-  const finished = books.filter((b) => b.status === 'done')
-  const dnf = books.filter((b) => b.status === 'dnf')
+  const applyBook = useCallback((book: Book) => {
+    setBooks((current) => (
+      current.some((item) => item.id === book.id)
+        ? current.map((item) => (item.id === book.id ? book : item))
+        : [...current, book]
+    ))
+  }, [])
+
+  const bookById = useMemo(() => new Map(books.map((b) => [b.id, b])), [books])
+  const booksByIds = useCallback(
+    (ids: string[]): Book[] => ids.map((id) => bookById.get(id)).filter((b): b is Book => Boolean(b)),
+    [bookById],
+  )
+  const { currentlyReading, wantToRead, finished, dnf } = useMemo(() => selectShelves(books), [books])
 
   const readingGoal = useReadingGoal(finished)
 
@@ -228,86 +227,48 @@ export default function App() {
     onNavigate: goTo,
   })
 
-  async function createCollection(): Promise<string> {
-    const name = nextCollectionName(collections)
-    const data = await apiFetch<{ lists?: RawList[] }>('/reading-lists', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+  // Every collection route answers with the full list, ids only, so this is
+  // cheap and leaves nothing to merge.
+  async function sendCollections(path: string, method: string, body?: object) {
+    const data = await apiFetch<{ id?: number; collections?: RawCollection[] }>(path, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
     })
-    const nextCollections = mapReadingLists(data.lists || [])
-    setCollections(nextCollections)
-    setView(`collection:${collectionIdFromName(name)}`)
-    return name
+    const next = mapCollections(data.collections)
+    setCollections(next)
+    return { createdId: String(data.id ?? ''), next }
   }
 
-  async function renameCollection(collection: Collection, name: string): Promise<string> {
-    const data = await apiFetch<{ lists?: RawList[] }>(`/reading-lists/${collectionIdFromName(collection.name)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+  async function createCollection(): Promise<Collection | undefined> {
+    const { createdId, next } = await sendCollections('/collections', 'POST', {
+      name: nextCollectionName(collections),
     })
-    const nextCollections = mapReadingLists(data.lists || [])
-    setCollections(nextCollections)
-    const oldView = `collection:${collection.id}`
-    const newView = `collection:${collectionIdFromName(name)}`
-    if (view === oldView) setView(newView)
-    return name
+    setView(`collection:${createdId}`)
+    return next.find((collection) => collection.id === createdId)
+  }
+
+  async function renameCollection(collection: Collection, name: string): Promise<void> {
+    await sendCollections(`/collections/${collection.id}`, 'PATCH', { name })
   }
 
   async function setCollectionIcon(collection: Collection, icon: string): Promise<void> {
-    const data = await apiFetch<{ lists?: RawList[] }>(
-      `/reading-lists/${collectionIdFromName(collection.name)}/icon`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ icon }),
-      },
-    )
-    setCollections(mapReadingLists(data.lists || []))
+    await sendCollections(`/collections/${collection.id}`, 'PATCH', { icon })
   }
 
   async function deleteCollection(collection: Collection): Promise<void> {
-    const data = await apiFetch<{ lists?: RawList[] }>(`/reading-lists/${collectionIdFromName(collection.name)}`, {
-      method: 'DELETE',
-    })
-    const nextCollections = mapReadingLists(data.lists || [])
-    setCollections(nextCollections)
+    await sendCollections(`/collections/${collection.id}`, 'DELETE')
     if (view === `collection:${collection.id}`) {
       setView('library')
     }
   }
 
-  async function addBookToCollection(collectionName: string, bookId: string): Promise<void> {
-    const data = await apiFetch<{ lists?: RawList[] }>(`/reading-lists/${collectionIdFromName(collectionName)}/books`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ book_id: bookId }),
-    })
-    setCollections(mapReadingLists(data.lists || []))
+  async function addBookToCollection(collectionId: string, bookId: string): Promise<void> {
+    await sendCollections(`/collections/${collectionId}/books`, 'POST', { book_id: bookId })
   }
 
-  async function removeBookFromCollection(collectionName: string, bookId: string): Promise<void> {
-    const data = await apiFetch<{ lists?: RawList[] }>(
-      `/reading-lists/${collectionIdFromName(collectionName)}/books/${bookId}`,
-      {
-        method: 'DELETE',
-      }
-    )
-    setCollections(mapReadingLists(data.lists || []))
-  }
-
-  async function toggleBookWantToRead(bookId: string, isSaved: boolean): Promise<void> {
-    const data = await apiFetch<{ books?: RawBookPayload[] }>(
-      isSaved ? `/want-to-read-books/${bookId}` : '/want-to-read-books',
-      {
-        method: isSaved ? 'DELETE' : 'POST',
-        headers: isSaved ? undefined : { 'Content-Type': 'application/json' },
-        body: isSaved ? undefined : JSON.stringify({ book_id: bookId }),
-      }
-    )
-    setWantToReadBooks((data.books || []).map(normaliseBook))
-    await reloadAppData()
+  async function removeBookFromCollection(collectionId: string, bookId: string): Promise<void> {
+    await sendCollections(`/collections/${collectionId}/books/${bookId}`, 'DELETE')
   }
 
   async function pushToVault() {
@@ -338,20 +299,18 @@ export default function App() {
   }
 
   const libraryData = {
+    books,
     collections,
-    wantToReadBooks,
-    globalLibrary,
     currentlyReading,
     wantToRead,
     finished,
     dnf,
     readingGoal,
     booksByIds,
-    dataVersion,
+    applyBook,
     refreshLibrary: reloadAppData,
     addBookToCollection,
     removeBookFromCollection,
-    toggleBookWantToRead,
     createCollection,
     renameCollection,
     setCollectionIcon,
@@ -376,7 +335,7 @@ export default function App() {
       goTo,
       onAddBook: openScraperDialog,
       onNewCollection: async () => { await createCollection() },
-      onRefresh: reloadAppData,
+      onRefresh: async () => { await reloadAppData() },
       onVaultSettings: () => setShowSettingsDialog(true),
       onPush: pushToVault,
       onPull: pullFromVault,
@@ -454,10 +413,11 @@ export default function App() {
           {showScraperDialog && (
             <ScraperDialog
               onClose={() => setShowScraperDialog(false)}
-              onSuccess={async (newBook) => {
+              onSuccess={(newBook) => {
+                const book = normaliseBook(newBook)
                 setShowScraperDialog(false)
-                await reloadAppData()
-                setSelected({ book: normaliseBook(newBook) })
+                applyBook(book)
+                setSelected({ book })
               }}
             />
           )}

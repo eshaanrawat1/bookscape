@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 
-export type ReadingStatus = 'not_started' | 'reading' | 'done' | 'dnf'
+export type ReadingStatus = 'not_started' | 'want' | 'reading' | 'done' | 'dnf'
 
 // Shapes vary by endpoint; normaliseBook() is the single place that coerces them into a Book.
 export interface RawBookPayload {
@@ -9,34 +9,25 @@ export interface RawBookPayload {
   title?: string
   author?: string
   image_url?: string
-  linked_catalog_book?: RawLinkedCatalogBook | null
-  genre?: string
-  genres?: string[]
+  description?: string
+  avg_rating?: number
+  rating_count?: number
+  review_count?: number
+  page_count?: number
   series?: string
   series_number?: string
-  page_count?: number
-  total_pages?: number
-  reading_total_pages?: number
-  current_page?: number
-  reading_current_page?: number
-  start_date?: string
-  reading_start_date?: string
-  finish_date?: string
-  reading_finish_date?: string
-  avg_rating?: number | string
-  review_count?: number | string
-  rating_count?: number | string
-  reading_status?: ReadingStatus
+  genres?: string[]
+  similar_book_ids?: string[]
   status?: ReadingStatus
-  description?: string
-  similar_books?: RawBookPayload[]
+  current_page?: number
+  total_pages?: number
+  start_date?: string
+  finish_date?: string
+  my_rating?: number
+  notes?: string
+  updated_at?: string
   [key: string]: unknown
 }
-
-type RawLinkedCatalogBook = Pick<
-  RawBookPayload,
-  'series' | 'series_number' | 'avg_rating' | 'rating_count' | 'review_count' | 'page_count'
->
 
 export interface Book {
   id: string
@@ -59,25 +50,22 @@ export interface Book {
   progress: number
   status: ReadingStatus
   blurb: string
-  _raw: RawBookPayload
-  similar_books?: RawBookPayload[]
+  similarIds: string[]
+  // 0 is "not rated yet", as on the server.
+  myRating: number
+  notes: string
+  updatedAt: string
 }
 
 export interface BookProps {
   book: Book
 }
 
-export interface CatalogBooks {
-  books: Book[]
-  loading: boolean
-  error: string | null
-}
-
-export interface RawList {
+export interface RawCollection {
+  id: number
   name: string
   icon?: string
   book_ids?: string[]
-  books?: RawBookPayload[]
 }
 
 export interface Collection {
@@ -86,7 +74,6 @@ export interface Collection {
   // A lucide name from collectionIcons.ts, or '' for the default dot.
   icon: string
   bookIds: string[]
-  books: Book[]
 }
 
 export interface GenreSection {
@@ -117,8 +104,6 @@ export interface Highlight {
 
 export interface RawHighlightGroup {
   book_id: string
-  book: RawBookPayload | null
-  count: number
   highlights: RawHighlight[]
 }
 
@@ -130,23 +115,17 @@ export interface HighlightGroup {
   highlights: Highlight[]
 }
 
-export interface RawGenreSection {
-  genre: string
-  books: RawBookPayload[]
-}
-
-// `books` are raw payloads for normaliseBook(); `months` is always twelve entries, January first.
+// `months` is always twelve entries, January first.
 export interface StatsSummary {
-  year: number | null
-  available_years: number[]
-  books_read: number
-  pages_read: number
-  genres_covered: number
-  days_reading: number
+  availableYears: number[]
+  booksRead: number
+  pagesRead: number
+  genresCovered: number
+  daysReading: number
   months: number[]
-  // Oldest first, including empty years, capped to twelve; only populated for the all-time summary.
-  year_counts: YearCount[]
-  books: RawBookPayload[]
+  // Oldest first, including empty years, capped to twelve. Only set for all time.
+  yearCounts: YearCount[]
+  books: Book[]
 }
 
 interface YearCount {
@@ -160,7 +139,8 @@ export interface SeriesProgress {
   total: number
   read: number
   reading: number
-  next_book: RawBookPayload | null
+  dnf: number
+  nextBook: Book | null
 }
 
 // `target` is 0 when no goal is set; `read` comes from the client's finished list, not the server.
@@ -178,23 +158,24 @@ export interface ReadingGoalState {
 }
 
 export interface LibraryDataContextValue {
+  // Every book in the catalog, each carrying your reading state. All the pages
+  // below are derived from this one list, so an edit reaches them all at once.
+  books: Book[]
   collections: Collection[]
-  wantToReadBooks: Book[]
-  globalLibrary: GenreSection[]
   currentlyReading: Book[]
   wantToRead: Book[]
   finished: Book[]
   dnf: Book[]
   readingGoal: ReadingGoalState
   booksByIds: (ids: string[]) => Book[]
-  // Bumped on each app-level reload; views that fetch their own books watch it to refetch.
-  dataVersion: number
-  refreshLibrary: () => Promise<void>
-  addBookToCollection: (collectionName: string, bookId: string) => Promise<void>
-  removeBookFromCollection: (collectionName: string, bookId: string) => Promise<void>
-  toggleBookWantToRead: (bookId: string, isSaved: boolean) => Promise<void>
-  createCollection: () => Promise<string>
-  renameCollection: (collection: Collection, name: string) => Promise<string>
+  // Puts one changed book into the list, or adds it if it is new.
+  applyBook: (book: Book) => void
+  // Refetches everything and resolves with the fresh list of books.
+  refreshLibrary: () => Promise<Book[]>
+  addBookToCollection: (collectionId: string, bookId: string) => Promise<void>
+  removeBookFromCollection: (collectionId: string, bookId: string) => Promise<void>
+  createCollection: () => Promise<Collection | undefined>
+  renameCollection: (collection: Collection, name: string) => Promise<void>
   setCollectionIcon: (collection: Collection, icon: string) => Promise<void>
   deleteCollection: (collection: Collection) => Promise<void>
 }

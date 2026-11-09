@@ -37,18 +37,20 @@ def _apply_parsed_book(root: Path, book: dict, *, dry_run: bool) -> str:
     if dry_run:
         return ""
 
-    upsert_book(root, {
-        "uid": uid,
-        "title": book.get("title", ""),
-        "author": book.get("author", ""),
-        "image_url": book.get("image_url", ""),
-        "avg_rating": book.get("rating", 0),
-        "rating_count": book.get("rating_count", 0),
-        "review_count": book.get("review_count", 0),
-        "description": book.get("description", ""),
-        "genres": book.get("genres", []),
-    })
-    # want_to_read/collections never appear in notes, so Pull leaves them alone.
+    # A note only fills in a book the catalog lacks; it must not overwrite a newer scrape.
+    if not resolve_book(root, uid):
+        upsert_book(root, {
+            "uid": uid,
+            "title": book.get("title", ""),
+            "author": book.get("author", ""),
+            "image_url": book.get("image_url", ""),
+            "avg_rating": book.get("rating", 0),
+            "rating_count": book.get("rating_count", 0),
+            "review_count": book.get("review_count", 0),
+            "description": book.get("description", ""),
+            "genres": book.get("genres", []),
+        })
+    # Notes round-trip like status and dates: the last sync direction wins.
     state_fields = {
         "status": status,
         "current_page": book.get("current_page", 0),

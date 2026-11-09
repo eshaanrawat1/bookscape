@@ -1,5 +1,5 @@
 import { apiFetch } from './api.js'
-import type { Book, Collection, GenreSection, RawBookPayload, RawGenreSection, RawList } from './types.js'
+import type { Book, Collection, RawBookPayload, RawCollection } from './types.js'
 
 function asArray<T>(value: T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : []
@@ -10,34 +10,20 @@ function sleep(ms: number): Promise<void> {
 }
 
 interface BootstrapData {
-  books: RawBookPayload[]
-  lists: RawList[]
-  wantToReadBooks: RawBookPayload[]
-  globalLibrary: GenreSection[]
+  books: Book[]
+  collections: Collection[]
 }
 
 async function loadBootstrapData(): Promise<BootstrapData> {
-  const [myBooksRes, listsRes, wantToReadRes, globalRes] = await Promise.all([
-    apiFetch<{ books?: RawBookPayload[] }>('/my-books'),
-    apiFetch<{ lists?: RawList[] }>('/reading-lists'),
-    apiFetch<{ books?: RawBookPayload[] }>('/want-to-read-books'),
-    apiFetch<{ genres?: RawGenreSection[] }>('/global-library'),
+  const [booksRes, collectionsRes] = await Promise.all([
+    apiFetch<{ books?: RawBookPayload[] }>('/books'),
+    apiFetch<{ collections?: RawCollection[] }>('/collections'),
   ])
 
   return {
-    books: asArray(myBooksRes?.books),
-    lists: asArray(listsRes?.lists),
-    wantToReadBooks: asArray(wantToReadRes?.books),
-    // Normalised like every other list, or these books open the tracking panel with 0/0 pages.
-    globalLibrary: asArray(globalRes?.genres).map((section) => ({
-      genre: section.genre,
-      books: asArray(section.books).map(normaliseBook),
-    })),
+    books: asArray(booksRes?.books).map(normaliseBook),
+    collections: mapCollections(collectionsRes?.collections),
   }
-}
-
-function collectionIdFromName(name: string): string {
-  return encodeURIComponent(name)
 }
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -49,13 +35,12 @@ function formatDayLabel(iso: string): string {
   return `${MONTH_LABELS[m - 1]} ${d}, ${y}`
 }
 
-function mapReadingLists(rawLists: RawList[]): Collection[] {
-  return rawLists.map((list) => ({
-    id: collectionIdFromName(list.name),
-    name: list.name,
-    icon: list.icon || '',
-    bookIds: (list.book_ids || []),
-    books: (list.books || []).map(normaliseBook),
+function mapCollections(rawCollections: RawCollection[] | null | undefined): Collection[] {
+  return asArray(rawCollections).map((collection) => ({
+    id: String(collection.id),
+    name: collection.name,
+    icon: collection.icon || '',
+    bookIds: asArray(collection.book_ids),
   }))
 }
 
@@ -86,55 +71,35 @@ function toNumberOrZero(value: unknown): number {
 }
 
 function normaliseBook(raw: RawBookPayload): Book {
-  const totalPages = toNumberOrZero(raw.reading_total_pages ?? raw.total_pages)
-  const currentPage = toNumberOrZero(raw.reading_current_page ?? raw.current_page)
-  const progress =
-    totalPages > 0 ? Math.min(100, Math.round((currentPage / totalPages) * 100)) : 0
-
-  const status = raw.reading_status || raw.status || 'not_started'
-  const genres = Array.isArray(raw.genres) ? raw.genres.filter(Boolean) : []
-  const primaryGenre = raw.genre || genres[0] || ''
-  // /my-books nests catalog stats under linked_catalog_book, so those fields fall back through it.
-  const catalog = raw.linked_catalog_book || {}
-  const rating = parseFloat(String(raw.avg_rating ?? catalog.avg_rating ?? '')) || 0
-  const pages = raw.page_count || raw.total_pages || raw.reading_total_pages || totalPages || catalog.page_count || 0
-  const reviewCount = parseInt(String(raw.review_count ?? catalog.review_count ?? 0), 10) || 0
-  const ratingCount = parseInt(String(raw.rating_count ?? catalog.rating_count ?? 0), 10) || 0
+  const totalPages = toNumberOrZero(raw.total_pages)
+  const currentPage = toNumberOrZero(raw.current_page)
+  const genres = asArray(raw.genres).filter(Boolean)
 
   return {
     id: raw.id || raw.uid || '',
     title: raw.title || 'Untitled',
     author: raw.author || '',
     cover: raw.image_url || '',
-    genre: primaryGenre,
+    genre: genres[0] || '',
     genres,
-    series: raw.series || raw.linked_catalog_book?.series || '',
-    seriesNumber: raw.series_number || raw.linked_catalog_book?.series_number || '',
-    pages,
+    series: raw.series || '',
+    seriesNumber: raw.series_number || '',
+    pages: toNumberOrZero(raw.page_count) || totalPages,
     totalPages,
     currentPage,
-    startDate: raw.reading_start_date || raw.start_date || '',
-    finishDate: raw.reading_finish_date || raw.finish_date || '',
-    rating,
-    reviewCount,
-    ratingCount,
-    progress,
-    status,
+    startDate: raw.start_date || '',
+    finishDate: raw.finish_date || '',
+    rating: toNumberOrZero(raw.avg_rating),
+    reviewCount: toNumberOrZero(raw.review_count),
+    ratingCount: toNumberOrZero(raw.rating_count),
+    progress: totalPages > 0 ? Math.min(100, Math.round((currentPage / totalPages) * 100)) : 0,
+    status: raw.status || 'not_started',
     blurb: raw.description || '',
-    _raw: raw,
+    similarIds: asArray(raw.similar_book_ids).map(String),
+    myRating: toNumberOrZero(raw.my_rating),
+    notes: raw.notes || '',
+    updatedAt: raw.updated_at || '',
   }
-}
-
-function getCatalogBookId(book?: Book | RawBookPayload | null): string {
-  if (!book) return ''
-  const raw: RawBookPayload = '_raw' in book ? (book as Book)._raw : (book as RawBookPayload)
-  return String(raw.uid || raw.id || '').trim() || ''
-}
-
-function resolveSavedWantToReadBook(book: Book, savedBooks: Book[] | null | undefined): Book | null {
-  const targetId = getCatalogBookId(book)
-  if (!targetId) return null
-  return (savedBooks || []).find((savedBook) => getCatalogBookId(savedBook) === targetId) || null
 }
 
 function authorViewId(author: string): string {
@@ -190,14 +155,14 @@ function booksReadYearFromView(view: string): string {
   return raw === 'all' ? '' : raw
 }
 
-// The backend clamps limit to 50 and searches the whole catalog, not just owned books.
-async function searchBooks(query: string, limit: number): Promise<Book[]> {
+// Ids, best match first; the books themselves are already in the library.
+async function searchBookIds(query: string, limit: number): Promise<string[]> {
   const clean = String(query || '').trim()
   if (!clean) return []
-  const data = await apiFetch<{ results?: RawBookPayload[] }>(
+  const data = await apiFetch<{ ids?: string[] }>(
     `/search?q=${encodeURIComponent(clean)}&limit=${limit}`,
   )
-  return (data.results || []).map(normaliseBook)
+  return asArray(data.ids)
 }
 
 function errorMessage(err: unknown, fallback: string): string {
@@ -208,15 +173,12 @@ export {
   sleep,
   errorMessage,
   loadBootstrapData,
-  searchBooks,
-  collectionIdFromName,
+  searchBookIds,
   formatDayLabel,
-  mapReadingLists,
+  mapCollections,
   nextCollectionName,
   formatCompactNumber,
   normaliseBook,
-  getCatalogBookId,
-  resolveSavedWantToReadBook,
   authorViewId,
   authorNameFromView,
   seriesViewId,

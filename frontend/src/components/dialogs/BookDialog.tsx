@@ -1,10 +1,10 @@
 import { useState, useEffect, useLayoutEffect, useRef, type Ref } from 'react'
 import {
-  X, Star, MessageSquareText, FileText, Plus, Heart, Highlighter, ChevronDown, Upload, Download,
+  X, Star, MessageSquareText, FileText, Plus, Highlighter, ChevronDown, Upload, Download,
   LoaderCircle, Hash, Sigma, Calendar, CalendarCheck, TextAlignStart,
 } from 'lucide-react'
 import { apiFetch } from '../../api.js'
-import { normaliseBook, getCatalogBookId, formatCompactNumber, resolveSavedWantToReadBook } from '../../utils.js'
+import { normaliseBook, formatCompactNumber } from '../../utils.js'
 import BookCover from '../books/BookCover.jsx'
 import DateProperty from './DateProperty.jsx'
 import GenrePills from '../books/GenrePills.jsx'
@@ -13,7 +13,7 @@ import { useLibraryData } from '../../context/LibraryDataContext.jsx'
 import { useNavigation } from '../../context/NavigationContext.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 import type { DialogCloseProps } from './Dialog.jsx'
-import type { Book, BookProps, RawBookPayload, VaultAction } from '../../types.js'
+import type { Book, BookProps, Collection, RawBookPayload, VaultAction } from '../../types.js'
 
 interface BookDialogProps extends BookProps, DialogCloseProps {
   isNavigation?: boolean
@@ -34,9 +34,15 @@ interface ReadingProgressRecord {
   notes: string
 }
 
-interface ReadingProgressResponse {
-  entry?: Partial<ReadingProgressRecord>
-}
+const recordFromBook = (book: Book): ReadingProgressRecord => ({
+  status: book.status,
+  current_page: book.currentPage,
+  total_pages: book.totalPages,
+  start_date: book.startDate,
+  finish_date: book.finishDate,
+  my_rating: book.myRating,
+  notes: book.notes,
+})
 
 // Saved-state fingerprint. Both sides must use exactly these fields or autosave fires on every open.
 const recordSignature = (record: ReadingProgressRecord): string => JSON.stringify({
@@ -50,26 +56,21 @@ const recordSignature = (record: ReadingProgressRecord): string => JSON.stringif
   notes: String(record.notes || '').trim(),
 })
 
-// 0, '' and [] are normaliseBook's stand-ins for a missing field, not real values.
-const hasValue = (value: unknown): boolean => {
-  if (Array.isArray(value)) return value.length > 0
-  if (typeof value === 'number') return Number.isFinite(value) && value !== 0
-  if (typeof value === 'string') return value.trim() !== ''
-  return value !== null && value !== undefined
-}
+const STATUS_OPTIONS = [
+  ['done', 'Finished'],
+  ['reading', 'Reading'],
+  ['want', 'Want to read'],
+  ['dnf', 'DNF'],
+  ['not_started', 'Not started'],
+]
+const STATUS_LABELS: Record<string, string> = Object.fromEntries(STATUS_OPTIONS)
 
-const STATUS_LABELS: Record<string, string> = {
-  done: 'Finished',
-  reading: 'Reading',
-  dnf: 'DNF',
-  not_started: 'Not started',
-}
-
-// Mirrors TRACKED_STATUSES on the server; these books open on the tracking panel.
+// Picked-up statuses: these open on the tracking panel, and the vault exports them.
 const TRACKED_STATUSES = ['reading', 'done', 'dnf']
 
-function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onClose }: BookDialogProps) {
-  const { collections, wantToReadBooks, addBookToCollection, toggleBookWantToRead, refreshLibrary } = useLibraryData()
+function BookDialog({ book: openedBook, isNavigation = false, exiting = false, cardRef, onClose }: BookDialogProps) {
+  const { collections, booksByIds, addBookToCollection, applyBook, refreshLibrary } = useLibraryData()
+  const book = booksByIds([openedBook.id])[0] || openedBook
   const { onOpen, onOpenAuthor, onOpenSeries } = useNavigation()
   const { showToast, showError } = useToast()
   const [view, setView] = useState<BookDialogView>(() => (
@@ -132,103 +133,22 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
     setPanelHeight(null)
   }
 
-  const savedWantToReadBook = resolveSavedWantToReadBook(book, wantToReadBooks)
-  const [fullBook, setFullBook] = useState<Book | null>(null)
   const [collectionMenuOpen, setCollectionMenuOpen] = useState(false)
   const [savingCollection, setSavingCollection] = useState('')
-  const [savingToRead, setSavingToRead] = useState(false)
   const [highlighting, setHighlighting] = useState(false)
 
-  const bookId = [
-    book?._raw?.id,
-    book?.id,
-    getCatalogBookId(book),
-  ]
-    .map((value) => String(value || '').trim())
-    .filter(Boolean)[0] || ''
+  const bookId = book.id
+  const displayBook = book
+  const similarBooks = booksByIds(book.similarIds)
+  const dialogGenres = book.genres.slice(0, 5)
 
-  useEffect(() => {
-    let cancelled = false
-    setFullBook(null)
-    if (!bookId) return () => { cancelled = true }
-    apiFetch<RawBookPayload>(`/book/${bookId}`)
-      .then((data) => {
-        if (!cancelled && data) setFullBook({ ...normaliseBook(data), similar_books: data.similar_books || [] })
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [bookId])
-
-  // The card's payload wins, but only where it has a value, so sparse rows don't blank fetched fields.
-  const displayBook = fullBook
-    ? {
-        ...fullBook,
-        ...(Object.fromEntries(
-          Object.entries(book).filter(([key, value]) => hasValue(value) || !hasValue(fullBook[key as keyof Book])),
-        ) as Partial<Book>),
-        similar_books: fullBook.similar_books || book.similar_books || [],
-      } as Book
-    : book
-  const similarBooks = displayBook.similar_books || []
-  const dialogGenres = (displayBook.genres && displayBook.genres.length > 0)
-    ? displayBook.genres.slice(0, 5)
-    : (displayBook.genre ? [displayBook.genre] : [])
-  const savedWantToReadKey = getCatalogBookId(savedWantToReadBook)
-  const isSavedToWantToRead = Boolean(savedWantToReadBook)
-
-  const [record, setRecord] = useState<ReadingProgressRecord | null>(null)
-  const [hydrated, setHydrated] = useState(false)
+  // Tracking view state
+  const [draft, setRecord] = useState<ReadingProgressRecord>(() => recordFromBook(book))
   const [statusMenuOpen, setStatusMenuOpen] = useState(false)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastSavedRef = useRef('')
+  const lastSavedRef = useRef(recordSignature(draft))
   const statusMenuRef = useRef<HTMLDivElement>(null)
-  const baseRecord: ReadingProgressRecord = {
-    status: book.status || 'not_started',
-    current_page: book.currentPage || 0,
-    total_pages: book.totalPages || book.pages || 0,
-    start_date: book.startDate || '',
-    finish_date: book.finishDate || '',
-    my_rating: 0,
-    notes: '',
-  }
 
-  useEffect(() => {
-    let cancelled = false
-    setHydrated(false)
-    if (!bookId) {
-      setRecord(baseRecord)
-      lastSavedRef.current = recordSignature(baseRecord)
-      setHydrated(true)
-      return () => { cancelled = true }
-    }
-
-    // The fetched entry is authoritative; baseRecord only fills the gap before it lands.
-    apiFetch<ReadingProgressResponse>(`/reading-progress/${bookId}`)
-      .then((data) => {
-        if (cancelled) return
-        const next = data?.entry || {}
-        const nextRecord: ReadingProgressRecord = {
-          ...baseRecord,
-          ...next,
-          total_pages: Number(next.total_pages) || baseRecord.total_pages,
-        }
-        setRecord(nextRecord)
-        lastSavedRef.current = recordSignature(nextRecord)
-        setHydrated(true)
-      })
-      .catch(() => {
-        if (!cancelled) {
-          const nextRecord = { ...baseRecord }
-          setRecord(nextRecord)
-          lastSavedRef.current = recordSignature(nextRecord)
-          setHydrated(true)
-        }
-      })
-
-    return () => { cancelled = true }
-  }, [bookId, baseRecord.current_page, baseRecord.total_pages, baseRecord.start_date, baseRecord.finish_date])
-
-  const draft = record || baseRecord
   const trackedTotalPages = Number(draft.total_pages) || 0
   const trackedCurrentPage = Number(draft.current_page) || 0
   const progressPct = trackedTotalPages > 0
@@ -258,16 +178,12 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
     setObsidianBusy('pull')
     try {
       await apiFetch(`/sync/obsidian/pull/${bookId}`, { method: 'POST' })
-      const refreshed = await apiFetch<ReadingProgressResponse>(`/reading-progress/${bookId}`)
-      const nextEntry = refreshed?.entry || {}
-      const nextRecord: ReadingProgressRecord = {
-        ...baseRecord,
-        ...nextEntry,
-        total_pages: Number(nextEntry.total_pages) || baseRecord.total_pages,
+      const pulled = (await refreshLibrary()).find((item) => item.id === bookId)
+      if (pulled) {
+        const nextRecord = recordFromBook(pulled)
+        lastSavedRef.current = recordSignature(nextRecord)
+        setRecord(nextRecord)
       }
-      setRecord(nextRecord)
-      lastSavedRef.current = recordSignature(nextRecord)
-      await refreshLibrary()
       showToast(`Pulled “${displayBook.title}” from the vault.`, { key: vaultToastKey })
     } catch (err) {
       showError(err, 'Could not pull from vault.', vaultToastKey)
@@ -278,7 +194,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
 
   const updateField = (field: keyof ReadingProgressRecord, value: string) => {
     setRecord((current) => ({
-      ...(current || baseRecord),
+      ...current,
       [field]: value,
       // Mirrors the server dropping a DNF's finish date, so it doesn't linger until autosave round-trips.
       ...(field === 'status' && value === 'dnf' ? { finish_date: '' } : {}),
@@ -286,7 +202,6 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
   }
 
   const persistRecord = async (nextRecord: ReadingProgressRecord) => {
-    if (!bookId) return
     try {
       const payload = {
         status: String(nextRecord.status || 'done').trim().toLowerCase() || 'done',
@@ -297,36 +212,38 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
         my_rating: Math.min(5, Math.max(0, Number(nextRecord.my_rating) || 0)),
         notes: String(nextRecord.notes || '').trim(),
       }
-      const data = await apiFetch<ReadingProgressResponse>(`/reading-progress/${bookId}`, {
+      const data = await apiFetch<{ book: RawBookPayload }>(`/books/${bookId}/state`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      const nextSaved: ReadingProgressRecord = { ...baseRecord, ...(data.entry || payload) }
+      const saved = normaliseBook(data.book)
+      // Clearing Total Pages means "use the catalog's length". The server answers
+      // with that length, and it must not appear in the field mid-edit.
+      const nextSaved: ReadingProgressRecord = {
+        ...recordFromBook(saved),
+        total_pages: payload.total_pages > 0 ? saved.totalPages : nextRecord.total_pages,
+      }
       setRecord(nextSaved)
       lastSavedRef.current = recordSignature(nextSaved)
-      // "Reading now" and "Finished" derive from the app-level list, which nothing else refills after an edit.
-      await refreshLibrary()
+      applyBook(saved)
     } catch {
       // Keep the draft visible; autosave will retry on the next edit.
     }
   }
 
   useEffect(() => {
-    if (!hydrated || !record) return undefined
-    const signature = recordSignature(record)
-
-    if (signature === lastSavedRef.current) return undefined
+    if (recordSignature(draft) === lastSavedRef.current) return undefined
 
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => {
-      persistRecord(record)
+      persistRecord(draft)
     }, 650)
 
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     }
-  }, [record, hydrated])
+  }, [draft])
 
   useEffect(() => {
     return () => {
@@ -349,35 +266,17 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
     done: 'trackingStatusDot done',
     reading: 'trackingStatusDot reading',
     dnf: 'trackingStatusDot dnf',
+    want: 'trackingStatusDot want',
     not_started: 'trackingStatusDot notStarted',
   } as Record<string, string>)[draft.status] || 'trackingStatusDot'
 
-  const handleSave = async () => {
-    if (!bookId || savingToRead) return
-    setSavingToRead(true)
+  const handleAddToCollection = async (collection: Collection) => {
+    if (savingCollection === collection.id) return
+    setSavingCollection(collection.id)
     try {
-      const nextSaved = !isSavedToWantToRead
-      await toggleBookWantToRead(isSavedToWantToRead ? savedWantToReadKey : bookId, isSavedToWantToRead)
-      showToast(
-        nextSaved
-          ? `Saved “${displayBook.title}” to Want to read.`
-          : `Removed “${displayBook.title}” from Want to read.`,
-        { key: `want-to-read:${bookId}` },
-      )
-    } catch (err) {
-      showError(err, 'Could not save this book.', `want-to-read:${bookId}`)
-    } finally {
-      setSavingToRead(false)
-    }
-  }
-
-  const handleAddToCollection = async (collectionName: string) => {
-    if (!bookId || !collectionName || savingCollection === collectionName) return
-    setSavingCollection(collectionName)
-    try {
-      await addBookToCollection(collectionName, bookId)
+      await addBookToCollection(collection.id, bookId)
       setCollectionMenuOpen(false)
-      showToast(`Added “${displayBook.title}” to ${collectionName}.`, { key: `collection:${bookId}` })
+      showToast(`Added “${displayBook.title}” to ${collection.name}.`, { key: `collection:${bookId}` })
     } catch (err) {
       showError(err, 'Could not add this book.', `collection:${bookId}`)
     } finally {
@@ -521,23 +420,12 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
 
                 <div className="dialogActionPanel">
                   <div className="dialogActionRow">
-                    <button
-                      type="button"
-                      className={isSavedToWantToRead ? 'dialogIconButton dialogSaveButton saved' : 'dialogIconButton dialogSaveButton'}
-                      onClick={handleSave}
-                      disabled={!bookId || savingToRead}
-                      aria-label={isSavedToWantToRead ? 'Remove from Want to read' : 'Save to Want to read'}
-                      title={isSavedToWantToRead ? 'Remove from Want to read' : 'Save to Want to read'}
-                    >
-                      <Heart fill={isSavedToWantToRead ? 'currentColor' : 'none'} />
-                    </button>
-
                     <div className={collectionMenuOpen ? 'collectionMenuAnchor open' : 'collectionMenuAnchor'}>
                       <button
                         type="button"
                         className="dialogIconButton dialogCollectionButton"
                         onClick={() => setCollectionMenuOpen((value) => !value)}
-                        disabled={!collections.length || !bookId}
+                        disabled={!collections.length}
                         aria-label="Add to collections"
                         title="Add to collections"
                         aria-expanded={collectionMenuOpen}
@@ -551,11 +439,11 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
                               key={collection.id}
                               type="button"
                               className="collectionPickerItem"
-                              onClick={() => handleAddToCollection(collection.name)}
-                              disabled={savingCollection === collection.name}
+                              onClick={() => handleAddToCollection(collection)}
+                              disabled={savingCollection === collection.id}
                             >
                               <span>{collection.name}</span>
-                              {savingCollection === collection.name ? <span className="collectionPickerState">Adding…</span> : null}
+                              {savingCollection === collection.id ? <span className="collectionPickerState">Adding…</span> : null}
                             </button>
                           ))}
                         </div>
@@ -566,7 +454,6 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
                       type="button"
                       className="dialogIconButton dialogHighlightButton"
                       onClick={() => setHighlighting(true)}
-                      disabled={!bookId}
                       aria-label="Add a highlight"
                       title="Add a highlight"
                     >
@@ -599,12 +486,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
                         </button>
                         {statusMenuOpen && (
                           <div className="trackingStatusMenu" role="menu" aria-label="Reading status">
-                            {[
-                              ['done', 'Finished'],
-                              ['reading', 'Reading'],
-                              ['dnf', 'DNF'],
-                              ['not_started', 'Not started'],
-                            ].map(([value, label]) => (
+                            {STATUS_OPTIONS.map(([value, label]) => (
                               <button
                                 key={value}
                                 type="button"
@@ -754,14 +636,11 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
             <h3>Similar Books</h3>
             <div className="dialogSimilarScroll">
               {similarBooks.length > 0 ? (
-                similarBooks.map((simRaw) => {
-                  const simBook = normaliseBook(simRaw)
-                  return (
-                    <button key={simBook.id} className="similarCard" onClick={() => onOpen(simBook)}>
-                      <BookCover book={simBook} />
-                    </button>
-                  )
-                })
+                similarBooks.map((simBook) => (
+                  <button key={simBook.id} className="similarCard" onClick={() => onOpen(simBook)}>
+                    <BookCover book={simBook} />
+                  </button>
+                ))
               ) : (
                 <div className="similarCard similarCardEmpty" aria-hidden="true">
                 </div>

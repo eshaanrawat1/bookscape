@@ -72,7 +72,6 @@ class Book:
     series:           str       = ""
     series_number:    str       = ""
     similar_book_ids: list[str] = field(default_factory=list)
-    source_url:       str       = ""
     scraped_at:       str       = ""
 
 
@@ -492,7 +491,6 @@ def parse_book(html: str, url: str) -> Optional[tuple]:
         series=series,
         series_number=series_number,
         similar_book_ids=[],   # filled in by GraphQL call
-        source_url=url,
         scraped_at=_now(),
     ), kca_id
 

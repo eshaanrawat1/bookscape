@@ -25,6 +25,7 @@
   --danger-strong: oklch(0.62 0.24 25);
   --status-reading: oklch(0.72 0.16 72);
   --status-not-started: oklch(0.69 0.05 85);
+  --status-want: oklch(0.68 0.08 250);
   --status-finished: #7dbf85;
   --status-dnf: oklch(0.66 0.07 20);
   --shadow-tint: 60, 40, 20;
@@ -1732,24 +1733,6 @@ svg {
   z-index: 3;
 }
 
-.dialogSaveButton {
-  color: color-mix(in oklch, var(--foreground) 76%, var(--muted-foreground));
-}
-
-.dialogSaveButton.saved {
-  border-color: color-mix(in oklch, var(--danger-strong) 34%, var(--border));
-  color: var(--danger-strong);
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--danger-strong) 14%, transparent);
-}
-
-.dialogSaveButton.saved svg {
-  color: var(--danger-strong);
-}
-
-.dialogSaveButton.saved:hover:not(:disabled) {
-  background: color-mix(in oklch, var(--danger-strong) 10%, white);
-}
-
 .collectionPicker {
   position: absolute;
   top: calc(100% + 0.7rem);
@@ -2342,6 +2325,10 @@ svg {
   background: color-mix(in oklch, var(--status-dnf) 30%, transparent);
 }
 
+.trackingStatusButton[data-status='want'] {
+  background: color-mix(in oklch, var(--status-want) 30%, transparent);
+}
+
 .trackingStatusButton:hover {
   filter: brightness(0.97);
 }
@@ -2415,6 +2402,11 @@ svg {
 .trackingStatusDot.dnf {
   background: var(--status-dnf);
   box-shadow: 0 0 0 4px color-mix(in oklch, var(--status-dnf) 18%, transparent);
+}
+
+.trackingStatusDot.want {
+  background: var(--status-want);
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--status-want) 18%, transparent);
 }
 
 .trackingStatusDot.notStarted {

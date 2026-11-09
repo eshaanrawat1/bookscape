@@ -39,9 +39,9 @@ def render_frontmatter(book: dict, state: dict) -> str:
     lines = [
         "---",
         f"status: {state.get('status', 'not_started')}",
-        f"uid: {book.get('uid', '')}",
+        f"uid: {book.get('id', '')}",
         f'author: "[[{book.get("author", "")}]]"',
-        f"total_pages: {int(state.get('total_pages') or 0)}",
+        f"total_pages: {int(book.get('total_pages') or 0)}",
         f"current_page: {int(state.get('current_page') or 0)}",
         _bare_or_valued("start_date", state.get("start_date") or ""),
         _bare_or_valued("completed_date", state.get("finish_date") or ""),

@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '../api.js'
-import { normaliseBook, errorMessage } from '../utils.js'
+import { errorMessage } from '../utils.js'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import type { Highlight, HighlightGroup, RawHighlight, RawHighlightGroup } from '../types.js'
+
+type StoredGroup = Pick<HighlightGroup, 'bookId' | 'highlights'>
 
 function normaliseHighlight(raw: RawHighlight): Highlight {
   return {
@@ -16,20 +18,17 @@ function normaliseHighlight(raw: RawHighlight): Highlight {
   }
 }
 
-function normaliseGroup(raw: RawHighlightGroup): HighlightGroup | null {
-  if (!raw?.book) return null
+function normaliseGroup(raw: RawHighlightGroup): StoredGroup {
   return {
     bookId: String(raw.book_id || ''),
-    book: normaliseBook(raw.book),
-    count: Number(raw.count) || 0,
     highlights: (raw.highlights || []).map(normaliseHighlight),
   }
 }
 
-// Patch the one returned group: drop it if emptied, prepend if new (newest-highlight order).
-function mergeGroup(groups: HighlightGroup[], updated: HighlightGroup): HighlightGroup[] {
+// Mutations answer with one book's group: an emptied book drops out, a new one is prepended.
+function mergeGroup(groups: StoredGroup[], updated: StoredGroup): StoredGroup[] {
   const rest = groups.filter((group) => group.bookId !== updated.bookId)
-  if (updated.count === 0) return rest
+  if (updated.highlights.length === 0) return rest
   const existed = groups.some((group) => group.bookId === updated.bookId)
   return existed
     ? groups.map((group) => (group.bookId === updated.bookId ? updated : group))
@@ -37,8 +36,8 @@ function mergeGroup(groups: HighlightGroup[], updated: HighlightGroup): Highligh
 }
 
 function useHighlights() {
-  const { dataVersion } = useLibraryData()
-  const [groups, setGroups] = useState<HighlightGroup[]>([])
+  const { booksByIds } = useLibraryData()
+  const [stored, setStored] = useState<StoredGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -48,7 +47,7 @@ function useHighlights() {
     apiFetch<{ groups?: RawHighlightGroup[] }>('/highlights')
       .then((data) => {
         if (cancelled) return
-        setGroups((data.groups || []).map(normaliseGroup).filter((g): g is HighlightGroup => g !== null))
+        setStored((data.groups || []).map(normaliseGroup))
         setError(null)
       })
       .catch((err) => {
@@ -59,12 +58,16 @@ function useHighlights() {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [dataVersion])
+  }, [])
+
+  const groups: HighlightGroup[] = useMemo(() => stored.flatMap((group) => {
+    const [book] = booksByIds([group.bookId])
+    return book ? [{ ...group, book, count: group.highlights.length }] : []
+  }), [stored, booksByIds])
 
   // Mutations rethrow so the calling form can stay open showing what failed.
   const applyGroup = (raw: RawHighlightGroup) => {
-    const group = normaliseGroup(raw)
-    if (group) setGroups((current) => mergeGroup(current, group))
+    setStored((current) => mergeGroup(current, normaliseGroup(raw)))
   }
 
   const updateHighlight = async (id: number, fields: Partial<Pick<Highlight, 'text' | 'page' | 'note'>>) => {

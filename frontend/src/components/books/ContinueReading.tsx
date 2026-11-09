@@ -4,7 +4,6 @@ import CoverProgress from './CoverProgress.jsx'
 import ProgressRing from '../ui/ProgressRing.jsx'
 import SectionHeader from '../ui/SectionHeader.jsx'
 import { useNavigation } from '../../context/NavigationContext.jsx'
-import { normaliseBook } from '../../utils.js'
 import type { Book, SeriesProgress } from '../../types.js'
 
 interface ContinueReadingProps {
@@ -13,13 +12,11 @@ interface ContinueReadingProps {
 }
 
 function ContinueReading({ books, series }: ContinueReadingProps) {
-  // A series card already shows its next book, so that book doesn't get its own card.
-  const coveredIds = new Set(
-    series.map((entry) => entry.next_book?.id || entry.next_book?.uid).filter(Boolean),
-  )
+  // A series card already shows its next book's cover, so that book gets no card of its own.
+  const coveredIds = new Set(series.map((entry) => entry.nextBook?.id).filter(Boolean))
   const looseBooks = books.filter((book) => !coveredIds.has(book.id))
 
-  // Mid-book entries first; partitioned here so the order holds however /series-progress sorts.
+  // Mid-book first, lone or in a series; then the series you are between books on.
   const readingSeries = series.filter((entry) => entry.reading > 0)
   const restSeries = series.filter((entry) => entry.reading === 0)
 
@@ -45,7 +42,7 @@ function ContinueReading({ books, series }: ContinueReadingProps) {
 
 function SeriesCard({ entry }: { entry: SeriesProgress }) {
   const { onOpen, onOpenSeries } = useNavigation()
-  const nextBook = entry.next_book ? normaliseBook(entry.next_book) : null
+  const { nextBook } = entry
   const reading = nextBook?.status === 'reading'
 
   return (

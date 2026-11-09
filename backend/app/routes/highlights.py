@@ -25,24 +25,17 @@ def create_router(root: Path, highlights: HighlightStore) -> APIRouter:
     router = APIRouter()
 
     def _group(book_id: str) -> dict:
-        """One book's highlights with the book, the mutation response shape."""
-        items = highlights.list_for_book(book_id)
-        return {
-            "book_id": book_id,
-            "book": load_book(root, book_id),
-            "count": len(items),
-            "highlights": items,
-        }
+        """One book's highlights, the mutation response shape.
+
+        Returning only the touched book rather than the whole corpus the way the
+        collection routes do: a library's highlights grow without bound, and the
+        client only ever needs the group it just changed.
+        """
+        return {"book_id": book_id, "highlights": highlights.list_for_book(book_id)}
 
     @router.get("/highlights")
     def get_highlights() -> dict:
-        # Drop books whose catalog row has gone, rather than sending a null book.
-        groups = [
-            {"book_id": group["book_id"], "book": book, "count": len(group["highlights"]), "highlights": group["highlights"]}
-            for group in highlights.list_all()
-            if (book := load_book(root, group["book_id"]))
-        ]
-        return {"groups": groups}
+        return {"groups": highlights.list_all()}
 
     @router.post("/highlights")
     def create_highlight(payload: CreateHighlightIn) -> dict:
