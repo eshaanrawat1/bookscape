@@ -29,9 +29,7 @@ interface ReadingProgressRecord {
   total_pages: number | string
   start_date: string
   finish_date: string
-  // A string mid-edit (the input hands its raw text straight to updateField),
-  // a number once the server's normalised value lands. The rating row leans on
-  // that distinction to tell "typed a leading 0" from "unrated".
+  // String mid-edit, number once saved: the rating row uses this to tell a typed "0" from unrated.
   my_rating: number | string
   notes: string
 }
@@ -40,27 +38,19 @@ interface ReadingProgressResponse {
   entry?: Partial<ReadingProgressRecord>
 }
 
-// The saved-state fingerprint used to decide whether an edit is worth
-// persisting. Both sides of that comparison must be built from exactly these
-// seven normalised fields — the server's `entry` also carries a `book_id`, and
-// stringifying the raw record let it leak into one side only, so the check
-// never matched and an unedited PUT fired on every dialog open.
+// Saved-state fingerprint. Both sides must use exactly these fields or autosave fires on every open.
 const recordSignature = (record: ReadingProgressRecord): string => JSON.stringify({
   status: String(record.status || 'done').trim().toLowerCase() || 'done',
   current_page: Number(record.current_page) || 0,
   total_pages: Number(record.total_pages) || 0,
   start_date: String(record.start_date || '').trim(),
   finish_date: String(record.finish_date || '').trim(),
-  // Rounded to the two decimals the server stores, so a saved rating's
-  // fingerprint matches the one rebuilt from the PUT response and the autosave
-  // settles instead of re-firing on what it reads as a fresh edit.
+  // Rounded to the server's two decimals so the fingerprint matches the PUT response and autosave settles.
   my_rating: Math.round((Number(record.my_rating) || 0) * 100) / 100,
   notes: String(record.notes || '').trim(),
 })
 
-// "Did this payload actually say something?" — a 0 rating, an empty blurb and an
-// empty genre list are all normaliseBook's stand-ins for a missing field, not
-// values worth preferring over one that was fetched.
+// 0, '' and [] are normaliseBook's stand-ins for a missing field, not real values.
 const hasValue = (value: unknown): boolean => {
   if (Array.isArray(value)) return value.length > 0
   if (typeof value === 'number') return Number.isFinite(value) && value !== 0
@@ -75,9 +65,7 @@ const STATUS_LABELS: Record<string, string> = {
   not_started: 'Not started',
 }
 
-// The statuses that mean a book has been picked up, mirroring TRACKED_STATUSES
-// on the server: these are the books /my-books returns, and the ones whose
-// dialog should open on the tracking panel rather than the library blurb.
+// Mirrors TRACKED_STATUSES on the server; these books open on the tracking panel.
 const TRACKED_STATUSES = ['reading', 'done', 'dnf']
 
 function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onClose }: BookDialogProps) {
@@ -110,13 +98,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
   const panelResizeObserverRef = useRef<ResizeObserver | null>(null)
 
   useLayoutEffect(() => {
-    // Guard against React StrictMode's dev-only double-invocation of effects
-    // (mount -> cleanup -> mount again, same `view` both times). A plain
-    // "have we ever run" boolean ref gets flipped by the throwaway first
-    // invocation and no longer protects the second one, which then wrongly
-    // treats a fresh mount as a real transition. Comparing against the last
-    // `view` we actually animated for is idempotent under a replay with an
-    // unchanged `view`, while still catching every genuine transition.
+    // StrictMode replays effects with the same view; comparing to the last animated view is idempotent.
     if (lastAnimatedView.current === view) {
       return
     }
@@ -128,10 +110,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
     const content = panelRef.current
     if (!content) return
 
-    // Keep the animated height in sync with the panel's actual content while it
-    // settles — a one-shot scrollHeight snapshot can be taken before async data
-    // (e.g. the /book/{id} fetch, or collections from context) finishes landing,
-    // permanently clipping whatever renders last (the action buttons row).
+    // Track content while it settles; a one-shot scrollHeight can miss async data and clip the last row.
     const observer = new ResizeObserver(() => {
       setPanelHeight(content.scrollHeight)
     })
@@ -180,11 +159,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
     return () => { cancelled = true }
   }, [bookId])
 
-  // The card's own payload wins — it carries the live reading state the catalog
-  // row knows nothing about — but only where it actually has a value. A plain
-  // `{ ...fullBook, ...book }` let a sparse list payload's zeros and empty
-  // strings overwrite what the /book/{id} fetch just supplied, blanking the
-  // About tab's stats for books opened from a reading shelf.
+  // The card's payload wins, but only where it has a value, so sparse rows don't blank fetched fields.
   const displayBook = fullBook
     ? {
         ...fullBook,
@@ -201,7 +176,6 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
   const savedWantToReadKey = getCatalogBookId(savedWantToReadBook)
   const isSavedToWantToRead = Boolean(savedWantToReadBook)
 
-  // Tracking view state
   const [record, setRecord] = useState<ReadingProgressRecord | null>(null)
   const [hydrated, setHydrated] = useState(false)
   const [statusMenuOpen, setStatusMenuOpen] = useState(false)
@@ -228,11 +202,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
       return () => { cancelled = true }
     }
 
-    // The fetched entry is authoritative — it and the card that opened this
-    // dialog are the same user_book_state row, so the panel reads the same no
-    // matter which page the book was opened from. `baseRecord` only fills the
-    // gap before it lands, and supplies the page count for a book nobody has
-    // tracked yet.
+    // The fetched entry is authoritative; baseRecord only fills the gap before it lands.
     apiFetch<ReadingProgressResponse>(`/reading-progress/${bookId}`)
       .then((data) => {
         if (cancelled) return
@@ -267,10 +237,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
   const [obsidianBusy, setObsidianBusy] = useState<VaultAction | null>(null)
   const canSyncObsidian = Boolean(bookId) && TRACKED_STATUSES.includes(draft.status)
 
-  // Toasts from this dialog name the book. They outlive the dialog by design —
-  // the whole point of moving them out — so by the time one is read there may be
-  // nothing on screen to say which book it meant, and App's whole-library vault
-  // buttons raise near-identical messages into the same corner.
+  // Toasts outlive the dialog, so they name the book.
   const vaultToastKey = `vault:${bookId}`
 
   const pushToVault = async () => {
@@ -313,10 +280,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
     setRecord((current) => ({
       ...(current || baseRecord),
       [field]: value,
-      // The server drops the finish date of an abandoned book, so mirroring it
-      // here is only about the gap: autosave is debounced, and without this the
-      // date sits visible in the panel for a second before the round-trip
-      // wipes it, reading as a save that failed.
+      // Mirrors the server dropping a DNF's finish date, so it doesn't linger until autosave round-trips.
       ...(field === 'status' && value === 'dnf' ? { finish_date: '' } : {}),
     }))
   }
@@ -341,11 +305,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
       const nextSaved: ReadingProgressRecord = { ...baseRecord, ...(data.entry || payload) }
       setRecord(nextSaved)
       lastSavedRef.current = recordSignature(nextSaved)
-      // The app-level book list is what "Reading now" and "Finished" are
-      // derived from, and it is only ever filled by the bootstrap fetch. A
-      // status or page edit here changes which of those a book belongs to, so
-      // without this the carousel keeps showing the pre-edit library until
-      // something else happens to reload it (an Obsidian pull, a restart).
+      // "Reading now" and "Finished" derive from the app-level list, which nothing else refills after an edit.
       await refreshLibrary()
     } catch {
       // Keep the draft visible; autosave will retry on the next edit.
@@ -402,9 +362,6 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
         nextSaved
           ? `Saved “${displayBook.title}” to Want to read.`
           : `Removed “${displayBook.title}” from Want to read.`,
-        // Keyed on the book, so flipping the heart on and off leaves one toast
-        // showing where the book actually ended up rather than a stack arguing
-        // with itself.
         { key: `want-to-read:${bookId}` },
       )
     } catch (err) {
@@ -480,8 +437,6 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
                 type="button"
                 className="dialogSeries dialogSeriesButton"
                 onClick={() => onOpenSeries(displayBook.series)}
-                // The number is part of the label but not part of the
-                // destination — the page is the whole series.
                 aria-label={`View the ${displayBook.series} series`}
               >
                 {displayBook.series}
@@ -683,12 +638,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
                         step="0.01"
                         className="trackingPageInput trackingRatingInput"
                         placeholder="Empty"
-                        // Only the *number* 0 — what the server sends for a book
-                        // you have not rated — falls back to the placeholder.
-                        // Typing stores a string, so the "0" on the way to "0.5"
-                        // is not `=== 0` and stays on screen; testing
-                        // `Number(x) > 0` instead would blank the field the
-                        // instant you typed the leading zero.
+                        // Only numeric 0 shows the placeholder; a typed "0" is a string, so "0.5" can be entered.
                         value={draft.my_rating === 0 ? '' : draft.my_rating}
                         onChange={(event) => updateField('my_rating', event.target.value)}
                       />

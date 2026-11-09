@@ -11,8 +11,6 @@ interface CatalogPageProps extends CatalogBooks {
   children: ReactNode
 }
 
-// The drilldown pages differ in how they draw their books, not in what they do
-// while there are none to draw.
 function CatalogPage({
   books,
   loading,

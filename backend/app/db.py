@@ -154,17 +154,7 @@ def transaction(root: Path) -> Iterator[sqlite3.Connection]:
 
 
 def _add_missing_columns(conn: sqlite3.Connection) -> None:
-    """Bring an existing database up to SCHEMA_SQL's column list.
-
-    SCHEMA_SQL is all CREATE TABLE IF NOT EXISTS, so it describes a *fresh*
-    database and says nothing to one that already exists — a column added to it
-    reaches new installs only. Each entry here is the ALTER that catches the
-    existing file up, guarded by a table_info read so a restart is a no-op.
-
-    Only plain column adds belong here. A change to an existing column (the
-    status CHECK gaining 'dnf', say) needs a table rebuild, which is a migration
-    with a backup, not a startup step.
-    """
+    """Add columns missing from an existing database; changing a column needs a real migration."""
     for table, column, ddl in (
         (
             "user_book_state",

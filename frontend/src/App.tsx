@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Menu, Plus, File, Upload, Download, ArrowLeft } from 'lucide-react'
 
-// API & Utilities
 import { apiFetch, BOOTSTRAP_RETRIES, BOOTSTRAP_RETRY_DELAY_MS } from './api.js'
 import {
   sleep,
@@ -23,16 +22,13 @@ import {
 import { viewMeta, shortcutLabel } from './constants.js'
 import { buildCommands } from './commands.js'
 
-// Context
 import { LibraryDataContext, useLibraryData } from './context/LibraryDataContext.jsx'
 import { NavigationContext } from './context/NavigationContext.jsx'
 import { useToast } from './context/ToastContext.jsx'
 
-// Hooks
 import useAppHotkeys from './hooks/useAppHotkeys.js'
 import useReadingGoal from './hooks/useReadingGoal.js'
 
-// Components
 import Sidebar from './components/sidebar/Sidebar.jsx'
 import EmptyState from './components/ui/EmptyState.jsx'
 import BookDialogStage, { type Selected } from './components/dialogs/BookDialogStage.jsx'
@@ -42,7 +38,6 @@ import ReadingGoalDialog from './components/dialogs/ReadingGoalDialog.jsx'
 import CommandPalette from './components/dialogs/CommandPalette.jsx'
 import BookGrid from './components/books/BookGrid.jsx'
 
-// Views
 import ReadingNow from './views/ReadingNow.jsx'
 import LibraryView from './views/LibraryView.jsx'
 import SearchView from './views/SearchView.jsx'
@@ -55,9 +50,7 @@ import BooksReadView from './views/BooksReadView.jsx'
 import CollectionView from './views/CollectionView.jsx'
 import type { Book, Collection, GenreSection, RawBookPayload, RawList, VaultAction } from './types.js'
 
-// The pages with a Back link, and where it lands with nothing to go back to.
-// Books read is reached from the stats page, so it falls back there rather than
-// to the library the others return to.
+// Pages with a Back link and where it lands when there's no history.
 const DRILLDOWNS = [
   { prefix: 'author:', fallback: 'library' },
   { prefix: 'series:', fallback: 'library' },
@@ -74,7 +67,6 @@ export default function App() {
   const [mobileNav, setMobileNav] = useState(false)
   const [selected, setSelected] = useState<Selected | null>(null)
 
-  // Live data from the API
   const [books, setBooks] = useState<Book[]>([])
   const [collections, setCollections] = useState<Collection[]>([])
   const [wantToReadBooks, setWantToReadBooks] = useState<Book[]>([])
@@ -88,9 +80,7 @@ export default function App() {
   const [showPalette, setShowPalette] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Temporary: A/B for the active-nav treatment, ⌥⌘G to cycle. Deliberately
-  // chorded with Alt, which useAppHotkeys drops on the floor. Delete this and
-  // the loser's CSS block once we've picked one.
+  // Temporary A/B of the active-nav style (⌥⌘G); delete this and the loser's CSS once picked.
   const [navStyle, setNavStyle] = useState<'rail' | 'ember'>('rail')
 
   useEffect(() => {
@@ -146,12 +136,10 @@ export default function App() {
     setCollections(mapReadingLists(data.lists))
     setWantToReadBooks(data.wantToReadBooks.map(normaliseBook))
     setGlobalLibrary(data.globalLibrary)
-    // Views that fetch their own books watch this rather than these lists, so
-    // one reload refreshes the whole app rather than only the shelves.
+    // Views that fetch their own books watch this, so one reload refreshes the whole app.
     setDataVersion((version) => version + 1)
   }
 
-  // Derived views from live books
   const bookById = new Map(books.map((b) => [b.id, b]))
   const booksByIds = (ids: string[]): Book[] =>
     ids.map((id) => bookById.get(id)).filter((b): b is Book => Boolean(b))
@@ -160,9 +148,6 @@ export default function App() {
   const finished = books.filter((b) => b.status === 'done')
   const dnf = books.filter((b) => b.status === 'dnf')
 
-  // Progress against the goal is counted from `finished` rather than fetched,
-  // so marking a book done moves the bar on the next render — the same list the
-  // goal card draws its covers from.
   const readingGoal = useReadingGoal(finished)
 
   const activeCollection = view.startsWith('collection:')
@@ -192,8 +177,7 @@ export default function App() {
   const openBookDialog = (book: Book) =>
     setSelected((prev) => ({ book, isNavigation: prev !== null }))
 
-  // Hopping between two pages of the same kind keeps the original return target,
-  // so Back leaves the drilldown rather than walking back through it.
+  // Hopping between drilldowns keeps the original return target, so Back leaves the drilldown.
   const openDrilldown = (target: string) => {
     setPreviousView((current) => (drilldownFor(target) === drilldownFor(view) ? current : view))
     setSelected(null)
@@ -219,19 +203,13 @@ export default function App() {
     setView(previousView && !previousView.startsWith(drilldown.prefix) ? previousView : drilldown.fallback)
     setMobileNav(false)
   }
-  // 'want-to-read' is a sidebar destination rather than a drilldown, so this
-  // doesn't touch previousView — the back arrows belong to the author/series/
-  // genre pages, and landing here should leave their return target alone.
+  // A sidebar destination, not a drilldown, so previousView stays untouched.
   const openWantToRead = () => {
     setView('want-to-read')
     setMobileNav(false)
   }
 
-  // The generic jump used by the sidebar, the ⌘1–⌘7 chords and every palette
-  // navigate command. Like the sidebar it is a top-level destination rather
-  // than a drilldown, so it leaves previousView alone; it does dismiss whatever
-  // is open on top, since arriving at a new view behind a dialog reads as the
-  // shortcut having done nothing.
+  // Top-level jump: leaves previousView alone but dismisses anything open on top.
   const goTo = (viewId: string) => {
     setShowPalette(false)
     setSelected(null)
@@ -332,10 +310,6 @@ export default function App() {
     await reloadAppData()
   }
 
-  // Both vault actions say "your library" where the per-book buttons in the
-  // book dialog name the book. They land in the same corner now, and "Pushed to
-  // vault." from two places that sync very different amounts of data was the
-  // one genuine ambiguity in moving these out of their own surfaces.
   async function pushToVault() {
     if (vaultBusy) return
     setVaultBusy('push')
@@ -394,8 +368,7 @@ export default function App() {
     onEditReadingGoal: () => setShowGoalDialog(true),
   }
 
-  // Only assembled while the palette is on screen — several entries close over
-  // vault state that changes underneath it.
+  // Built only while the palette is open; several entries close over changing vault state.
   const commands = showPalette
     ? buildCommands({
       collections,

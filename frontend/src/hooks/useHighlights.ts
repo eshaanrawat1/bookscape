@@ -26,10 +26,7 @@ function normaliseGroup(raw: RawHighlightGroup): HighlightGroup | null {
   }
 }
 
-// Every mutation answers with the one book's group, so the list is patched in
-// place rather than refetched: a book that lost its last highlight drops out,
-// one that gained its first is prepended (the backend orders books by their
-// newest highlight, and a brand-new highlight is the newest there is).
+// Patch the one returned group: drop it if emptied, prepend if new (newest-highlight order).
 function mergeGroup(groups: HighlightGroup[], updated: HighlightGroup): HighlightGroup[] {
   const rest = groups.filter((group) => group.bookId !== updated.bookId)
   if (updated.count === 0) return rest
@@ -39,9 +36,6 @@ function mergeGroup(groups: HighlightGroup[], updated: HighlightGroup): Highligh
     : [updated, ...rest]
 }
 
-// Owned by the Highlights view rather than LibraryDataContext: nothing else in
-// the app reads highlights, and a corpus that grows with every snippet does not
-// belong in the bootstrap every view waits on.
 function useHighlights() {
   const { dataVersion } = useLibraryData()
   const [groups, setGroups] = useState<HighlightGroup[]>([])
@@ -67,8 +61,7 @@ function useHighlights() {
     return () => { cancelled = true }
   }, [dataVersion])
 
-  // The three mutations rethrow rather than swallowing: the caller is a form or
-  // a row that has to stay on screen showing what failed.
+  // Mutations rethrow so the calling form can stay open showing what failed.
   const applyGroup = (raw: RawHighlightGroup) => {
     const group = normaliseGroup(raw)
     if (group) setGroups((current) => mergeGroup(current, group))
@@ -91,8 +84,7 @@ function useHighlights() {
   return { groups, loading, error, applyGroup, updateHighlight, deleteHighlight }
 }
 
-// Shared with the book dialog, which creates highlights without ever mounting
-// the view — so the POST lives outside the hook rather than only inside it.
+// Outside the hook because the book dialog creates highlights without mounting the view.
 async function createHighlight(bookId: string, text: string, page: number): Promise<RawHighlightGroup> {
   return apiFetch<RawHighlightGroup>('/highlights', {
     method: 'POST',

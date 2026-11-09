@@ -27,7 +27,6 @@ function Sidebar({ active, onSelect }: SidebarProps) {
   const [draftName, setDraftName] = useState('')
   const [collectionError, setCollectionError] = useState('')
   const [saving, setSaving] = useState(false)
-  // The collection whose icon picker is open, and the dot it hangs off.
   const [iconPicker, setIconPicker] = useState<{ id: string; anchor: HTMLElement } | null>(null)
   const [pendingDelete, setPendingDelete] = useState<Collection | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -145,8 +144,6 @@ function Sidebar({ active, onSelect }: SidebarProps) {
             const isActive = active === id
             const isEditing = editingId === collection.id
             const bookCount = (collection.books?.length ?? collection.bookIds?.length ?? 0)
-            // An icon name the current lucide set no longer has resolves to
-            // null, and the row quietly falls back to the plain dot.
             const Icon = resolveCollectionIcon(collection.icon)
             const pickerOpen = iconPicker?.id === collection.id
             return (
@@ -250,8 +247,6 @@ function Sidebar({ active, onSelect }: SidebarProps) {
         {collectionError && <p className="collectionError">{collectionError}</p>}
       </section>
 
-      {/* Last child, and the collections section above it is the one that grows
-          — so this sits on the floor of the sidebar whatever the list does. */}
       <ReadingGoalWidget />
 
       {pendingDelete && (

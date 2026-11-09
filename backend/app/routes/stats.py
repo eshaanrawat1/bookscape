@@ -23,11 +23,7 @@ def _span(book: dict) -> tuple[date, date] | None:
 
 
 def _days_reading(books_list: list[dict]) -> int:
-    """Calendar days with a book open, counted once.
-
-    A union rather than a sum of per-book spans: two books read side by side
-    over the same fortnight is a fortnight of reading, not a month of it.
-    """
+    """Calendar days with a book open; a union, so overlapping books aren't double counted."""
     days: set[date] = set()
     for book in books_list:
         span = _span(book)
@@ -41,11 +37,7 @@ def _days_reading(books_list: list[dict]) -> int:
 
 
 def _months(books_list: list[dict]) -> list[int]:
-    """Books finished per calendar month, January first.
-
-    Always twelve entries — the chart draws a full year, so an empty month is a
-    zero-height bar rather than a missing column.
-    """
+    """Books finished per month, January first; always twelve entries."""
     counts = [0] * 12
     for book in books_list:
         if finish := parse_iso_date(book.get("reading_finish_date")):
@@ -53,19 +45,12 @@ def _months(books_list: list[dict]) -> list[int]:
     return counts
 
 
-# The same column count the month view draws, so the all-time chart keeps the
-# shape of the one it replaces rather than growing a column per year read.
+# Matches the month view's column count.
 YEAR_SPAN = 12
 
 
 def _year_counts(books_list: list[dict]) -> list[dict]:
-    """Books finished per calendar year, oldest first.
-
-    Only for the all-time view, where stacking every January together says
-    which months you read in but nothing about which years. A contiguous run
-    rather than only the years with books, so a year off reads as a gap instead
-    of closing up, and capped to the most recent YEAR_SPAN of them.
-    """
+    """Books finished per year, oldest first, contiguous and capped to YEAR_SPAN."""
     counts: dict[int, int] = {}
     for book in books_list:
         if finish := parse_iso_date(book.get("reading_finish_date")):
@@ -125,8 +110,7 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
             "genres_covered": len(genres),
             "days_reading": _days_reading(books_list),
             "months": _months(books_list),
-            # Empty when a single year is asked for: that view is drawn month
-            # by month, and one bar for the year it already names says nothing.
+            # Empty for a single year, which is drawn month by month.
             "year_counts": _year_counts(books_list) if year is None else [],
             "books": books_list,
         }

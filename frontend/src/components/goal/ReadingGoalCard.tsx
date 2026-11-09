@@ -6,17 +6,10 @@ import { useLibraryData } from '../../context/LibraryDataContext.jsx'
 import { useNavigation } from '../../context/NavigationContext.jsx'
 import type { BookProps } from '../../types.js'
 
-// How many bonus slots sit past a met goal. They are never filled — read 25
-// against a goal of 20 and there are still five ahead of you — so the run is an
-// invitation to keep going rather than a second target you are behind on.
+// Slots past a met goal; never filled, so there's always more ahead.
 const BONUS_SLOTS = 5
 
-// The open end of the row: what is still to go. Below the goal that is one slot
-// per book left, counting up to the target; at or past it, the bonus run. Never
-// both — an unmet goal should show what is left and nothing else, so the gold
-// only ever appears once the target is actually behind you. Both kinds are the
-// same numbered slot, so the count runs unbroken across the goal and the only
-// thing the bonus run changes is its colour.
+// What's still to go: one slot per book left, or the bonus run once the goal is met, never both.
 type GoalSlot = { key: string; number: number; bonus: boolean }
 
 function openSlots(booksRead: number, target: number): GoalSlot[] {
@@ -29,9 +22,6 @@ function openSlots(booksRead: number, target: number): GoalSlot[] {
   }))
 }
 
-// The year's goal, at the top of Reading Now: a heading, a meter, and the year
-// so far. With no goal set it is one line, since an empty progress bar would
-// report failure at something never started.
 function ReadingGoalCard() {
   const { readingGoal } = useLibraryData()
   const { onEditReadingGoal } = useNavigation()
@@ -39,24 +29,18 @@ function ReadingGoalCard() {
   const stripRef = useRef<HTMLDivElement | null>(null)
   const boundaryRef = useRef<HTMLDivElement | null>(null)
 
-  // The strip runs oldest to newest and can be a whole year long, so it rests
-  // on the boundary between read and unread: the books just finished on the
-  // left, the next open slots on the right. Both ends are worse views — the
-  // start is January, and the far end is nothing but empty boxes. There is
-  // always a boundary to rest on, since a met goal still has its bonus slots.
+  // Rests the scroller on the read/unread boundary; the ends are January and empty boxes.
   useEffect(() => {
     const strip = stripRef.current
     const boundary = boundaryRef.current
     if (!strip || !boundary) return
-    // Measured rather than derived from offsetLeft, which is relative to
-    // whichever ancestor happens to be positioned.
+    // Measured because offsetLeft depends on which ancestor is positioned.
     const offsetInContent =
       strip.scrollLeft + boundary.getBoundingClientRect().left - strip.getBoundingClientRect().left
     strip.scrollLeft = Math.max(0, offsetInContent - strip.clientWidth * 0.35)
   }, [booksRead, target])
 
-  // Nothing until the target is known: an invitation that swaps to a full
-  // progress bar a beat later reads as a glitch.
+  // Nothing until the target is known, or the invitation flashes before the bar.
   if (loading) return null
 
   if (target <= 0) {
@@ -74,9 +58,6 @@ function ReadingGoalCard() {
   }
 
   const percent = Math.min(100, Math.round((booksRead / target) * 100))
-  // The whole year, in order: a cover for every book read, then the slots still
-  // open ahead of it. Covers load lazily so a long row costs what is on screen
-  // rather than the full year of images.
   const slots = openSlots(booksRead, target)
 
   return (

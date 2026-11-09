@@ -36,10 +36,7 @@ function StatsView() {
 
   const scope = year || 'all time'
 
-  // A chosen year is drawn month by month; all time is drawn year by year,
-  // because stacking every January together would say which months you read in
-  // but nothing about which years. The month labels are mapped rather than the
-  // payload trusted, so a short `months` still draws a full twelve.
+  // Months for a chosen year, years for all time; labels are mapped so a short `months` still draws twelve.
   const bars = year
     ? monthLabels.map((month, index) => ({
       label: month,
@@ -86,8 +83,6 @@ function StatsView() {
             title="Books read"
             subtitle={year ? "All the books you've read this year." : "All the books you've ever read."}
           >
-            {/* The row is a scroller; this opens the same books as a full page
-                for whichever year the picker above is on. */}
             <button type="button" className="statsSeeAll" onClick={() => onOpenBooksRead(year)}>
               See all
             </button>

@@ -8,8 +8,6 @@ from datetime import date
 MY_RATING_MAX = 5.0
 
 
-# Text Normalization from obsidian fields
-
 def normalize_text(value: object) -> str:
     """Normalize text by removing unicode combining marks and special characters."""
     text = str(value or "").strip()
@@ -30,8 +28,6 @@ def split_author_field(value: object) -> list[str]:
     return [p.strip() for p in parts if p.strip()] or [raw]
 
 
-# Date Parsing
-
 def parse_iso_date(value: object) -> date | None:
     raw = str(value or "").strip()
     try:
@@ -44,16 +40,8 @@ def parse_iso_date_string(value: object) -> str:
     return d.isoformat() if d else ""
 
 
-# Personal rating
-
 def clamp_my_rating(value: object) -> float:
-    """Coerce a personal score into the 0-5, two-decimal shape the column holds.
-
-    Applied at every boundary the value crosses — the API payload and the vault
-    frontmatter — so `user_book_state.my_rating`'s CHECK constraint stays a
-    backstop rather than something a typo can trip. Anything unreadable (a YAML
-    list, a stray word, a NaN) is 0, which is this column's "not rated yet".
-    """
+    """Coerce a score to 0-5 with two decimals; anything unreadable is 0 ("not rated yet")."""
     try:
         rating = float(value or 0)
     except (TypeError, ValueError):

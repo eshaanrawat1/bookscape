@@ -15,13 +15,10 @@ const MONTH_NAMES = [
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
-// Six fixed rows, so the popover never changes height as you page through
-// months — a 5-week month next to a 6-week one would otherwise make the
-// Clear/Today row jump under the cursor.
+// Six fixed rows so the popover height doesn't jump between months.
 const GRID_DAYS = 42
 
-// `YYYY-MM-DD` in, local calendar date out. Going via `new Date(value)` would
-// parse the bare date as UTC and land on the previous day west of Greenwich.
+// Parsed as local: new Date('YYYY-MM-DD') is UTC, the previous day west of Greenwich.
 const parseISODate = (value: string): Date | null => {
   const [year, month, day] = String(value || '').split('-').map(Number)
   if (!year || !month || !day || month < 1 || month > 12 || day < 1 || day > 31) return null
@@ -47,8 +44,7 @@ const addDays = (date: Date, days: number): Date => {
 }
 
 const addMonths = (date: Date, months: number): Date => {
-  // Clamp to the last day of the target month so 31 Jan + 1 month lands on 28
-  // Feb rather than rolling over into March.
+  // Clamp to the target month's last day so 31 Jan + 1 month is 28 Feb, not March.
   const target = new Date(date.getFullYear(), date.getMonth() + months, 1)
   const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
   target.setDate(Math.min(date.getDate(), lastDay))
@@ -90,8 +86,7 @@ function DateProperty({ value, label, onChange }: DatePropertyProps) {
     closePicker()
   }
 
-  // Registered above the book dialog's own layer while the picker is open, so
-  // Escape dismisses the picker rather than the whole dialog behind it.
+  // Above the book dialog's layer, so Escape dismisses only the picker.
   useModalLayer({ enabled: open, onEscape: () => closePicker() })
 
   useEffect(() => {
@@ -103,8 +98,7 @@ function DateProperty({ value, label, onChange }: DatePropertyProps) {
     return () => document.removeEventListener('pointerdown', handlePointerDown)
   }, [open])
 
-  // Flip above the field when the popover would spill past the bottom of the
-  // card, which clips it — `.bookDialog` scrolls its own overflow.
+  // Flip above the field if it would spill past the card, whose overflow clips it.
   useLayoutEffect(() => {
     if (!open) return
     const popover = popoverRef.current
@@ -124,10 +118,7 @@ function DateProperty({ value, label, onChange }: DatePropertyProps) {
   }, [open, cursorISO])
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    // Escape is handled by the modal layer above, which stops the key before
-    // it ever reaches React's synthetic event system.
-    // Arrow keys belong to the day grid; leave them alone while the month
-    // arrows or Clear/Today have focus so those stay tabbable as normal.
+    // Arrows only act on the day grid, so the month arrows and Clear/Today stay tabbable.
     if (!(event.target as HTMLElement).closest('.datePickerDay')) return
     const moves: Record<string, () => Date> = {
       ArrowLeft: () => addDays(cursor, -1),

@@ -48,11 +48,7 @@ function useSearch() {
     }
   }, [draft, query])
 
-  // Results are a snapshot of the catalog at the moment Enter was pressed, so an
-  // edit made in the dialog on top of them — a status change, a page update —
-  // would otherwise leave the card behind it showing the old reading state. This
-  // re-runs the submitted query quietly: no loading state, because the results
-  // are already on screen and only their reading half is stale.
+  // Quietly re-runs the submitted query after dialog edits, since only the reading state is stale.
   useEffect(() => {
     const submitted = query.trim()
     if (!submitted) return undefined

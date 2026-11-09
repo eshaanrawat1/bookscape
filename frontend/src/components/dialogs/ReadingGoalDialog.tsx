@@ -5,17 +5,10 @@ import { useLibraryData } from '../../context/LibraryDataContext.jsx'
 
 const PRESETS = [12, 24, 52, 100]
 
-// What the field starts on when there is no goal yet: two books a month, the
-// least intimidating of the presets that still asks for a habit.
 const DEFAULT_TARGET = 24
 
 const onlyDigits = (raw: string): string => raw.replace(/\D/g, '').slice(0, 4)
 
-// Set or edit the year's goal. Two fields for one number: the count of books,
-// and the pace that count works out to. Either can be typed in and the other
-// follows, because "a book a week" and "52 books" are the same intention
-// arrived at from opposite directions — and a pace is the easier one to know
-// about yourself.
 function ReadingGoalDialog({ onClose }: DialogCloseProps) {
   const { readingGoal } = useLibraryData()
   const { year, target, booksRead, saving, error, save, clear } = readingGoal
@@ -23,9 +16,7 @@ function ReadingGoalDialog({ onClose }: DialogCloseProps) {
   const [booksDraft, setBooksDraft] = useState(() => String(target > 0 ? target : DEFAULT_TARGET))
   const [daysDraft, setDaysDraft] = useState(() => String(daysPerBook(target > 0 ? target : DEFAULT_TARGET)))
 
-  // Only the field you are not typing in is recomputed. Rewriting both on every
-  // keystroke would round "100" back to "91" under the cursor, since a book
-  // every 4 days is 91 books rather than 100.
+  // Recompute only the other field; rewriting both would round "100" back to "91" under the cursor.
   const handleBooks = (raw: string) => {
     const digits = onlyDigits(raw)
     setBooksDraft(digits)
@@ -55,8 +46,7 @@ function ReadingGoalDialog({ onClose }: DialogCloseProps) {
       await save(nextTarget)
       onClose()
     } catch {
-      // save() has already put the reason in `error`; the dialog stays open on
-      // the number that was typed rather than closing over a failed write.
+      // save() already set `error`; stay open on the typed number.
     }
   }
 
@@ -66,7 +56,7 @@ function ReadingGoalDialog({ onClose }: DialogCloseProps) {
       await clear()
       onClose()
     } catch {
-      // Same posture as a failed save.
+      // clear() already set `error`; stay open.
     }
   }
 

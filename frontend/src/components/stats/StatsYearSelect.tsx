@@ -57,8 +57,6 @@ function StatsYearSelect({ value, years, onChange }: StatsYearSelectProps) {
             {year}
           </button>
         ))}
-        {/* All time sits under the years rather than above them: the picker
-            opens on a year, so the years are what the eye lands on first. */}
         <button
           type="button"
           className={`yearSelectOption${value === '' ? ' active' : ''}`}

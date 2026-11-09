@@ -4,9 +4,7 @@ import useModalLayer from '../../hooks/useModalLayer.js'
 import { collectionIcons, collectionIconLabel } from '../../collectionIcons.js'
 
 interface CollectionIconPickerProps {
-  // The dot the picker hangs off. The panel is positioned from its rect rather
-  // than nested inside it: `.collectionList` scrolls its own overflow, so a
-  // popover living in the row would be clipped by the list it sits in.
+  // Positioned from its rect rather than nested: `.collectionList` would clip a child popover.
   anchor: HTMLElement | null
   current: string
   onSelect: (icon: string) => void
@@ -40,9 +38,6 @@ function CollectionIconPicker({ anchor, current, onSelect, onClose }: Collection
     return () => document.removeEventListener('pointerdown', handlePointerDown)
   }, [anchor, onClose])
 
-  // Placed to the right of the dot and vertically centred on it, then pulled
-  // back inside the viewport — the sidebar rows near the floor would otherwise
-  // open a panel that runs off the bottom of the window.
   useLayoutEffect(() => {
     const panel = panelRef.current
     if (!panel || !anchor) return
@@ -62,13 +57,10 @@ function CollectionIconPicker({ anchor, current, onSelect, onClose }: Collection
       className="iconPicker"
       role="dialog"
       aria-label="Choose a collection icon"
-      // A portal still bubbles its events up the React tree, so without this a
-      // click in the panel would also reach the collection row that renders it
-      // and navigate away mid-choice.
+      // Portals still bubble through React, or this click would also navigate the row.
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
-      // Hidden until measured, so the panel never flashes at the top-left
-      // corner on the frame before its position is known.
+      // Hidden until measured so it doesn't flash at the top-left corner.
       style={position ? { top: position.top, left: position.left } : { visibility: 'hidden' }}
     >
       <div className="iconPickerHeader">

@@ -27,15 +27,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-// The icons a collection can wear, in the order the picker shows them. A
-// curated 150 rather than lucide's full 1,715: named imports keep the bundle to
-// what we actually offer, and a grid you can scan beats one you have to search.
-//
-// A collection stores the PascalCase name below, exactly as lucide exports it,
-// so there is no slug-to-component translation to get wrong. Names are only
-// ever looked up in this map — never rendered as markup — so an unknown one
-// (an icon retired from a future lucide, a hand-edited row) resolves to null
-// and the row falls back to the default dot.
+// In picker order. Names are only looked up here, never rendered, so an unknown one resolves to null.
 const ICONS: Record<string, LucideIcon> = {
   // Reading
   Book, BookOpen, BookMarked, BookText, BookHeart, BookCheck,
@@ -81,8 +73,7 @@ const ICONS: Record<string, LucideIcon> = {
 interface CollectionIconEntry {
   name: string
   Icon: LucideIcon
-  // 'BookOpen' searched as 'book open', so typing what you see in the tooltip
-  // finds the icon.
+  // 'BookOpen' is searched as 'book open', so tooltip text finds the icon.
   search: string
 }
 

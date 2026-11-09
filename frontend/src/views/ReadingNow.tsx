@@ -13,17 +13,8 @@ function ReadingNow() {
   const suggested = useSuggestedBooks()
   return (
     <div className="stack">
-      {/* Above everything else: it frames the year the rest of the page is a
-          slice of. It renders nothing while the target is still loading, and
-          shrinks to a one-line invitation when no goal is set, so the page it
-          sits on top of is never pushed down by an empty progress bar. */}
       <ReadingGoalCard />
       <ContinueReading books={currentlyReading} series={seriesInProgress} />
-      {/* Below "Continue reading" and above "Up next": both of those are books
-          you have already chosen, and this one is the page's only guess. It
-          earns its place under them, not over them. Shelf renders nothing on an
-          empty list, so a library with nothing finished simply has no such
-          row. */}
       <Shelf
         title="Suggested"
         subtitle="Because of what you finished recently."

@@ -120,8 +120,7 @@ def _replace_genres(conn, uid: str, genre_names: list) -> None:
 
 
 def upsert_book(root: Path, book: dict) -> None:
-    """Insert or partially update a catalog row. Only keys present in `book` are touched,
-    so a partial dict (e.g. from an Obsidian Pull) never nulls out scraper-only fields."""
+    """Insert or partially update a catalog row; only keys present in `book` are touched."""
     uid = str(book.get("uid") or "").strip()
     if not uid:
         raise ValueError("book uid is required")
@@ -260,11 +259,7 @@ def get_global_library(root: Path) -> list[dict]:
     for genre in top_genres:
         genre_books = by_genre[genre]
         genre_books.sort(key=lambda x: int(x.get("rating_count", 0) or 0), reverse=True)
-        # Only the genre is overridden — a book filed under several should read
-        # as belonging to the shelf it is sitting on. Everything else is passed
-        # through as-is: this used to hand-pick a dozen keys and hardcode
-        # "not_started", which is how the Library page became the one place a
-        # book you were halfway through rendered as an untouched one.
+        # Only the genre is overridden, so a book reads as belonging to this shelf.
         mapped = [{**b, "genre": genre} for b in genre_books[:30]]
         library.append({"genre": genre, "books": mapped})
 
@@ -297,14 +292,7 @@ def get_books_by_author(root: Path, author: str) -> list[dict]:
 
 
 def series_sort_key(book: dict) -> tuple:
-    """Order a series the way a reader would shelve it: by number, ascending.
-
-    `series_number` is text because Goodreads numbers novellas "1.5", so it is
-    parsed here rather than sorted as a string — otherwise "10" would file
-    between "1" and "2". Anything unparseable (an omnibus "1-3", an empty
-    number on a prequel) sorts to the end rather than crashing or landing at
-    zero, where it would displace book one.
-    """
+    """Series sort key: numeric ascending (numbers are text, e.g. "1.5"); unparseable sorts last."""
     raw = str(book.get("series_number") or "").strip()
     try:
         return (0, float(raw), str(book.get("title") or "").lower())
@@ -350,31 +338,12 @@ def get_books_by_genre(root: Path, genre: str, limit: int = 100) -> list[dict]:
 
 
 def get_series_progress(root: Path) -> list[dict]:
-    """Every series you are partway through, with your position in it.
-
-    "Partway through" is two conditions, and both matter. At least one book read
-    or being read, so a series you merely own titles from is not a series you
-    started. And at least one book neither finished nor abandoned, so a series
-    you have settled every book in drops off the shelf the moment the last one
-    lands rather than lingering as a finished thing to keep looking at.
-
-    A one-book "series" is skipped outright: it is a series in the catalog's
-    sense but it has no reading order to be partway through, and the shelf reads
-    as noise with them in.
-
-    Only `next_book` is expanded into a full book payload. Counting statuses
-    needs the raw rows and nothing more, and this walks every book in the
-    catalog that belongs to a series — running the per-book genre lookup over
-    all 639 of them to render one cover apiece would be several hundred queries
-    for data no caller reads.
-    """
+    """Series with a book read or in progress and at least one unsettled; only next_book is expanded."""
     with transaction(root) as conn:
         rows = conn.execute("SELECT * FROM books WHERE TRIM(series) <> ''").fetchall()
         states = _states_map(conn)
 
-        # Grouped case-insensitively to match the lookup on the other side:
-        # /series-books resolves a name with COLLATE NOCASE, so a series split
-        # across two capitalisations here would send you to a page listing both.
+        # Case-insensitive to match /series-books, which resolves names with COLLATE NOCASE.
         groups: dict[str, list[dict]] = {}
         for row in rows:
             book = dict(row)
@@ -397,10 +366,7 @@ def get_series_progress(root: Path) -> list[dict]:
             if read + reading == 0 or read + dnf == total:
                 continue
 
-            # The book in your hands is what you are next on; failing that, the
-            # first one in reading order you have not settled either way. A book
-            # you put down stays put down — next-up skips it rather than sending
-            # you back to the one you already decided against.
+            # The book in hand, else the first unsettled in order; abandoned books are skipped.
             paired = list(zip(books, statuses))
             next_book = next((book for book, status in paired if status == "reading"), None)
             if next_book is None:
@@ -415,9 +381,7 @@ def get_series_progress(root: Path) -> list[dict]:
                 "next_book": _row_to_book(conn, next_book) if next_book else None,
             })
 
-    # A series you are actively reading comes first — this shelf sits on Reading
-    # Now, where the book open on your nightstand outranks the one you are
-    # merely closest to finishing. Everything else sorts by how little is left.
+    # Actively read series first, then by how little is left.
     progress.sort(
         key=lambda entry: (
             0 if entry["reading"] else 1,
@@ -428,12 +392,7 @@ def get_series_progress(root: Path) -> list[dict]:
     return progress
 
 
-# A settled book is one you have already made up your mind about, and none of
-# them belong in a row of things to read next — a finished book least of all,
-# since finishing it is what put its neighbours on the list in the first place.
-# `want_to_read` is deliberately not here: a saved book is a book you have not
-# read yet, and seeing it turn up again as a recommendation is a reminder, not a
-# repeat.
+# `want_to_read` is deliberately absent: seeing a saved book suggested is a reminder, not a repeat.
 SUGGESTION_EXCLUDED_STATUSES = frozenset({"done", "reading", "dnf"})
 
 
@@ -460,9 +419,7 @@ def get_suggested_books(
             if str(state.get("status") or "") in SUGGESTION_EXCLUDED_STATUSES
         }
 
-        # One membership query for the union of every source's candidates, so
-        # the cost stays flat in the number of sources rather than one lookup
-        # per suggested id.
+        # One membership query for all candidates, not one lookup per id.
         candidates = [
             [
                 sid

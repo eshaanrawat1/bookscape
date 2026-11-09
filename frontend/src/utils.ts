@@ -28,11 +28,7 @@ async function loadBootstrapData(): Promise<BootstrapData> {
     books: asArray(myBooksRes?.books),
     lists: asArray(listsRes?.lists),
     wantToReadBooks: asArray(wantToReadRes?.books),
-    // Every other list normalises on the way in; the shelves on the Library
-    // page are the one place that used to hand the backend's raw rows straight
-    // to the cards. That left `pages`/`totalPages` undefined on those books, so
-    // opening one and switching to My Reading seeded the tracking panel with
-    // 0/0 instead of the catalog's page count.
+    // Normalised like every other list, or these books open the tracking panel with 0/0 pages.
     globalLibrary: asArray(globalRes?.genres).map((section) => ({
       genre: section.genre,
       books: asArray(section.books).map(normaliseBook),
@@ -46,9 +42,7 @@ function collectionIdFromName(name: string): string {
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-// 'Nov 3, 2021' from either a plain date or a full timestamp. Sliced rather than
-// passed through Date, which would read a bare '2021-11-03' as UTC midnight and
-// show the day before to anyone west of Greenwich.
+// Sliced rather than parsed: new Date('YYYY-MM-DD') is UTC, the previous day west of Greenwich.
 function formatDayLabel(iso: string): string {
   const [y, m, d] = String(iso || '').slice(0, 10).split('-').map(Number)
   if (!y || !m || !d) return ''
@@ -100,11 +94,7 @@ function normaliseBook(raw: RawBookPayload): Book {
   const status = raw.reading_status || raw.status || 'not_started'
   const genres = Array.isArray(raw.genres) ? raw.genres.filter(Boolean) : []
   const primaryGenre = raw.genre || genres[0] || ''
-  // /my-books is built around the reading row and carries none of the catalog's
-  // review stats at the top level — only nested under `linked_catalog_book`, the
-  // same reason `series` falls back the way it does. Without these fallbacks a
-  // finished or in-progress book opened its About tab with no rating and no
-  // review count, while the very same book showed both in Library.
+  // /my-books nests catalog stats under linked_catalog_book, so those fields fall back through it.
   const catalog = raw.linked_catalog_book || {}
   const rating = parseFloat(String(raw.avg_rating ?? catalog.avg_rating ?? '')) || 0
   const pages = raw.page_count || raw.total_pages || raw.reading_total_pages || totalPages || catalog.page_count || 0
@@ -118,8 +108,6 @@ function normaliseBook(raw: RawBookPayload): Book {
     cover: raw.image_url || '',
     genre: primaryGenre,
     genres,
-    // /my-books nests the catalog row under linked_catalog_book, so the catalog
-    // fields fall back through it.
     series: raw.series || raw.linked_catalog_book?.series || '',
     seriesNumber: raw.series_number || raw.linked_catalog_book?.series_number || '',
     pages,
@@ -133,7 +121,6 @@ function normaliseBook(raw: RawBookPayload): Book {
     progress,
     status,
     blurb: raw.description || '',
-    // keep raw fields for completeness
     _raw: raw,
   }
 }
@@ -192,8 +179,7 @@ function genreNameFromView(view: string): string {
   }
 }
 
-// The stats page's year filter is '' for all time; the view id spells that as
-// 'all' so the drilldown reads as a destination rather than as a bare prefix.
+// '' (all time) becomes 'all' so the view id isn't a bare prefix.
 function booksReadViewId(year: string): string {
   return `books-read:${String(year || '').trim() || 'all'}`
 }
@@ -204,9 +190,7 @@ function booksReadYearFromView(view: string): string {
   return raw === 'all' ? '' : raw
 }
 
-// Shared by the search view and the command palette. The backend clamps limit
-// to 50 (backend/app/routes/catalog.py), and searches the whole catalog rather
-// than only owned books.
+// The backend clamps limit to 50 and searches the whole catalog, not just owned books.
 async function searchBooks(query: string, limit: number): Promise<Book[]> {
   const clean = String(query || '').trim()
   if (!clean) return []
@@ -216,8 +200,6 @@ async function searchBooks(query: string, limit: number): Promise<Book[]> {
   return (data.results || []).map(normaliseBook)
 }
 
-// Whatever a rejected call threw, as text. Our API errors already carry the
-// backend's wording; anything else falls back to the caller's.
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback
 }

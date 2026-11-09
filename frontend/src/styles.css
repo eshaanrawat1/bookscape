@@ -1,6 +1,4 @@
-/* ========================================================================== */
-/* Tokens & Base Reset                                                      */
-/* ========================================================================== */
+/* Tokens & Base Reset */
 
 :root {
   color-scheme: light;
@@ -77,12 +75,7 @@ svg {
   flex: 0 0 auto;
 }
 
-/* Every horizontal scroller in the app rides the trackpad/wheel alone: no
-   visible bar, no rubber-band chaining out to the pane behind it. Vertical
-   scrollers keep their bars, which is why this is a shared opt-in list rather
-   than a blanket `*` rule. Both properties are needed — `scrollbar-width` is
-   the standard one, the pseudo-element is what the macOS WebView honours when
-   "Show scroll bars: Always" is set in System Settings. */
+/* Shared opt-in list: hides horizontal scrollbars; the pseudo-element covers macOS's "Always" setting. */
 .shelfScroll,
 .dialogSimilarScroll,
 .statsBookScroll,
@@ -98,9 +91,7 @@ svg {
   display: none;
 }
 
-/* ========================================================================== */
-/* App Shell & Layout                                                       */
-/* ========================================================================== */
+/* App Shell & Layout */
 
 .appRoot {
   min-height: 100vh;
@@ -124,10 +115,7 @@ svg {
   background: var(--background);
 }
 
-/* max-width is coupled to the sidebar's flex-basis: the content pane gets
-   whatever the sidebar gives up, so narrowing the sidebar by Nrem means widening
-   this by the same Nrem to keep the gutters either side of the content the same
-   width they were. */
+/* Coupled to the sidebar's flex-basis: narrow one by N, widen the other by N. */
 .mainContent {
   max-width: 86rem;
   margin: 0 auto;
@@ -144,9 +132,7 @@ svg {
   height: 100%;
 }
 
-/* ========================================================================== */
-/* Sidebar & Navigation                                                     */
-/* ========================================================================== */
+/* Sidebar & Navigation */
 
 .sidebar {
   display: flex;
@@ -165,10 +151,6 @@ svg {
   gap: 1.3rem;
 }
 
-/* The mark stands on its own — no disc, no shadow. It keeps the 4.3rem slot the
-   filled badge occupied so the brand row's metrics don't move, and the glyph
-   grows to fill that slot so it reads at the same weight it did inside the
-   badge. */
 .brandMark {
   display: grid;
   width: 4.3rem;
@@ -281,11 +263,7 @@ svg {
   background: color-mix(in oklch, var(--sidebar-accent) 70%, transparent);
 }
 
-/* Active-state experiment. Two directions live side by side, switched by
-   `data-nav-style` on .hearthShell (⌥⌘G cycles). Both drop the old outer halo:
-   an outer glow on an opaque pill over an opaque sidebar has nowhere to bloom,
-   so it only ever read as a smudge at the pill's edge.
-   Once we pick, fold the winner into a plain .active rule and delete the rest. */
+/* Temporary active-nav A/B via data-nav-style; fold the winner into .active and delete the rest. */
 .navButton.active,
 .collectionButton.active {
   position: relative;
@@ -293,9 +271,7 @@ svg {
   background: var(--sidebar-accent);
 }
 
-/* -- "rail": state reads as position. The pill barely lifts off the sidebar and
-   a lit bar in the left gutter carries the signal, so the column of nav rows
-   scans as one. The glow lands on the bar, where it has open ground to bloom. */
+/* "rail": a lit bar in the left gutter carries the state. */
 [data-nav-style='rail'] .navButton.active,
 [data-nav-style='rail'] .collectionButton.active {
   background: color-mix(in oklch, var(--sidebar-accent) 55%, transparent);
@@ -315,15 +291,11 @@ svg {
   box-shadow: 0 0 8px 1px color-mix(in oklch, var(--ember-soft) 55%, transparent);
 }
 
-/* The dot's own halo would be a second lit thing an inch from the rail, on the
-   same row, on the same side. Let the rail have the row to itself. */
 [data-nav-style='rail'] .collectionButton.active .collectionDot:not(.hasIcon)::before {
   box-shadow: 0 0 0 3px var(--card);
 }
 
-/* -- "ember": state reads as warmth. The pill is lit from inside rather than
-   haloed from outside, which is the one place a glow still works on an opaque
-   ground — and it's the more on-theme of the two for a hearth. */
+/* "ember": the pill is lit from inside. */
 [data-nav-style='ember'] .navButton.active,
 [data-nav-style='ember'] .collectionButton.active {
   background: color-mix(in oklch, var(--ember-soft) 18%, var(--sidebar-accent));
@@ -332,11 +304,7 @@ svg {
     inset 0 1px 0 color-mix(in oklch, white 45%, transparent);
 }
 
-/* Click target for the icon picker as well as the row's leading mark. The box
-   is 1.5rem — the same as a nav row's icon — whichever mark it holds, so every
-   label in the sidebar starts on the same line and swapping the dot for an icon
-   never shifts one sideways. The dot is drawn inside that box at its own
-   smaller size rather than sizing the box to itself. */
+/* Fixed 1.5rem box, matching nav icons, so swapping dot for icon never shifts the label. */
 .collectionDot {
   display: grid;
   flex: 0 0 auto;
@@ -372,13 +340,9 @@ svg {
   outline: 0;
 }
 
-/* ========================================================================== */
-/* Collection Icon Picker                                                     */
-/* ========================================================================== */
+/* Collection Icon Picker */
 
-/* Portalled and fixed rather than parented to the row: `.collectionList`
-   scrolls its own overflow, and a panel inside it would be clipped by the very
-   list it belongs to. Position comes from the dot's rect at open time. */
+/* Portalled and fixed: .collectionList's overflow would clip a child panel. */
 .iconPicker {
   position: fixed;
   z-index: 60;
@@ -435,8 +399,6 @@ svg {
   color: var(--foreground);
 }
 
-/* Already on the default — the button stays visible as a label for what the
-   plain dot means, but there is nothing to reset to. */
 .iconPickerReset:disabled {
   cursor: default;
   opacity: 0.55;
@@ -505,8 +467,7 @@ svg {
   cursor: pointer;
 }
 
-/* Book count that swaps to a delete X on hover. Both layers share one grid
-   cell so the row never reflows during the swap. */
+/* Both layers share one grid cell so the row never reflows during the swap. */
 .collectionCount {
   display: grid;
   flex: 0 0 auto;
@@ -601,9 +562,7 @@ svg {
   cursor: pointer;
 }
 
-/* ========================================================================== */
-/* Top Bar                                                                  */
-/* ========================================================================== */
+/* Top Bar */
 
 .iconPill {
   position: fixed;
@@ -745,9 +704,7 @@ svg {
   transition: background 160ms ease, transform 160ms ease;
 }
 
-/* ========================================================================== */
-/* Shared Primitives                                                        */
-/* ========================================================================== */
+/* Shared Primitives */
 
 .dialogClose {
   display: grid;
@@ -877,10 +834,7 @@ svg {
   position: relative;
 }
 
-/* Pinned by BookDialogStage while a card-to-card swap settles, so the height
-   difference between the two cards eases instead of snapping the centred
-   stage. auto -> px (and back) is not interpolable, so only the deliberate
-   px -> px settle animates. */
+/* Only the px -> px settle animates; auto -> px isn't interpolable. */
 .dialogCrossfadeStage.settling {
   transition: height 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -928,10 +882,7 @@ svg {
   }
 }
 
-/* The incoming card paints on top of the outgoing one, so the two fades are
-   deliberately not symmetrical: the incoming card reaches full opacity before
-   the outgoing one starts to leave. Two cards at half opacity would both let
-   the scrim through at the midpoint, which reads as a brightness dip. */
+/* Asymmetric so the incoming card is opaque first; two half-faded cards would dip in brightness. */
 @keyframes dialogCrossfadeIn {
   from {
     opacity: 0;
@@ -1029,20 +980,14 @@ svg {
   height: 1.2rem;
 }
 
-/* ========================================================================== */
-/* Reading Goal                                                             */
-/* ========================================================================== */
+/* Reading Goal */
 
-/* No card and no shadow: a heading with a meter beside it, sitting on the page
-   the way the shelf headings below it do. */
 .goalCard {
   display: flex;
   flex-direction: column;
   gap: 1.8rem;
 }
 
-/* No goal set: one row, no progress bar. An empty meter reading 0% would
-   report failure at something that was never started. */
 .goalCard.goalCardEmpty {
   flex-direction: row;
   align-items: center;
@@ -1137,9 +1082,6 @@ svg {
   color: var(--foreground);
 }
 
-/* The year so far, left to right, then a few of the slots still open. A
-   scroller rather than a grid: a good year should not push the shelves below
-   it off the page. */
 .goalSlots {
   display: flex;
   gap: 1rem;
@@ -1174,10 +1116,6 @@ svg {
   font-weight: 400;
 }
 
-/* Past the goal: the same numbered slot, gold. It borrows the accent the target
-   mark at the top of the card already uses, so the bonus run reads as part of
-   the card rather than a new colour arriving. The numeral warms to match — the
-   muted grey it inherits is tuned for a grey tile and goes muddy on gold. */
 .goalSlotBonus {
   background: color-mix(in oklch, var(--accent) 55%, transparent);
 }
@@ -1382,9 +1320,7 @@ svg {
   opacity: 0.6;
 }
 
-/* ========================================================================== */
-/* Shelf & Book Card                                                        */
-/* ========================================================================== */
+/* Shelf & Book Card */
 
 .shelf,
 .dialogCopy {
@@ -1393,9 +1329,6 @@ svg {
   gap: 0.9rem;
 }
 
-/* Baseline-ish alignment rather than centre: "See all" should sit level with
-   the heading's foot, not float against a heading that is two lines taller than
-   it. */
 .shelfHeader {
   display: flex;
   align-items: end;
@@ -1407,8 +1340,6 @@ svg {
   font-family: var(--font-serif);
   font-weight: 500;
   font-size: 2rem;
-  /* Body's 1.5 leaves close to a rem of leading under a 2rem line, which reads
-     as a gap between the title and its subtitle rather than as part of either. */
   line-height: 1.15;
   letter-spacing: -0.015em;
   color: var(--foreground);
@@ -1635,9 +1566,7 @@ svg {
   background: rgba(0, 0, 0, 0.3);
 }
 
-/* ========================================================================== */
-/* Book Dialog                                                              */
-/* ========================================================================== */
+/* Book Dialog */
 
 .dialogTop {
   display: grid;
@@ -1680,10 +1609,7 @@ svg {
   margin-top: -0.1rem;
 }
 
-/* Series line — a subtitle belonging to the title above it, so it cancels most
-   of .dialogCopy's column gap instead of reading as its own block. Scoped to
-   .dialogCopy to outrank `.dialogCopy p`, which would otherwise win on
-   specificity and reset the margin and font-size. */
+/* Scoped to .dialogCopy to outrank `.dialogCopy p`. */
 .dialogCopy .dialogSeries {
   display: inline-flex;
   align-items: center;
@@ -1697,13 +1623,9 @@ svg {
   font-style: italic;
   line-height: 1.3;
   text-align: left;
-  /* Fading toward transparent rather than picking a lighter colour keeps this
-     a step quieter than the author line in both themes. */
   color: color-mix(in oklch, var(--muted-foreground) 72%, transparent);
 }
 
-/* Underlined like .dialogAuthor so the two links in this block read as the same
-   kind of affordance, just weighted differently. */
 .dialogSeriesButton {
   cursor: pointer;
   text-decoration: underline;
@@ -1752,10 +1674,7 @@ svg {
   white-space: nowrap;
 }
 
-/* Single row, always: a second row of pills changes the card's height, which
-   makes the dialog resize as you navigate between books. GenrePills measures
-   what fits and folds the rest into a +N chip; the clip here is the backstop
-   for the frame before that lands. */
+/* GenrePills folds overflow into +N; this clip is the backstop before that lands. */
 .dialogGenrePills {
   display: flex;
   flex-wrap: nowrap;
@@ -1779,8 +1698,7 @@ svg {
   letter-spacing: 0.01em;
 }
 
-/* Tabular figures so the measured "+0" placeholder is exactly as wide as the
-   "+3" that replaces it. */
+/* Tabular so the measured "+0" is exactly as wide as the real chip. */
 .dialogGenrePillOverflow {
   color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
@@ -1893,12 +1811,7 @@ svg {
   font-size: 1.3rem;
   line-height: 1.55;
   color: var(--foreground);
-  /* Six lines exactly. The height has to come from the line-height that actually
-     wins the cascade, which is the 1.5 on `.dialogCopy p` — that selector
-     outranks this one, so multiplying this rule's own 1.55 gave 6.2 lines and
-     left a sliver of the seventh showing above the bottom edge. `lh` is the
-     computed line-height whatever wins; the em value is the fallback for
-     engines without it. */
+  /* Six lines, using `lh` because `.dialogCopy p`'s line-height wins the cascade; em is the fallback. */
   max-height: calc(6 * 1.5em);
   max-height: calc(6 * 1lh);
   overflow-y: auto;
@@ -1982,9 +1895,7 @@ svg {
   line-height: 1.5;
 }
 
-/* ========================================================================== */
-/* Book Dialog — tabs                                                       */
-/* ========================================================================== */
+/* Book Dialog: tabs */
 
 .dialogCopy {
   gap: 1.15rem;
@@ -2036,9 +1947,7 @@ svg {
   transform: scaleX(1);
 }
 
-/* ========================================================================== */
-/* Book Dialog — tracking view                                              */
-/* ========================================================================== */
+/* Book Dialog: tracking view */
 
 @keyframes dialogTabPanelFadeIn {
   from {
@@ -2067,7 +1976,7 @@ svg {
   animation: dialogTabPanelFadeIn 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Property rows — a Notion page's property table, in this card's type scale. */
+/* Property rows */
 .trackingProps {
   display: flex;
   flex-direction: column;
@@ -2127,8 +2036,6 @@ svg {
   background: color-mix(in oklch, var(--accent) 30%, transparent);
 }
 
-/* Notes is the one long-form field — drop the label column and let it run the
-   full width of the panel, the way it did before the property layout. */
 .trackingProp.notes {
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
@@ -2139,8 +2046,6 @@ svg {
   align-items: stretch;
 }
 
-/* The accent tint reads as a highlight on the one-line rows, but across the
-   full notes block it turns the field into a sticky note — keep it on the card. */
 .trackingProp.notes:hover .trackingPropValue,
 .trackingProp.notes .trackingPropValue:focus-within {
   background: transparent;
@@ -2168,8 +2073,6 @@ svg {
   color: color-mix(in oklch, var(--muted-foreground) 62%, transparent);
 }
 
-/* Long notes scroll inside the field — letting the textarea grow with its
-   content stretched the whole card, so cap it and keep the card's height fixed. */
 .trackingPropValue textarea {
   resize: none;
   height: 16rem;
@@ -2180,8 +2083,7 @@ svg {
   font-family: inherit;
 }
 
-/* Dates use our own picker rather than `<input type="date">` — WebKit's field
-   paints today's date as filler when empty and its popover can't be themed. */
+/* Custom picker: WebKit's date input shows today when empty and can't be themed. */
 .datePropertyAnchor {
   position: relative;
   display: flex;
@@ -2533,11 +2435,7 @@ svg {
   margin: 0;
 }
 
-/* The rating is the one value field with something after it, so it opts out of
-   the `width: 100%` every other property input carries — that would strand the
-   "/ 5" against the far edge of the row and wrap it onto two lines. Qualified
-   with the parent to outweigh `.trackingPropValue input`, which is the rule it
-   is overriding and would otherwise win on specificity. */
+/* Qualified to outweigh `.trackingPropValue input`'s `width: 100%`, which would strand the "/ 5". */
 .trackingPropValue input.trackingRatingInput {
   width: 4rem;
   flex: none;
@@ -2549,18 +2447,13 @@ svg {
   white-space: nowrap;
 }
 
-/* ========================================================================== */
-/* Scraper / Settings Dialog                                                */
-/* ========================================================================== */
+/* Scraper / Settings Dialog */
 
 .scraperDialog {
   width: min(44rem, calc(100vw - 2rem)) !important;
   min-height: auto !important;
 }
 
-/* Icon-only link sitting at the end of the scraper dialog's intro line. It is a
-   flex item of .dialogAuthor, so the gap does the spacing and the inherited
-   underline has to be cancelled. */
 .scraperIntroLink {
   display: inline-flex;
   align-items: center;
@@ -2801,12 +2694,9 @@ svg {
   opacity: 0.85;
 }
 
-/* ========================================================================== */
-/* Command Palette                                                          */
-/* ========================================================================== */
+/* Command Palette */
 
-/* Sits high in the viewport rather than dead-centre like the other dialogs —
-   the results grow downwards, and a centred panel would see-saw as they do. */
+/* High in the viewport so the panel doesn't see-saw as results grow. */
 .dialogScrim.paletteScrim {
   align-items: flex-start;
   padding: 12vh 1rem 4rem;
@@ -2988,15 +2878,13 @@ svg {
   font-size: 0.9rem;
 }
 
-/* ========================================================================== */
-/* Stats Page                                                               */
-/* ========================================================================== */
+/* Stats Page */
 
 .statsPage {
   gap: 3.2rem;
 }
 
-/* Summary tiles ------------------------------------------------------------- */
+/* Summary tiles */
 
 .statTiles {
   display: grid;
@@ -3010,17 +2898,10 @@ svg {
   gap: 0.85rem;
   align-items: center;
   justify-content: center;
-  /* A wide rectangle, driven by the column width so the four keep their
-     proportion at every breakpoint. Height stays auto, so the ratio is a floor:
-     a label that wraps on a narrow screen pushes the tile taller rather than
-     spilling out of it. */
   aspect-ratio: 2 / 1;
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: 1.1rem;
-  /* Transparent rather than a colour picked to match: the fill is then the page
-     itself, exactly, whatever the page is — so the tile is only ever its
-     hairline, and it cannot drift if --background is ever retuned. */
   background: transparent;
   padding: 0 1.5rem;
   text-align: center;
@@ -3029,9 +2910,6 @@ svg {
 .statTile strong {
   font-family: var(--font-serif);
   font-size: 3.1rem;
-  /* Regular, not the 500 the serif headings carry: at this size the number is
-     already the loudest thing on the page, and the extra weight only coarsens
-     the letterforms. */
   font-weight: 400;
   letter-spacing: -0.01em;
   line-height: 1;
@@ -3045,7 +2923,7 @@ svg {
   line-height: 1.25;
 }
 
-/* Section headers ----------------------------------------------------------- */
+/* Section headers */
 
 .statsSection {
   display: flex;
@@ -3067,8 +2945,6 @@ svg {
   font-size: 2rem;
   font-weight: 500;
   letter-spacing: -0.015em;
-  /* Body's 1.5 leaves close to a rem of leading under a 2rem line, which reads
-     as a gap between the title and its subtitle rather than as part of either. */
   line-height: 1.15;
   color: var(--foreground);
 }
@@ -3080,8 +2956,6 @@ svg {
   letter-spacing: 0.005em;
 }
 
-/* Matches the shelves' "See all", down to sitting level with the heading's foot
-   rather than centred against the two lines beside it. */
 .statsSeeAll {
   align-self: end;
   flex: 0 0 auto;
@@ -3095,15 +2969,13 @@ svg {
   cursor: pointer;
 }
 
-/* Year picker --------------------------------------------------------------- */
+/* Year picker */
 
 .yearSelect {
   position: relative;
   flex: 0 0 auto;
 }
 
-/* Chromeless on purpose: the chart glyph and the caret are enough to read as a
-   control, and a boxed button here competed with the section heading beside it. */
 .yearSelectTrigger {
   display: inline-flex;
   align-items: center;
@@ -3196,19 +3068,15 @@ svg {
   background: var(--secondary);
 }
 
-/* The selected row is tinted rather than filled: at this type size a solid
-   accent block reads as a button pressed into the menu. */
 .yearSelectOption.active {
   background: color-mix(in oklch, var(--primary) 8%, var(--card));
   color: var(--primary);
 }
 
-/* Reading by year chart ----------------------------------------------------- */
+/* Reading by year chart */
 
 .barChart {
-  /* The axis column is sized here rather than by content so the gridlines and
-     the month labels below them share one left edge whatever the tick digits
-     come out to. */
+  /* Fixed axis column so gridlines and month labels share a left edge. */
   --chart-axis: 3.2rem;
   --chart-height: 13rem;
   --chart-bar: 1.9rem;
@@ -3216,8 +3084,6 @@ svg {
   grid-template-columns: var(--chart-axis) minmax(0, 1fr);
   grid-template-rows: var(--chart-height) auto;
   gap: 0 1rem;
-  /* No card around the plot: the gridlines already bound it, and a border here
-     would be a second frame drawn just inside the section's own whitespace. */
   margin: 0;
   padding: 0.5rem 0 0;
 }
@@ -3240,8 +3106,6 @@ svg {
   position: relative;
 }
 
-/* Recessive on purpose: the grid is there to let you read a bar off the axis,
-   not to be read itself. */
 .barChartGridline {
   position: absolute;
   inset-inline: 0;
@@ -3253,9 +3117,7 @@ svg {
   position: absolute;
   inset: 0;
   display: grid;
-  /* Twelve for a year of months, one per year read over all time — the chart
-     sets it inline. Equal fractions either way, so the columns stay evenly
-     spaced across the same plot however many there are. */
+  /* Column count is set inline by the chart. */
   grid-template-columns: repeat(var(--chart-columns, 12), minmax(0, 1fr));
   align-items: end;
 }
@@ -3281,16 +3143,10 @@ svg {
   background: var(--primary);
 }
 
-/* Years can be as few as one or two columns where months are always twelve, and
-   a 1.9rem bar marooned in half the plot reads as a rendering fault. So the year
-   variant takes a share of whatever column it lands in, floored at the month
-   width and capped before it turns into a slab. */
 .barChart[data-scale="years"] .barChartBar {
   width: clamp(var(--chart-bar), 45%, 4.5rem);
 }
 
-/* Four digits where the months get three letters: the tracking that spaces out
-   JAN closes up here so a dozen years still clear each other. */
 .barChart[data-scale="years"] .barChartMonths span {
   letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
@@ -3335,14 +3191,13 @@ svg {
   text-transform: uppercase;
 }
 
-/* Books read row ------------------------------------------------------------ */
+/* Books read row */
 
 .statsBookScroll {
   display: flex;
   gap: 1.6rem;
   overflow-x: auto;
-  /* The covers lift on hover, so the padding is what keeps the top of the card
-     and its focus ring from being clipped by the scroller's own bounds. */
+  /* Padding keeps hover lift and focus ring from being clipped by the scroller. */
   padding: 0.4rem 0.1rem 0.6rem;
   scroll-snap-type: x proximity;
 }
@@ -3371,9 +3226,7 @@ svg {
   }
 }
 
-/* ========================================================================== */
-/* Search                                                                   */
-/* ========================================================================== */
+/* Search */
 
 .searchHeader {
   display: flex;
@@ -3583,8 +3436,6 @@ svg {
   align-items: baseline;
   justify-content: space-between;
   gap: 1rem;
-  /* Lined up with the row text below it rather than with the rows' padding, so
-     the label sits over the queries and not over the clock icons. */
   padding: 0 0.9rem;
 }
 
@@ -3621,9 +3472,7 @@ svg {
   list-style: none;
 }
 
-/* The row is the hover target, not the query button inside it: the dismiss has
-   to sit outside that button to be clickable, and the two should still light up
-   as one row. */
+/* The row is the hover target: the dismiss sits outside the query button to stay clickable. */
 .recentSearchRow {
   display: flex;
   align-items: center;
@@ -3674,8 +3523,6 @@ svg {
   white-space: nowrap;
 }
 
-/* Hidden until the row is hovered or the dismiss itself is tabbed to, so a
-   resting list is queries and nothing else. */
 .recentSearchRemove {
   flex: 0 0 auto;
   border: 0;
@@ -3719,13 +3566,8 @@ svg {
   font-size: 1.15rem;
 }
 
-/* ========================================================================== */
-/* Highlights                                                               */
-/* ========================================================================== */
+/* Highlights */
 
-/* No border and no action, unlike .emptyState: this is the whole page rather
-   than a gap in one, and the way to make a highlight is the button on the book
-   itself. Centred on the pane it is standing in for. */
 .highlightsEmpty {
   display: flex;
   flex-direction: column;
@@ -3761,9 +3603,7 @@ svg {
   font-size: 1.25rem;
 }
 
-/* Master-detail over the content pane's own scroll: the book list is sticky
-   inside its column rather than a second scroller, so the page keeps one
-   scrollbar and the list stays put as the highlights run past it. */
+/* The list is sticky in its column, so the page keeps one scrollbar. */
 .highlightsLayout {
   display: grid;
   grid-template-columns: 28.5rem minmax(0, 1fr);
@@ -3828,8 +3668,6 @@ svg {
   font-weight: 600;
   font-size: 1.15rem;
   line-height: 1.3;
-  /* Two lines, then ellipsis — a long title should not push the count out of
-     the row or set every row to a different height. */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -3842,13 +3680,7 @@ svg {
   font-size: 1.05rem;
 }
 
-/* A slot, not a frame: the cover is a full 2:3 book hung from near the top of
-   the card, tilted a couple of degrees, running off the bottom edge and just
-   past the right one. The row's own overflow/radius does the clipping, so it
-   reads as a book laid on the card rather than a rectangle packed into it.
-   Geometry measured off the reference design at a 7.4rem row height:
-   5.25rem wide, 0.9rem down from the card's inner top edge, 0.25rem of bleed
-   past the right edge, ~2deg of tilt. */
+/* A full 2:3 cover hung and tilted, clipped by the row's own overflow. */
 .highlightsBookCover {
   position: relative;
   flex: 0 0 5rem;
@@ -3864,8 +3696,6 @@ svg {
   transform: rotate(2deg);
 }
 
-/* Nearly square corners — at this size the stock 0.85rem radius reads as a
-   rounded tile rather than a book. */
 .highlightsBookCover .coverImage {
   border-radius: 0.25rem;
 }
@@ -3933,8 +3763,6 @@ svg {
   line-height: 1.6;
   letter-spacing: -0.01em;
   color: var(--foreground);
-  /* Preserves the line breaks of a pasted passage without letting a long line
-     widen the card. */
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -3986,7 +3814,6 @@ svg {
   color: var(--foreground);
 }
 
-/* Destructive, so it reaches for the danger tint where Edit stays neutral. */
 .highlightDeleteButton:hover {
   background: color-mix(in oklch, var(--danger-strong) 10%, transparent);
   color: var(--danger-strong);
@@ -3997,8 +3824,6 @@ svg {
   height: 1.25rem;
 }
 
-/* Edit mode: the quote becomes the field it is read from, so the card keeps
-   its size and the text does not jump as you switch in and out. */
 .highlightEditInput {
   width: 100%;
   resize: vertical;
@@ -4063,12 +3888,7 @@ svg {
   font-size: 1.02rem;
 }
 
-/* Grows with the note rather than scrolling inside a fixed box: a note is a
-   sentence or two, and a scrollbar on two lines reads as broken. The height is
-   set from JS by useAutoGrowTextarea, which also owns overflow-y — it brings
-   the scrollbar back at the five-line cap, so none is declared here.
-   `resize: none` keeps a hand-dragged height from being overwritten on the
-   next keystroke. */
+/* Height and overflow-y are owned by useAutoGrowTextarea. */
 .highlightNoteInput {
   width: 100%;
   min-height: 3.6rem;
@@ -4154,9 +3974,7 @@ svg {
   text-align: center;
 }
 
-/* ========================================================================== */
-/* Author Page                                                              */
-/* ========================================================================== */
+/* Author Page */
 
 .authorPage {
   gap: 1.7rem;
@@ -4215,18 +4033,7 @@ svg {
   transform: translateX(0.18rem);
 }
 
-/* Series rows extend the author row's grid by a leading number column and a
-   fixed-width status marker. Same specificity as .authorBookRow, so this has to
-   sit *after* it — declared earlier it silently loses the cascade and the last
-   child wraps to its own row.
-
-   The marker column is a fixed width rather than `auto` so the rating and
-   chevron hold one line down the list: "Read" and "Not started" are very
-   different widths, and an auto column would step the right-hand side of every
-   row in and out as you read through the series. The labels do not wrap, so a
-   column too narrow spills them over the title rather than folding them: 7.2rem
-   is the longest of them, "Not started" at 6.79rem measured in Plus Jakarta
-   Sans 600, plus a little room for how another face in the stack might set it. */
+/* Must follow .authorBookRow (same specificity). Fixed marker column; 7.2rem fits "Not started". */
 .seriesBookRow {
   grid-template-columns: 2.6rem 3.6rem minmax(0, 1fr) 7.2rem auto auto;
 }
@@ -4293,7 +4100,7 @@ svg {
   flex: 0 0 auto;
 }
 
-/* Series progress ------------------------------------------------------------ */
+/* Series progress */
 
 .progressRing {
   position: relative;
@@ -4302,10 +4109,7 @@ svg {
   place-items: center;
 }
 
-/* The app-wide `svg { width: 1.15em }` rule outranks an SVG's own width and
-   height attributes — CSS beats presentation attributes — so a ring asked for
-   at 52px painted at ~20 in the corner of its box. Sized here instead, where
-   the cascade can see it. */
+/* The global `svg { width }` outranks SVG attributes, so the ring is sized here. */
 .progressRing svg {
   position: absolute;
   inset: 0;
@@ -4325,8 +4129,6 @@ svg {
 .progressRingValue {
   stroke: var(--status-finished);
   stroke-linecap: round;
-  /* The dash length is what animates, so a book marked read closes the arc
-     rather than snapping it to its new size. */
   transition: stroke-dasharray 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -4367,25 +4169,15 @@ svg {
   color: color-mix(in oklch, var(--muted-foreground) 88%, var(--foreground));
 }
 
-/* The quietest of the five, and deliberately quieter than "up next": on a
-   series you have not opened every row carries this, and at the weight the
-   others use it would read as a column of alarms about books you simply have
-   not got to. */
 .seriesRowMarker.isNotStarted {
   color: color-mix(in oklch, var(--muted-foreground) 60%, transparent);
 }
 
-/* The "Series in progress" shelf on Reading Now. The card borrows .bookCard's
-   box so it scrolls and hovers exactly like the book cards beside it, and only
-   replaces what a series has instead of an author line. */
+/* Series card on Reading Now, reusing .bookCard's box. */
 .seriesCard .coverWrap {
   position: relative;
 }
 
-/* The cover above opens the book, so the series needs its own target: the name,
-   split out of the cover button the way .bookAuthorButton is split out on a
-   book card. It keeps the title's type and only picks up an underline on hover,
-   so the row still reads as a column of titles rather than of links. */
 .seriesCardTitle {
   display: block;
   width: 100%;
@@ -4426,8 +4218,6 @@ svg {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--foreground);
-  /* Sits over cover art of any colour, so it carries its own ground rather
-     than tinting whatever is underneath. */
   background: color-mix(in oklch, var(--card) 88%, transparent);
   backdrop-filter: blur(6px);
   box-shadow: 0 4px 12px rgba(var(--shadow-tint), 0.22);
@@ -4443,7 +4233,7 @@ svg {
   font-variant-numeric: tabular-nums;
 }
 
-/* Toasts --------------------------------------------------------------------- */
+/* Toasts */
 
 .toastHost {
   position: fixed;
@@ -4453,14 +4243,9 @@ svg {
   flex-direction: column;
   align-items: flex-end;
   gap: 0.6rem;
-  /* Above every dialog, the command palette and the tracking status popover —
-     the highest z-index anywhere else in this file is 40. A toast fired from a
-     dialog that then covers it would be worse than the inline message it
-     replaces. */
+  /* Above every dialog; the next-highest z-index in this file is 40. */
   z-index: 60;
-  /* The host spans a corner of the viewport whether or not it holds anything,
-     so it must never eat clicks meant for the page behind it. Each toast turns
-     pointer events back on for itself. */
+  /* The host always spans the corner, so it must not eat clicks; toasts re-enable pointer events. */
   pointer-events: none;
 }
 
@@ -4478,8 +4263,6 @@ svg {
   animation: toastIn 0.22s ease-out;
 }
 
-/* A left edge rather than a tinted fill: these sit over the app's warm paper
-   and a full-bleed danger wash reads as an error page, not a note about one. */
 .toastError {
   border-left: 3px solid var(--danger);
 }
@@ -4498,8 +4281,7 @@ svg {
   color: var(--foreground);
   font-size: 1rem;
   line-height: 1.4;
-  /* Server errors carry paths and other unbroken strings that would otherwise
-     push the dismiss button off the edge. */
+  /* Server errors carry unbroken paths that would push out the dismiss button. */
   overflow-wrap: anywhere;
 }
 
@@ -4576,11 +4358,7 @@ svg {
     width: 2.9rem;
   }
 
-  /* The marker drops to its dot here. Six columns do not fit a phone, and the
-     word is the widest of them by far — the colour still separates read from
-     reading from abandoned, and the label survives for screen readers on the
-     wrapper's aria-label. The column stays a fixed 1rem rather than `auto` so
-     an untouched book's empty slot lines up with its neighbours' dots. */
+  /* Marker drops to its dot on phones; the fixed column keeps empty slots aligned. */
   .seriesBookRow {
     grid-template-columns: 2.2rem 2.9rem minmax(0, 1fr) 1rem auto auto;
     gap: 0.7rem;
@@ -4591,9 +4369,7 @@ svg {
   }
 }
 
-/* ========================================================================== */
-/* Responsive                                                               */
-/* ========================================================================== */
+/* Responsive */
 
 @media (max-width: 1280px) {
   .sidebar {
@@ -4724,16 +4500,12 @@ svg {
     font-size: 2.6rem;
   }
 
-  /* The arrows and the year picker drop under their heading rather than squeeze
-     it, so a two-line subtitle still gets the full width. */
   .statsSectionHeader {
     align-items: start;
     flex-direction: column;
     gap: 1rem;
   }
 
-  /* Twelve uppercase labels is what runs out of room first, so the axis gutter,
-     the bars and the tracking all give some back before the row wraps. */
   .barChart {
     --chart-axis: 2.4rem;
     --chart-height: 11rem;
@@ -4745,8 +4517,6 @@ svg {
     letter-spacing: 0.02em;
   }
 
-  /* Twelve four-digit years in a phone-width plot is the one place these labels
-     genuinely run out of room. */
   .barChart[data-scale="years"] .barChartMonths span {
     font-size: 0.72rem;
   }

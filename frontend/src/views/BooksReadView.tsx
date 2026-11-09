@@ -7,9 +7,6 @@ interface BooksReadViewProps {
   year: string
 }
 
-// The "See all" behind the stats page's Books read row. Same /stats payload the
-// stats page itself reads, asked for one key — the endpoint returns every book
-// in the year rather than a capped page, so the grid is the whole shelf.
 function BooksReadView({ year }: BooksReadViewProps) {
   const catalog = useCatalogBooks(
     year ? `/stats?year=${encodeURIComponent(year)}` : '/stats',

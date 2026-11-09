@@ -4,7 +4,6 @@ interface SectionHeaderProps {
   title: string
   subtitle?: string
   className?: string
-  // Whatever sits opposite the title: a "See all", a year picker.
   children?: ReactNode
 }
 

@@ -46,8 +46,7 @@ def render_frontmatter(book: dict, state: dict) -> str:
         _bare_or_valued("start_date", state.get("start_date") or ""),
         _bare_or_valued("completed_date", state.get("finish_date") or ""),
         f"image: {book.get('image_url') or ''}",
-        # Two ratings, and the names have to keep them apart: `rating_value` is
-        # the catalog's crowd average, `my_rating` is yours.
+        # `rating_value` is the catalog's crowd average, `my_rating` is the user's.
         f"my_rating: {clamp_my_rating(state.get('my_rating'))}",
         f"rating_value: {book.get('avg_rating') or 0}",
         f"rating_count: {int(book.get('rating_count') or 0)}",
@@ -80,11 +79,7 @@ def _atomic_write(path: Path, content: str) -> None:
 
 
 def push_one(root: Path, uid: str, *, dry_run: bool = False) -> dict:
-    """Push a single book's current Bookscape state out to its vault note.
-    Always regenerates the whole file (including `## Notes`) from current SQL
-    state — never reads an existing file first. Notes round-trip like every
-    other field: Pull writes file -> SQL, Push writes SQL -> file; whichever
-    direction ran most recently wins, same as status/progress/dates."""
+    """Push one book to its vault note, regenerating the whole file; last sync direction wins."""
     repo = DataRepository(root)
     state = repo.get_book_state(uid)
     if not state or state.get("status") not in EXPORTABLE_STATUSES:
@@ -112,9 +107,7 @@ def push_one(root: Path, uid: str, *, dry_run: bool = False) -> dict:
 
 
 def run_obsidian_push(root: Path, *, dry_run: bool = False) -> PushResult:
-    """Vault-level Push: export every reading/done book, full-regenerate.
-    Filename collisions are skipped (not fatal) so one colliding pair never blocks
-    the rest of the library — reported back for manual resolution in Obsidian."""
+    """Export every reading/done book; filename collisions are skipped and reported."""
     vault_path = resolve_vault_path(root)
     if not vault_path.exists():
         raise FileNotFoundError(f"Obsidian vault not found at: {vault_path}")
@@ -154,10 +147,7 @@ def run_obsidian_push(root: Path, *, dry_run: bool = False) -> PushResult:
         except FilenameCollisionError as e:
             skipped_collisions.append({"filename": e.filename, "uids": e.uids})
 
-    # Stale-file cleanup: a stored filename whose uid has genuinely left the
-    # export set (status moved off reading/done) gets its file removed. Collided
-    # uids are still valid reading/done books — just skipped for writing this
-    # round — so they must never be treated as stale/deleted here.
+    # Remove files for uids that left the export set; collided uids are still valid, so never stale.
     export_uid_set = set(export_uids)
     deleted = 0
     for uid, state in states.items():

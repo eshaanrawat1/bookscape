@@ -1,17 +1,10 @@
 import { type CSSProperties } from 'react'
 
-/** Axis tops worth landing on, scaled by powers of ten. */
 const NICE_STEPS = [1, 2, 5, 10]
 
 const INTERVALS = 3
 
-/** A round axis top and the gap between its gridlines.
- *
- * Three intervals, so the plot carries four labels including the zero — enough
- * to read a bar off without turning the background into a ladder. The step is
- * rounded up to a 1/2/5 multiple, which is what keeps the labels whole numbers:
- * a peak of 11 books scales to 0-5-10-15 rather than 0-3.7-7.3-11.
- */
+/** Round axis top with three intervals, stepped to 1/2/5 so tick labels stay whole numbers. */
 function niceScale(max: number): { top: number; step: number } {
   if (max <= 0) return { top: INTERVALS, step: 1 }
   const raw = max / INTERVALS
@@ -26,7 +19,6 @@ interface ChartBar {
 }
 
 interface StatsBarChartProps {
-  /** One column each, left to right. Twelve months, or a run of years. */
   bars: ChartBar[]
   /** What a column stands for — names the axis in the spoken summary. */
   unit: 'month' | 'year'
@@ -36,9 +28,7 @@ interface StatsBarChartProps {
 function StatsBarChart({ bars, unit, label }: StatsBarChartProps) {
   const { top, step } = niceScale(Math.max(0, ...bars.map((bar) => bar.count)))
   const ticks = Array.from({ length: INTERVALS + 1 }, (_, index) => index * step)
-  // The columns are driven from here rather than fixed at twelve in CSS, since
-  // the all-time chart is one column per year read. The floor of 1 is only to
-  // keep `repeat()` valid on an empty payload, which draws a bare grid.
+  // Column count is set here because all-time is one per year; the floor of 1 keeps repeat() valid.
   const plotStyle = { '--chart-columns': Math.max(bars.length, 1) } as CSSProperties
 
   return (

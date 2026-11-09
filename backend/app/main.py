@@ -21,13 +21,10 @@ from .routes.scraper import create_router as create_scraper_router
 from .routes.settings import create_router as create_settings_router
 
 
-# App setup
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_API_VERSION = 6
 
-# Origins the app itself is served from: the custom protocol the packaged
-# webview uses (per-platform), plus the Vite dev server. Anything else is a page
-# that found the port, not the app.
+# The packaged webview's per-platform origins plus the Vite dev server.
 ALLOWED_ORIGINS = [
     "tauri://localhost",       # macOS / Linux, packaged
     "https://tauri.localhost",  # Windows, packaged
@@ -40,23 +37,15 @@ init_app_db(ROOT)
 
 app = FastAPI(title="Bookscape API", version="0.1.0")
 
-# Middleware order is the reverse of registration: Starlette inserts each new
-# one at the front of the stack, so the LAST added ends up OUTERMOST. CORS has
-# to be outermost or preflights would hit the token check first and fail — the
-# browser does not attach custom headers to an OPTIONS probe.
+# Last added is outermost; CORS must be, or preflights would fail the token check.
 app.add_middleware(TokenAuthMiddleware, token=read_or_create_token(ROOT))
 
-# Blocks DNS rebinding, which is the attack Origin checks cannot see: the
-# attacker points a hostname they control at 127.0.0.1, so the browser believes
-# the request is same-origin and sends no Origin worth checking. The Host header
-# still carries their name, and that is what this rejects.
+# Blocks DNS rebinding, which Origin checks can't see: the Host header still carries the attacker's name.
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    # No cookies or credentials are used; the launch token is the only
-    # authenticator. Keeping this False also keeps the wildcard-origin footgun
-    # from ever coming back by way of a copy-paste.
+    # No cookies; the launch token is the only authenticator.
     allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["Content-Type", TOKEN_HEADER],
@@ -66,7 +55,6 @@ repo = DataRepository(ROOT)
 lists = ReadingListStore(ROOT)
 highlights = HighlightStore(ROOT)
 
-# Create and include routers
 api_router = create_catalog_router(ROOT)
 api_router.include_router(create_books_router(ROOT, repo))
 api_router.include_router(create_lists_router(ROOT, repo, lists))

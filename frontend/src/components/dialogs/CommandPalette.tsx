@@ -8,7 +8,6 @@ import Dialog, { type DialogCloseProps } from './Dialog.jsx'
 import useListNavigation from '../../hooks/useListNavigation.js'
 import type { Book, Command, CommandGroup } from '../../types.js'
 
-// Matches the search view's preview so the two surfaces feel like one thing.
 const DEBOUNCE_MS = 180
 const BOOK_LIMIT = 8
 
@@ -80,8 +79,7 @@ function CommandPalette({ commands, onClose }: CommandPaletteProps) {
   const runRow = (index: number) => {
     const row = rows[index]
     if (!row) return
-    // Close first: a command that opens another dialog (Add Book, Vault
-    // Settings) would otherwise leave the palette stacked on top of it.
+    // Close first, or a command that opens a dialog leaves the palette stacked on top.
     onClose()
     if (row.kind === 'book') {
       onOpen(row.book)
@@ -102,8 +100,7 @@ function CommandPalette({ commands, onClose }: CommandPaletteProps) {
   const activeId = activeIndex >= 0 && rows[activeIndex] ? `paletteRow-${activeIndex}` : undefined
 
   return (
-    // No blocksHotkeys: ⌘K should toggle the palette shut and ⌘1–6 should
-    // navigate straight through it.
+    // No blocksHotkeys: ⌘K must toggle the palette shut and nav chords must work through it.
     <Dialog
       label="Command palette"
       className="commandPalette"

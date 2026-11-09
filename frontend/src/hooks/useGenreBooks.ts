@@ -1,8 +1,6 @@
 import useCatalogBooks from './useCatalogBooks.js'
 
-// Unlike the author and series drilldowns this one is capped, matching the
-// backend's own default for /genre-books — a broad genre like "Fiction" covers
-// most of the catalog.
+// Matches the backend's /genre-books default; unlike author and series, this one is capped.
 const GENRE_BOOK_LIMIT = 100
 
 function useGenreBooks(genreName: string) {

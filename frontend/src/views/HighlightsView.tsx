@@ -13,9 +13,7 @@ import type { Highlight, HighlightGroup } from '../types.js'
 function HighlightsView() {
   const { groups, loading, error, applyGroup, updateHighlight, deleteHighlight } = useHighlights()
   const { showToast, showError } = useToast()
-  // The selection is a book id rather than an index: the list reorders as
-  // highlights are added, and an index would silently follow whatever book
-  // moved into that slot.
+  // A book id rather than an index, since the list reorders as highlights are added.
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [composing, setComposing] = useState(false)
 
@@ -39,9 +37,7 @@ function HighlightsView() {
     return <EmptyState title="Could not load highlights" message={error} />
   }
 
-  // No create button here on purpose: a highlight is always saved against a
-  // book, so the one way in is the highlight button on the book itself — and
-  // this page is where you find out that is where to go.
+  // No create button: a highlight is always saved against a book.
   if (groups.length === 0) {
     return (
       <div className="highlightsEmpty">
@@ -105,8 +101,6 @@ function HighlightsView() {
                     return true
                   } catch (err) {
                     showError(err, 'Could not save the highlight.', `highlight:${highlight.id}`)
-                    // Reported false so the card stays in edit mode on the text
-                    // that failed rather than reverting it out from under you.
                     return false
                   }
                 }}
@@ -138,9 +132,7 @@ function HighlightsView() {
   )
 }
 
-// How far the note field grows before it starts scrolling. The backend caps the
-// stored text at 5000 characters; this is the layout's own guard, so a pasted
-// wall of text cannot push the highlights below it off the page.
+// Layout guard only; the backend separately caps stored text at 5000 characters.
 const NOTE_MAX_LINES = 5
 
 function countLabel(count: number): string {
@@ -186,16 +178,11 @@ function HighlightCard({ highlight, onSaveNote, onSaveEdit, onDelete }: Highligh
   const [note, setNote] = useState(highlight.note)
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState(false)
-  // The note grows with what you type, up to five lines, after which it
-  // scrolls — a note long enough to push the rest of the page out of view is
-  // not a note. The edit field above it keeps a fixed box and a resize handle
-  // instead, since a highlight can run to a full passage.
   const noteRef = useAutoGrowTextarea(note, { maxLines: NOTE_MAX_LINES })
   const [draftText, setDraftText] = useState(highlight.text)
   const [draftPage, setDraftPage] = useState(highlight.page > 0 ? String(highlight.page) : '')
 
-  // Reopened from whatever is stored rather than from the last draft, so
-  // cancelling an edit and starting again begins from the saved text.
+  // Reopened from the stored text, so cancelling and re-editing starts fresh.
   const startEditing = () => {
     setDraftText(highlight.text)
     setDraftPage(highlight.page > 0 ? String(highlight.page) : '')
@@ -213,13 +200,9 @@ function HighlightCard({ highlight, onSaveNote, onSaveEdit, onDelete }: Highligh
     }
   }
 
-  // Saved on blur rather than on every keystroke, and only when the text has
-  // actually moved — tabbing through a card should not write to the database.
+  // On blur and only when changed, so tabbing through a card doesn't write.
   const commitNote = async (field: HTMLTextAreaElement) => {
-    // Escape blurs the field to dismiss it, which would otherwise land here and
-    // save the very text it just abandoned. Flagged on the element rather than
-    // in state because setState has not re-rendered by the time blur fires —
-    // the same reason the sidebar's rename field carries a cancel flag.
+    // Escape blurs to dismiss; flagged on the element since state hasn't re-rendered when blur fires.
     if (field.dataset.cancelNote === 'true') {
       delete field.dataset.cancelNote
       return

@@ -29,8 +29,6 @@ class DataRepository:
             d[col] = bool(d.get(col))
         return d
 
-    # Settings
-
     def get_setting(self, key: str, default: str = "") -> str:
         with transaction(self.root) as conn:
             row = conn.execute("SELECT value FROM app_settings WHERE key = ?", (key,)).fetchone()
@@ -43,8 +41,6 @@ class DataRepository:
                 "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                 (key, value),
             )
-
-    # Book state
 
     def get_book_state(self, uid: str) -> dict | None:
         with transaction(self.root) as conn:
@@ -61,12 +57,7 @@ class DataRepository:
         if not fields:
             return self.get_book_state(uid) or {}
 
-        # A finish date on an abandoned book is a contradiction, and a leaky one:
-        # the stats year picker is built from every finish_date in the table, not
-        # only the done ones, so a stray date would add a year whose book list is
-        # empty. Cleared here rather than in the route because the Obsidian pull
-        # writes state directly, and a vault note can carry a completed_date
-        # alongside status: dnf.
+        # A DNF has no finish date, or it adds an empty stats year. Here so Obsidian pulls are covered too.
         if str(fields.get("status") or "").strip().lower() == "dnf":
             fields["finish_date"] = ""
 

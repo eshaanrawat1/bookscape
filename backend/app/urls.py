@@ -16,13 +16,7 @@ def _parse(raw: object) -> ParseResult | None:
 
 
 def _hostname(parsed: ParseResult) -> str:
-    """The host a request would actually be sent to, lowercased.
-
-    Reads `.hostname` rather than `.netloc` deliberately: netloc carries
-    userinfo, so `https://www.goodreads.com@evil.example/` contains the string
-    "www.goodreads.com" while resolving to evil.example. `.hostname` is the part
-    that decides where the bytes go.
-    """
+    """The lowercased host; `.hostname` not `.netloc`, which carries spoofable userinfo."""
     try:
         host = parsed.hostname
     except ValueError:
@@ -31,14 +25,7 @@ def _hostname(parsed: ParseResult) -> str:
 
 
 def canonical_book_url(raw: object) -> tuple[str, str]:
-    """Validate a pasted Goodreads book link -> (book_id, url_to_fetch).
-
-    The returned URL is rebuilt from the parsed id rather than passed through,
-    so nothing the caller wrote — query string, fragment, redirect parameters,
-    embedded credentials — reaches the browser the scraper drives.
-
-    Raises ValueError carrying a message meant for the user.
-    """
+    """Validate a Goodreads link -> (book_id, rebuilt URL); raises ValueError with a user-facing message."""
     parsed = _parse(raw)
     if parsed is None or parsed.scheme not in {"http", "https"}:
         raise ValueError(

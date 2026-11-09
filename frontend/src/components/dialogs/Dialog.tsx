@@ -4,28 +4,21 @@ import { RefreshCcw, X } from 'lucide-react'
 import useModalLayer from '../../hooks/useModalLayer.js'
 
 interface DialogProps {
-  // Read out as the dialog's name, since most of these have no visible title
-  // tied to them by id.
   label: string
   className?: string
   scrimClassName?: string
   role?: 'dialog' | 'alertdialog'
-  // A write is in flight. Every way out is held back — Escape, the scrim and
-  // the close button — rather than closing over something that may still land.
+  // A write is in flight: Escape, the scrim and the close button are all held back.
   busy?: boolean
-  // For a dialog opened from inside another one: the book dialog's card animates
-  // in on a transform, a stacking context a fixed-position scrim rendered inside
-  // it could not escape.
+  // Escapes the book dialog's transformed stacking context, which would trap a fixed scrim.
   portal?: boolean
   showClose?: boolean
-  // Mutes the app-wide chords. On by default because most of these hold unsaved
-  // input or a destructive confirm.
+  // Mutes app-wide chords; on by default for unsaved input and destructive confirms.
   blocksHotkeys?: boolean
   onClose: () => void
   children: ReactNode
 }
 
-// What every dialog's caller hands it, for props interfaces to extend.
 type DialogCloseProps = Pick<DialogProps, 'onClose'>
 
 function Dialog({
@@ -46,9 +39,7 @@ function Dialog({
     <div
       className={['dialogScrim', scrimClassName].filter(Boolean).join(' ')}
       onClick={(event) => {
-        // A portal still bubbles through the React tree, so without this a click
-        // on this scrim would reach the book dialog's scrim behind it and close
-        // that too.
+        // Portals still bubble through the React tree; this stops the click reaching the book dialog's scrim.
         event.stopPropagation()
         if (!busy) onClose()
       }}

@@ -2,9 +2,7 @@ import { useRef, useState, type SyntheticEvent } from 'react'
 import type { BookProps } from '../../types.js'
 
 interface BookCoverProps extends BookProps {
-  // For long rows that hold a whole year of covers rather than a shelf's worth
-  // (the reading-goal strip), so the cost is what is on screen. Off everywhere
-  // else: a shelf's covers are all wanted at once.
+  // For very long rows (the reading-goal strip); shelves want all their covers at once.
   lazy?: boolean
 }
 

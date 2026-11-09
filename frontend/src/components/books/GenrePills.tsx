@@ -10,19 +10,15 @@ interface Metrics {
   gap: number
 }
 
-// Sub-pixel slack. Pill widths come back fractional, so a row that fits exactly
-// can sum to a hair over the container and drop a pill that visually fits.
+// Sub-pixel slack: fractional pill widths can sum a hair over a row that visually fits.
 const EPSILON = 0.5
 
-// How many leading pills fit on one line, leaving room for the +N chip whenever
-// anything is dropped. Returns pills.length when the whole set fits.
+// Leading pills that fit on one line, reserving room for the +N chip when anything is dropped.
 function fitCount({ pills, overflow, gap }: Metrics, available: number): number {
   let used = 0
   for (let index = 0; index < pills.length; index += 1) {
     const next = used + (index > 0 ? gap : 0) + pills[index]
     if (next > available + EPSILON) {
-      // Everything from `index` on is dropped, so the +N chip is now part of the
-      // row and has to fit too — walk back until it does.
       let count = index
       let width = used
       while (count > 0 && width + gap + overflow > available + EPSILON) {
@@ -36,17 +32,12 @@ function fitCount({ pills, overflow, gap }: Metrics, available: number): number 
   return pills.length
 }
 
-// The pills are pinned to a single row (`flex-wrap: nowrap` + `overflow: hidden`
-// in the stylesheet) so the card's height never depends on how many genres a
-// book happens to have — a second row shifts every book below it and makes the
-// dialog resize on navigation. Whatever does not fit collapses into a +N chip.
+// Pinned to one row so card height never depends on genre count; the rest collapse into +N.
 function GenrePills({ genres }: GenrePillsProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [visibleCount, setVisibleCount] = useState<number | null>(null)
 
-  // Pill widths only change when the genres do, so they are measured once from
-  // the unclamped render below and cached — a resize then only redoes the
-  // arithmetic, with no second layout pass and no re-render of the full set.
+  // Widths only change with the genres, so measure once and cache; resizes just redo the arithmetic.
   const metricsRef = useRef<Metrics | null>(null)
   const key = genres.join('\0')
   const [priorKey, setPriorKey] = useState(key)
@@ -56,13 +47,10 @@ function GenrePills({ genres }: GenrePillsProps) {
     setVisibleCount(null)
   }
 
-  // Reading the children is only valid while the unclamped render is on screen,
-  // which is exactly when the cache is empty — the two are reset together.
+  // Children are only valid to read during the unclamped render, i.e. while the cache is empty.
   const measureAndFit = () => {
     const container = containerRef.current
-    // Zero width means the row is not laid out yet (or is hidden); measuring it
-    // would collapse every pill into the chip. Leave the full set rendered and
-    // let the observer come back once there is a width to fit against.
+    // Zero width means not laid out yet; measuring would collapse every pill into the chip.
     if (!container || !container.clientWidth) return
 
     if (!metricsRef.current) {
@@ -76,13 +64,10 @@ function GenrePills({ genres }: GenrePillsProps) {
     setVisibleCount(fitCount(metricsRef.current, container.clientWidth))
   }
 
-  // Layout effect, not effect: the unclamped render is what gets measured, and
-  // clamping has to land in the same frame or the overflowing pills paint once.
+  // Layout effect so clamping lands in the same frame and overflowing pills never paint.
   useLayoutEffect(measureAndFit, [key])
 
-  // Observer deliveries land after layout effects in the same frame, so this
-  // never races the first measurement — it only reruns the fit as the dialog
-  // changes width, and covers the case where that first pass had none.
+  // Observer deliveries land after layout effects, so this never races the first measurement.
   useLayoutEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -102,8 +87,7 @@ function GenrePills({ genres }: GenrePillsProps) {
           {genre}
         </span>
       ))}
-      {/* Kept in the tree while measuring so its width is known before the first
-          clamp; that render is never painted, so the +0 is not seen. */}
+      {/* Kept while measuring so its width is known before the first clamp; never painted. */}
       {(measuring || hidden.length > 0) && (
         <span
           className="dialogGenrePill dialogGenrePillOverflow"

@@ -7,12 +7,9 @@ function useStats() {
   const [summary, setSummary] = useState<StatsSummary | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // '' is all time. The page opens on the year you are living in rather than on
-  // the whole shelf, because that is the one the bar chart has something to say
-  // about; a library with nothing finished this year is redirected below.
+  // '' is all time. Opens on the current year; an empty year redirects below.
   const [year, setYear] = useState(String(new Date().getFullYear()))
-  // The fallback fires at most once, and only against the default above — every
-  // other value comes from the picker, which only offers years that have books.
+  // The fallback fires at most once, and only against the default year.
   const redirected = useRef(false)
 
   useEffect(() => {
@@ -20,8 +17,7 @@ function useStats() {
 
     async function loadStats() {
       setLoading(true)
-      // Set when this response only tells us which year to ask for, so the page
-      // stays on "loading" across the hand-off instead of flashing "no books".
+      // Set when this response only names the year to ask for, so the page stays on "loading".
       let handingOff = false
       try {
         const suffix = year ? `?year=${year}` : ''

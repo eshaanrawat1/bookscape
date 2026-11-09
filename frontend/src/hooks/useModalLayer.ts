@@ -1,27 +1,17 @@
 import { useEffect, useRef } from 'react'
 
 interface ModalLayerOptions {
-  // Runs when Escape is pressed and this is the top-most layer. Leaving it
-  // undefined on a registered layer means Escape is swallowed but does nothing
-  // — the right behaviour for a dialog mid-save, where the key must not fall
-  // through to whatever is behind it either.
+  // Runs on Escape when top-most. Undefined swallows the key, as a dialog mid-save needs.
   onEscape?: () => void
-  // Whether this layer is on the stack at all. Popovers that live permanently
-  // in the tree (the stats filter, the date picker) pass their open state here,
-  // so a closed one doesn't sit on the stack swallowing Escape.
+  // Whether this layer is on the stack; always-mounted popovers pass their open state.
   enabled?: boolean
-  // Suppresses the app-wide ⌘K / ⌘1–6 / ⌘N chords while this layer is open.
-  // For surfaces holding unsaved input or a destructive confirm.
+  // Suppresses app-wide chords while open.
   blocksHotkeys?: boolean
 }
 
 type Layer = { current: ModalLayerOptions }
 
-// Every escape-dismissible surface in the app — dialogs, the command palette,
-// the stats filter dropdown, the date picker, the sidebar rename field — pushes
-// onto this one stack, so the top-most one owns Escape outright. Without the
-// ordering, a palette opened over a book dialog would close both at once, and a
-// date picker inside a book dialog would take the whole dialog down with it.
+// One stack for every Escape-dismissible surface, so only the top-most closes.
 const layers: Layer[] = []
 
 function onWindowKeyDown(event: KeyboardEvent) {
@@ -29,8 +19,7 @@ function onWindowKeyDown(event: KeyboardEvent) {
   const top = layers[layers.length - 1]
   if (!top) return
 
-  // Capture phase on window is the very first thing in the event path, so
-  // stopping here reliably keeps the key away from every layer below.
+  // Window capture runs first, so this keeps the key from every layer below.
   event.preventDefault()
   event.stopPropagation()
 
@@ -52,11 +41,8 @@ function popLayer(layer: Layer) {
   }
 }
 
-// Registers the caller as the top-most escape layer for as long as it is
-// mounted and `enabled`.
 function useModalLayer(options: ModalLayerOptions): void {
-  // Options are read through a ref so a parent re-render handing down a fresh
-  // inline callback doesn't pop the layer and re-push it above its siblings.
+  // Read through a ref so a fresh inline callback doesn't re-push the layer above its siblings.
   const layer = useRef<ModalLayerOptions>(options)
   layer.current = options
 
@@ -69,8 +55,7 @@ function useModalLayer(options: ModalLayerOptions): void {
   }, [enabled])
 }
 
-// Read at keydown time by useAppHotkeys, so no dialog has to plumb its open
-// state up to App just to mute the shortcuts.
+// Read at keydown so dialogs needn't plumb open state up to App.
 function hotkeysBlocked(): boolean {
   return layers.some((layer) => layer.current.blocksHotkeys === true)
 }

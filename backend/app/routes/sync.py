@@ -25,8 +25,7 @@ def create_router(root: Path) -> APIRouter:
         except FileNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e)) from e
         except ValueError as e:
-            # A configured path that fails validation — saved before the rule
-            # existed, or via the env var, which never passes through Settings.
+            # A saved path can predate validation, or come from the env var.
             raise HTTPException(status_code=400, detail=str(e)) from e
         return {
             "ok": True,

@@ -8,12 +8,7 @@ from ..repository import DataRepository
 from ..services.catalog import reading_overlay, resolve_book
 from ..utils import clamp_my_rating
 
-# A book the user has picked up, in any sense — the set /my-books is built from.
-# 'not_started' is the absence of a shelf, not a shelf of its own, so it is the
-# one status excluded: those books live in the catalog and are reachable through
-# Library and search. 'dnf' is in here both for its own shelf and because this
-# list is the whole client-side `books` array — leaving it out would make
-# abandoning a book look like deleting it.
+# 'not_started' is the absence of a shelf; 'dnf' stays so abandoning a book doesn't look like deleting it.
 TRACKED_STATUSES = {"reading", "done", "dnf"}
 VALID_STATUSES = {"not_started", *TRACKED_STATUSES}
 
@@ -67,11 +62,6 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
             if status not in TRACKED_STATUSES:
                 continue
             catalog = resolve_book(root, book_id) or {}
-            # The catalog half and the reading half of a book are assembled the
-            # same way here as on every other endpoint, so a book carries the
-            # same fields whichever page asked for it. This route used to
-            # hand-pick a subset, which is why a book opened from a shelf had
-            # no rating or page count until linked_catalog_book was consulted.
             books.append({
                 **catalog,
                 **reading_overlay({**row, "status": status}, catalog.get("page_count")),
@@ -86,11 +76,7 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
 
     @router.get("/reading-progress/{book_id}")
     def get_reading_progress_entry(book_id: str) -> dict:
-        # A book nobody has tracked yet still has a length: the scraped
-        # page_count on its catalog row. Seeding the entry with it is what makes
-        # the tracking panel open on "0 of 412" rather than "0 of 0", and it has
-        # to happen here rather than in the client because the payload a card
-        # was built from does not always carry the catalog page count.
+        # Seed with the catalog page count so the panel opens on "0 of 412", not "0 of 0".
         catalog = resolve_book(root, book_id)
         record = repo.get_book_state(book_id)
         if record is None:

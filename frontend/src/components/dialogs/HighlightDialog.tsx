@@ -7,16 +7,12 @@ import type { BookProps, RawHighlightGroup } from '../../types.js'
 import { errorMessage } from '../../utils.js'
 
 interface HighlightDialogProps extends BookProps, DialogCloseProps {
-  // Handed the book's refreshed group so a caller already showing the list can
-  // patch it in place. The book dialog, which has no list to patch, omits it.
+  // Gets the refreshed group so a caller showing the list can patch it in place.
   onCreated?: (group: RawHighlightGroup) => void
 }
 
 const onlyDigits = (raw: string): string => raw.replace(/\D/g, '').slice(0, 6)
 
-// Always scoped to a book it was opened from — the book dialog's highlight
-// button, or the Highlights page with a book already selected — so there is no
-// picker step and nothing to go back to.
 function HighlightDialog({ book, onClose, onCreated }: HighlightDialogProps) {
   const { showToast } = useToast()
   const [text, setText] = useState('')

@@ -17,12 +17,7 @@ class ReadingListStore:
 
     @staticmethod
     def _normalize_icon(icon: str) -> str:
-        """A lucide icon name, or '' for the default dot.
-
-        The name is only ever looked up in a map on the frontend, never rendered
-        as markup, so this guards the column's shape rather than the render:
-        anything that isn't a plausible icon slug is stored as no icon at all.
-        """
+        """A lucide icon name, or '' for the default dot; anything implausible is stored as no icon."""
         clean = (icon or "").strip()
         if not clean:
             return ""
@@ -82,10 +77,7 @@ class ReadingListStore:
             raise KeyError("List not found")
 
     def set_icon(self, name: str, icon: str) -> None:
-        """Set (or, with an empty icon, clear back to the default dot).
-
-        The icon lives on the row, so a rename carries it along on its own.
-        """
+        """Set an icon, or clear back to the default dot with an empty one."""
         clean = self._normalize(name)
         clean_icon = self._normalize_icon(icon)
         with transaction(self.root) as conn:

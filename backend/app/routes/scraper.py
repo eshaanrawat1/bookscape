@@ -21,14 +21,7 @@ class ScrapeBookIn(BaseModel):
 
 
 class ScrapedBookIn(BaseModel):
-    """One book as the scraper emitted it, handed back for import.
-
-    Mirrors the `Book` dataclass in backend/scripts/scraper.py. Typed rather
-    than a bare dict because this is the one route that writes straight into the
-    catalog: `extra="forbid"` turns a payload carrying unexpected fields into a
-    422 instead of a silent partial write, and the length caps stop a single
-    import from parking megabytes in the database.
-    """
+    """One scraped book for import; `extra="forbid"` and length caps guard this direct catalog write."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -65,9 +58,7 @@ def create_router(root: Path) -> APIRouter:
 
     @router.post("/scrape-book/preview")
     def scrape_book_preview(payload: ScrapeBookIn) -> StreamingResponse:
-        # `url` is rebuilt from the parsed id rather than taken as given: it is
-        # about to be handed to a real browser, so the host has to be Goodreads
-        # and nothing else may ride along in the query or fragment.
+        # Rebuilt from the parsed id since it goes to a real browser: Goodreads host only, no query or fragment.
         try:
             book_id, url = canonical_book_url(payload.url)
         except ValueError as e:
@@ -127,10 +118,7 @@ def create_router(root: Path) -> APIRouter:
                     if line.startswith("@@STAGE@@ "):
                         stage = line[len("@@STAGE@@ "):].strip()
                         if stage == "installing_browser":
-                            # The scraper found no Chromium and is fetching one.
-                            # A ~150MB download does not fit in a budget sized
-                            # for a page load, so restart the clock with room
-                            # for the download *and* the scrape that follows.
+                            # Chromium is downloading (~150MB); restart the clock with room for it and the scrape.
                             installing["flag"] = True
                             timer.cancel()
                             timer = threading.Timer(install_timeout + scraper_timeout, _kill)
@@ -147,8 +135,7 @@ def create_router(root: Path) -> APIRouter:
                     elif line.startswith("@@ERROR@@ "):
                         error_message = line[len("@@ERROR@@ "):].strip()
                     elif line.strip():
-                        # Non-machine-readable scraper log line — surface it to the
-                        # server console for debugging, not to the client.
+                        # Non-protocol log line: console only, not the client.
                         print(f"[scraper] {line}")
             finally:
                 proc.wait()

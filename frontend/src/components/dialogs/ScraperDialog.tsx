@@ -138,8 +138,7 @@ function ScraperDialog({ onClose, onSuccess }: ScraperDialogProps) {
 
   const reset = () => setStage({ kind: 'idle' })
 
-  // The webview would navigate away from the app if it followed the href itself,
-  // so hand the URL to the system browser instead.
+  // The webview would navigate away on the href, so open the system browser instead.
   const openGoodreads = async (e: React.MouseEvent) => {
     e.preventDefault()
     try {

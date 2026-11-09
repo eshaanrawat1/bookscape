@@ -13,27 +13,10 @@ interface BookDialogStageProps extends DialogCloseProps {
   selected: Selected
 }
 
-// Card-to-card navigation (clicking a "similar book") crossfades the incoming
-// card in over the outgoing one instead of letting the outgoing card vanish
-// instantly, which reads as a flicker of bare scrim between the two. The
-// outgoing snapshot must be derived synchronously during render (React's
-// "adjusting state when a prop changes" pattern) rather than in a useEffect —
-// an effect runs after the swap has already committed, so the old card would
-// already be gone for one paint before the effect re-adds it, which is the
-// exact flicker this is meant to prevent.
+// Card swaps crossfade. The outgoing snapshot is derived during render; an effect would paint a gap.
 const CROSSFADE_MS = 180
 
-// The stage is centred in the scrim, so every change in card height moves the
-// card by half the delta. During a navigation the height changes twice: once
-// when the incoming card replaces the outgoing one (different title/blurb
-// lengths), and again a moment later when the incoming card's /book/{id} fetch
-// lands and fills in the stats row, genre pills and real blurb. Tracking that
-// live is what makes the card visibly drop and then climb back — the flicker.
-//
-// Instead the stage is pinned at the outgoing card's height for the crossfade,
-// held until the incoming card has stopped resizing for CONTENT_QUIET_MS, and
-// then eased once to whatever height the content settled at. Nothing moves
-// while the cards swap; the settle is a single smooth ease afterwards.
+// The stage is centred, so height changes move the card: pin it through the swap, ease once content is quiet.
 const CONTENT_QUIET_MS = 140
 const MAX_HOLD_MS = 800
 
@@ -42,9 +25,7 @@ function BookDialogStage({ selected, onClose }: BookDialogStageProps) {
   const [outgoing, setOutgoing] = useState<Selected | null>(null)
   const [stageHeight, setStageHeight] = useState<number | null>(null)
 
-  // Escape is owned here rather than in BookDialog because this is where
-  // onClose lives, and a card-to-card crossfade briefly has two BookDialogs
-  // mounted. No blocksHotkeys: browsing a book shouldn't mute ⌘K or ⌘1–6.
+  // Owned here because a crossfade briefly mounts two BookDialogs. No blocksHotkeys, so chords stay live.
   useModalLayer({ onEscape: onClose })
 
   const cardRef = useRef<HTMLElement | null>(null)
@@ -66,9 +47,7 @@ function BookDialogStage({ selected, onClose }: BookDialogStageProps) {
     setPriorSelected(selected)
   }
 
-  // Mirror the pin into a ref so the observer and timers below can read it
-  // without being torn down and rebuilt on every height update. Declared first
-  // so it is already in sync when the effects that read it run.
+  // Mirrored to a ref so the observer and timers can read it without being rebuilt on each update.
   useLayoutEffect(() => {
     stageHeightRef.current = stageHeight
   })
@@ -91,9 +70,7 @@ function BookDialogStage({ selected, onClose }: BookDialogStageProps) {
       const pinned = stageHeightRef.current
       if (pinned === null) return
       if (Math.abs(pinned - cardHeightRef.current) < 1) {
-        // The height never moved, so there is nothing to ease. Keep holding —
-        // a pin that already matches the content is invisible, and it means a
-        // slow fetch still gets an eased settle rather than a snap.
+        // Height never moved: keep holding so a slow fetch still gets an eased settle.
         if (fromDeadline && !easingRef.current) setStageHeight(null)
         return
       }
@@ -102,19 +79,10 @@ function BookDialogStage({ selected, onClose }: BookDialogStageProps) {
       setStageHeight(cardHeightRef.current)
     }
 
-    // The first measurement is the incoming card's pre-fetch height, taken at
-    // the swap itself — hold it past the crossfade so the settle never runs
-    // while the cards are still dissolving into each other.
+    // The first measurement is the pre-fetch height at the swap; hold it past the crossfade.
     let awaitingFirstMeasure = true
 
-    // offsetHeight, not getBoundingClientRect().height: the latter is the
-    // post-transform rect. The first card of a session enters with
-    // dialogEnterIn, which scales it from 0.94, and ResizeObserver does not
-    // fire on transform changes — so every measurement taken during that
-    // 380ms recorded a shrunken height that then stuck. The first card-to-card
-    // hop pinned the stage to it, and since the stage is centred in the scrim
-    // a too-short pin dropped the incoming card before the settle lifted it
-    // back. Layout height is what the pin is about, so measure layout height.
+    // offsetHeight, not getBoundingClientRect: the latter includes the enter animation's scale, which would stick.
     const measure = () => {
       const height = card.offsetHeight
       if (height <= 0) return
@@ -129,9 +97,7 @@ function BookDialogStage({ selected, onClose }: BookDialogStageProps) {
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(card)
-    // Backstop: if the incoming card never goes quiet (or its data never
-    // arrives) the pin has to be released eventually so the stage can size
-    // itself normally again.
+    // Backstop: release the pin even if the incoming card never goes quiet.
     const deadline = stageHeightRef.current !== null
       ? setTimeout(() => settle(true), MAX_HOLD_MS)
       : null
@@ -153,8 +119,7 @@ function BookDialogStage({ selected, onClose }: BookDialogStageProps) {
     if (Math.abs((stageHeightRef.current ?? 0) - cardHeightRef.current) < 1) {
       setStageHeight(null)
     } else {
-      // Content shifted again mid-ease — chase it instead of releasing the pin,
-      // which would snap the remaining distance.
+      // Content shifted mid-ease: chase it rather than releasing the pin and snapping.
       easingRef.current = true
       setStageHeight(cardHeightRef.current)
     }

@@ -1,8 +1,5 @@
 import type { SVGProps } from 'react'
 
-/* Horizon: an open book whose page edges roll like hills, sun clearing the
-   gutter — the app's name drawn literally. Built on Lucide's 24-unit grid at a
-   1.7 stroke so it sits at the same weight as the nav icons beside it. */
 function BrandMark(props: SVGProps<SVGSVGElement>) {
   return (
     <svg

@@ -7,15 +7,7 @@ interface ProgressRingProps {
   label: string
 }
 
-// A ring rather than a bar because what it reports is a fraction of a countable
-// set — four books, three of them read — and an arc closing on itself reads as
-// "how much of this is left" in a way a bar the width of its column does not.
-//
-// Drawn as a stroked circle with a dash gap rather than an arc path: the
-// geometry is one number (how much of the circumference to paint) instead of
-// trigonometry, and it degenerates correctly at both ends — a zero-length dash
-// paints nothing, and a full-length one paints the whole ring without the
-// seam an arc from 0° to 360° leaves behind.
+// A dash-gap circle rather than an arc path: one number, and no seam at 100%.
 function ProgressRing({ value, total, size = 44, label }: ProgressRingProps) {
   const safeTotal = Math.max(0, total || 0)
   const safeValue = Math.min(safeTotal, Math.max(0, value || 0))
