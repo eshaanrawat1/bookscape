@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 import BookCover from '../books/BookCover.jsx'
-import { searchBookIds, formatCompactNumber } from '../../utils.js'
+import { searchBookIds, bookMeta } from '../../utils.js'
 import { filterCommands } from '../../commands.js'
 import { useLibraryData } from '../../context/LibraryDataContext.jsx'
 import { useNavigation } from '../../context/NavigationContext.jsx'
@@ -212,13 +212,6 @@ function PaletteRowItem({ row, index, active, showHeader, rowRef, onHover, onRun
       </button>
     </>
   )
-}
-
-function bookMeta(book: Book): string {
-  const parts: string[] = []
-  if (book.genre) parts.push(book.genre)
-  if (book.pages) parts.push(`${formatCompactNumber(book.pages)} pages`)
-  return parts.join(' · ')
 }
 
 export default CommandPalette

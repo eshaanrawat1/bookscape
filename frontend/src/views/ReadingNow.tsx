@@ -27,13 +27,13 @@ function ReadingNow() {
         onSeeAll={onOpenWantToRead}
       />
       {collections
-        .filter((collection) => collection.bookIds.length > 0)
+        .filter((collection) => collection.book_ids.length > 0)
         .map((collection) => (
           <Shelf
             key={collection.id}
             title={collection.name}
             subtitle="Kept together on purpose."
-            books={booksByIds(collection.bookIds)}
+            books={booksByIds(collection.book_ids)}
           />
         ))}
     </div>

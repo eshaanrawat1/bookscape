@@ -57,4 +57,7 @@ const monthLabels: string[] = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ]
 
-export { viewMeta, mainNav, shelfNav, monthLabels, shortcutLabel, navOrder, navShortcut }
+// Pinned at load: it keys the fetched goal, so it must not change on its own.
+const readingGoalYear = new Date().getFullYear()
+
+export { viewMeta, mainNav, shelfNav, monthLabels, readingGoalYear, shortcutLabel, navOrder, navShortcut }

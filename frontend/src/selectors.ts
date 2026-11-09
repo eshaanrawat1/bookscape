@@ -14,8 +14,8 @@ function isUntouched(book: Book): boolean {
 // ---- Shelves ----
 
 function newestFirst(a: Book, b: Book): number {
-  return compare(b.finishDate, a.finishDate)
-    || compare(b.startDate, a.startDate)
+  return compare(b.finish_date, a.finish_date)
+    || compare(b.start_date, a.start_date)
     || compare(b.title, a.title)
 }
 
@@ -26,7 +26,7 @@ function selectShelves(books: Book[]) {
     // In the order they were saved: changing a book's status stamps updatedAt.
     wantToRead: books
       .filter((book) => book.status === 'want')
-      .sort((a, b) => compare(a.updatedAt, b.updatedAt)),
+      .sort((a, b) => compare(a.updated_at, b.updated_at)),
     finished: withStatus('done'),
     dnf: withStatus('dnf'),
   }
@@ -42,7 +42,7 @@ const LIBRARY_SHELF_SIZE = 30
 const GENRE_PAGE_SIZE = 100
 
 function mostRatedFirst(a: Book, b: Book): number {
-  return b.ratingCount - a.ratingCount
+  return b.rating_count - a.rating_count
 }
 
 function selectLibrarySections(books: Book[]): GenreSection[] {
@@ -98,7 +98,7 @@ function selectAuthorBooks(books: Book[], author: string): Book[] {
 // text. Anything unparseable (an omnibus "1-3", a prequel with no number) goes to
 // the end rather than displacing book one.
 function seriesPosition(book: Book): number {
-  const raw = book.seriesNumber.trim()
+  const raw = book.series_number.trim()
   const parsed = raw ? Number(raw) : NaN
   return Number.isNaN(parsed) ? Infinity : parsed
 }
@@ -162,10 +162,10 @@ function selectSuggestedBooks(books: Book[]): Book[] {
   const byId = new Map(books.map((book) => [book.id, book]))
   const settled = (id: string) => ['done', 'reading', 'dnf'].includes(byId.get(id)?.status || '')
   const pools = books
-    .filter((book) => book.status === 'done' && book.finishDate.trim())
-    .sort((a, b) => compare(b.finishDate, a.finishDate) || compare(b.id, a.id))
+    .filter((book) => book.status === 'done' && book.finish_date.trim())
+    .sort((a, b) => compare(b.finish_date, a.finish_date) || compare(b.id, a.id))
     .slice(0, SUGGESTION_SOURCES)
-    .map((book) => book.similarIds.filter((id) => byId.has(id) && !settled(id)))
+    .map((book) => book.similar_book_ids.filter((id) => byId.has(id) && !settled(id)))
 
   const picked = new Set<string>()
   for (let round = 0; round < SUGGESTIONS_PER_SOURCE && picked.size < SUGGESTION_LIMIT; round += 1) {
@@ -196,7 +196,7 @@ function isoDay(value: string): number | null {
 }
 
 function finishYear(book: Book): number {
-  return Number(book.finishDate.trim().slice(0, 4))
+  return Number(book.finish_date.trim().slice(0, 4))
 }
 
 // A union rather than a sum of per-book spans: two books read side by side over
@@ -204,8 +204,8 @@ function finishYear(book: Book): number {
 function countDaysReading(books: Book[]): number {
   const days = new Set<number>()
   for (const book of books) {
-    const start = isoDay(book.startDate)
-    const finish = isoDay(book.finishDate)
+    const start = isoDay(book.start_date)
+    const finish = isoDay(book.finish_date)
     if (start === null || finish === null) continue
     for (let day = start; day <= finish; day += 1) days.add(day)
   }
@@ -228,18 +228,18 @@ function countByYear(books: Book[]) {
 
 function selectStats(books: Book[], year: number | null): StatsSummary {
   const finished = books
-    .filter((book) => book.status === 'done' && isoDay(book.finishDate) !== null)
+    .filter((book) => book.status === 'done' && isoDay(book.finish_date) !== null)
     .filter((book) => year === null || finishYear(book) === year)
-    .sort((a, b) => compare(a.finishDate, b.finishDate) || compare(a.title, b.title))
+    .sort((a, b) => compare(a.finish_date, b.finish_date) || compare(a.title, b.title))
 
   const months = Array<number>(12).fill(0)
-  for (const book of finished) months[Number(book.finishDate.trim().slice(5, 7)) - 1] += 1
+  for (const book of finished) months[Number(book.finish_date.trim().slice(5, 7)) - 1] += 1
 
   return {
-    availableYears: [...new Set(books.filter((book) => isoDay(book.finishDate) !== null).map(finishYear))]
+    availableYears: [...new Set(books.filter((book) => isoDay(book.finish_date) !== null).map(finishYear))]
       .sort((a, b) => b - a),
     booksRead: finished.length,
-    pagesRead: finished.reduce((sum, book) => sum + book.totalPages, 0),
+    pagesRead: finished.reduce((sum, book) => sum + book.total_pages, 0),
     genresCovered: new Set(finished.flatMap((book) => book.genres)).size,
     daysReading: countDaysReading(finished),
     months,

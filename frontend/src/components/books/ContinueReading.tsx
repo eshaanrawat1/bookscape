@@ -41,7 +41,7 @@ function ContinueReading({ books, series }: ContinueReadingProps) {
 }
 
 function SeriesCard({ entry }: { entry: SeriesProgress }) {
-  const { onOpen, onOpenSeries } = useNavigation()
+  const { onOpen, onOpenDrilldown } = useNavigation()
   const { nextBook } = entry
   const reading = nextBook?.status === 'reading'
 
@@ -51,7 +51,7 @@ function SeriesCard({ entry }: { entry: SeriesProgress }) {
       <button
         type="button"
         className="bookCardButton"
-        onClick={() => (nextBook ? onOpen(nextBook) : onOpenSeries(entry.series))}
+        onClick={() => (nextBook ? onOpen(nextBook) : onOpenDrilldown('series', entry.series))}
       >
         <div className="coverWrap">
           {/* Only "up next" is flagged: every card here is in progress, so silence means mid-book. */}
@@ -60,7 +60,7 @@ function SeriesCard({ entry }: { entry: SeriesProgress }) {
           {nextBook && !reading && <span className="seriesCardFlag isNextUp">Up next</span>}
         </div>
       </button>
-      <button type="button" className="seriesCardTitle" onClick={() => onOpenSeries(entry.series)}>
+      <button type="button" className="seriesCardTitle" onClick={() => onOpenDrilldown('series', entry.series)}>
         <strong>{entry.series}</strong>
       </button>
       <div className="seriesCardMeta">

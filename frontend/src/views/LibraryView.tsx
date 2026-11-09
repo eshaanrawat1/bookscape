@@ -7,7 +7,7 @@ import { selectLibrarySections } from '../selectors.js'
 
 function LibraryView() {
   const { books } = useLibraryData()
-  const { onOpenGenre } = useNavigation()
+  const { onOpenDrilldown } = useNavigation()
   const sections = useMemo(() => selectLibrarySections(books), [books])
   if (sections.length === 0) {
     return <EmptyState message="Your library is empty." />
@@ -19,7 +19,7 @@ function LibraryView() {
           key={genreSection.genre}
           title={genreSection.genre}
           books={genreSection.books}
-          onSeeAll={onOpenGenre}
+          onSeeAll={(genre) => onOpenDrilldown('genre', genre)}
         />
       ))}
     </div>

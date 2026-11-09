@@ -15,10 +15,6 @@ def parse_iso_date(value: object) -> date | None:
     except Exception:
         return None
 
-def parse_iso_date_string(value: object) -> str:
-    d = parse_iso_date(value)
-    return d.isoformat() if d else ""
-
 
 def clamp_my_rating(value: object) -> float:
     """Coerce a score to 0-5 with two decimals; anything unreadable is 0 ("not rated yet")."""

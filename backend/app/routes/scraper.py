@@ -44,6 +44,9 @@ class ConfirmBookIn(BaseModel):
     book: ScrapedBookIn
 
 
+router = APIRouter()
+SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "scripts"
+
 STAGE_MESSAGES = {
     "installing_browser": "Setting up the browser (one-time download)…",
     "fetching_page": "Fetching book info…",
@@ -51,124 +54,118 @@ STAGE_MESSAGES = {
 }
 
 
-def create_router(root: Path) -> APIRouter:
-    router = APIRouter()
+@router.post("/scrape-book/preview")
+def scrape_book_preview(payload: ScrapeBookIn) -> StreamingResponse:
+    # Rebuilt from the parsed id since it goes to a real browser: Goodreads host only, no query or fragment.
+    try:
+        book_id, url = canonical_book_url(payload.url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
-    @router.post("/scrape-book/preview")
-    def scrape_book_preview(payload: ScrapeBookIn) -> StreamingResponse:
-        # Rebuilt from the parsed id since it goes to a real browser: Goodreads host only, no query or fragment.
+    if not payload.force:
+        existing = resolve_book(book_id)
+        if existing:
+            def duplicate_stream():
+                yield json.dumps({
+                    "stage": "duplicate",
+                    "book": {
+                        "uid": existing.get("id"),
+                        "title": existing.get("title"),
+                        "author": existing.get("author"),
+                        "image_url": existing.get("image_url"),
+                    },
+                }) + "\n"
+
+            return StreamingResponse(duplicate_stream(), media_type="application/x-ndjson")
+
+    scraper_timeout = int(os.getenv("SCRAPER_TIMEOUT_SECONDS", "180"))
+    install_timeout = int(os.getenv("SCRAPER_BROWSER_INSTALL_TIMEOUT_SECONDS", "900"))
+
+    def run_stream():
+        env = {**os.environ, "PYTHONUNBUFFERED": "1"}
         try:
-            book_id, url = canonical_book_url(payload.url)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e)) from e
+            proc = subprocess.Popen(
+                [sys.executable, str(SCRIPTS_DIR / "scraper.py"), "--fetch-one", url],
+                cwd=SCRIPTS_DIR,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                env=env,
+            )
+        except Exception as e:
+            yield json.dumps({"stage": "error", "message": f"Failed to start the scraper: {e}"}) + "\n"
+            return
 
-        if not payload.force:
-            existing = resolve_book(root, book_id)
-            if existing:
-                def duplicate_stream():
+        timed_out = {"flag": False}
+
+        def _kill():
+            timed_out["flag"] = True
+            proc.kill()
+
+        timer = threading.Timer(scraper_timeout, _kill)
+        timer.start()
+
+        result_book: dict | None = None
+        error_message: str | None = None
+        installing = {"flag": False}
+        try:
+            for raw_line in proc.stdout:
+                line = raw_line.rstrip("\n")
+                if line.startswith("@@STAGE@@ "):
+                    stage = line[len("@@STAGE@@ "):].strip()
+                    if stage == "installing_browser":
+                        # Chromium is downloading (~150MB); restart the clock with room for it and the scrape.
+                        installing["flag"] = True
+                        timer.cancel()
+                        timer = threading.Timer(install_timeout + scraper_timeout, _kill)
+                        timer.start()
                     yield json.dumps({
-                        "stage": "duplicate",
-                        "book": {
-                            "uid": existing.get("id"),
-                            "title": existing.get("title"),
-                            "author": existing.get("author"),
-                            "image_url": existing.get("image_url"),
-                        },
+                        "stage": stage,
+                        "message": STAGE_MESSAGES.get(stage, stage),
                     }) + "\n"
+                elif line.startswith("@@RESULT@@ "):
+                    try:
+                        result_book = json.loads(line[len("@@RESULT@@ "):])
+                    except Exception:
+                        error_message = "The scraper returned an unreadable result."
+                elif line.startswith("@@ERROR@@ "):
+                    error_message = line[len("@@ERROR@@ "):].strip()
+                elif line.strip():
+                    # Non-protocol log line: console only, not the client.
+                    print(f"[scraper] {line}")
+        finally:
+            proc.wait()
+            timer.cancel()
 
-                return StreamingResponse(duplicate_stream(), media_type="application/x-ndjson")
+        if timed_out["flag"]:
+            message = (
+                "Downloading the browser took too long. Check your connection and try again."
+                if installing["flag"]
+                else f"Goodreads timed out after {scraper_timeout}s. Please try again."
+            )
+            yield json.dumps({"stage": "error", "message": message}) + "\n"
+            return
+        if result_book:
+            yield json.dumps({"stage": "preview", "book": result_book}) + "\n"
+            return
+        if error_message:
+            yield json.dumps({"stage": "error", "message": error_message}) + "\n"
+            return
+        yield json.dumps({
+            "stage": "error",
+            "message": f"The scraper exited unexpectedly (code {proc.returncode}).",
+        }) + "\n"
 
-        scraper_timeout = int(os.getenv("SCRAPER_TIMEOUT_SECONDS", "180"))
-        install_timeout = int(os.getenv("SCRAPER_BROWSER_INSTALL_TIMEOUT_SECONDS", "900"))
-        scripts_dir = root / "backend" / "scripts"
+    return StreamingResponse(run_stream(), media_type="application/x-ndjson")
 
-        def run_stream():
-            env = {**os.environ, "PYTHONUNBUFFERED": "1"}
-            try:
-                proc = subprocess.Popen(
-                    [sys.executable, str(scripts_dir / "scraper.py"), "--fetch-one", url],
-                    cwd=scripts_dir,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=1,
-                    env=env,
-                )
-            except Exception as e:
-                yield json.dumps({"stage": "error", "message": f"Failed to start the scraper: {e}"}) + "\n"
-                return
+@router.post("/scrape-book/confirm")
+def scrape_book_confirm(payload: ConfirmBookIn) -> dict:
+    book = payload.book.model_dump()
+    uid = book["uid"]
 
-            timed_out = {"flag": False}
-
-            def _kill():
-                timed_out["flag"] = True
-                proc.kill()
-
-            timer = threading.Timer(scraper_timeout, _kill)
-            timer.start()
-
-            result_book: dict | None = None
-            error_message: str | None = None
-            installing = {"flag": False}
-            try:
-                for raw_line in proc.stdout:
-                    line = raw_line.rstrip("\n")
-                    if line.startswith("@@STAGE@@ "):
-                        stage = line[len("@@STAGE@@ "):].strip()
-                        if stage == "installing_browser":
-                            # Chromium is downloading (~150MB); restart the clock with room for it and the scrape.
-                            installing["flag"] = True
-                            timer.cancel()
-                            timer = threading.Timer(install_timeout + scraper_timeout, _kill)
-                            timer.start()
-                        yield json.dumps({
-                            "stage": stage,
-                            "message": STAGE_MESSAGES.get(stage, stage),
-                        }) + "\n"
-                    elif line.startswith("@@RESULT@@ "):
-                        try:
-                            result_book = json.loads(line[len("@@RESULT@@ "):])
-                        except Exception:
-                            error_message = "The scraper returned an unreadable result."
-                    elif line.startswith("@@ERROR@@ "):
-                        error_message = line[len("@@ERROR@@ "):].strip()
-                    elif line.strip():
-                        # Non-protocol log line: console only, not the client.
-                        print(f"[scraper] {line}")
-            finally:
-                proc.wait()
-                timer.cancel()
-
-            if timed_out["flag"]:
-                message = (
-                    "Downloading the browser took too long. Check your connection and try again."
-                    if installing["flag"]
-                    else f"Goodreads timed out after {scraper_timeout}s. Please try again."
-                )
-                yield json.dumps({"stage": "error", "message": message}) + "\n"
-                return
-            if result_book:
-                yield json.dumps({"stage": "preview", "book": result_book}) + "\n"
-                return
-            if error_message:
-                yield json.dumps({"stage": "error", "message": error_message}) + "\n"
-                return
-            yield json.dumps({
-                "stage": "error",
-                "message": f"The scraper exited unexpectedly (code {proc.returncode}).",
-            }) + "\n"
-
-        return StreamingResponse(run_stream(), media_type="application/x-ndjson")
-
-    @router.post("/scrape-book/confirm")
-    def scrape_book_confirm(payload: ConfirmBookIn) -> dict:
-        book = payload.book.model_dump()
-        uid = book["uid"]
-
-        upsert_book(root, book)
-        saved = resolve_book(root, uid)
-        if not saved:
-            raise HTTPException(status_code=500, detail="Book was saved but could not be reloaded.")
-        return {"ok": True, "book": saved}
-
-    return router
+    upsert_book(book)
+    saved = resolve_book(uid)
+    if not saved:
+        raise HTTPException(status_code=500, detail="Book was saved but could not be reloaded.")
+    return {"ok": True, "book": saved}

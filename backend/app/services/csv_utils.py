@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import math
 
-from ..repository import VALID_STATUSES
 from ..utils import clamp_my_rating, parse_iso_date
+from .catalog import VALID_STATUSES
 
 LIST_SEPARATOR = ";"
 

@@ -11,22 +11,22 @@ import { useToast } from '../context/ToastContext.jsx'
 import type { Highlight, HighlightGroup } from '../types.js'
 
 function HighlightsView() {
-  const { groups, loading, error, applyGroup, updateHighlight, deleteHighlight } = useHighlights()
+  const { groups, loading, error, setHighlights, updateHighlight, deleteHighlight } = useHighlights()
   const { showToast, showError } = useToast()
   // A book id rather than an index, since the list reorders as highlights are added.
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [composing, setComposing] = useState(false)
 
-  const selected = groups.find((group) => group.bookId === selectedId) || groups[0] || null
+  const selected = groups.find((group) => group.book.id === selectedId) || groups[0] || null
 
   const handleListKeyDown = (event: KeyboardEvent) => {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
     event.preventDefault()
-    const index = groups.findIndex((group) => group.bookId === selected?.bookId)
+    const index = groups.findIndex((group) => group.book.id === selected?.book.id)
     const next = event.key === 'ArrowDown'
       ? (index + 1 >= groups.length ? 0 : index + 1)
       : (index <= 0 ? groups.length - 1 : index - 1)
-    setSelectedId(groups[next]?.bookId ?? null)
+    setSelectedId(groups[next]?.book.id ?? null)
   }
 
   if (loading) {
@@ -56,15 +56,15 @@ function HighlightsView() {
           role="listbox"
           tabIndex={0}
           aria-label="Books with highlights"
-          aria-activedescendant={selected ? `highlightBook-${selected.bookId}` : undefined}
+          aria-activedescendant={selected ? `highlightBook-${selected.book.id}` : undefined}
           onKeyDown={handleListKeyDown}
         >
           {groups.map((group) => (
             <BookRow
-              key={group.bookId}
+              key={group.book.id}
               group={group}
-              active={group.bookId === selected?.bookId}
-              onSelect={() => setSelectedId(group.bookId)}
+              active={group.book.id === selected?.book.id}
+              onSelect={() => setSelectedId(group.book.id)}
             />
           ))}
         </div>
@@ -75,7 +75,7 @@ function HighlightsView() {
           <header className="highlightsDetailHeader">
             <div>
               <h2>{selected.book.title}</h2>
-              <p>{countLabel(selected.count)}</p>
+              <p>{countLabel(selected.highlights.length)}</p>
             </div>
             <button type="button" className="primaryButton highlightsNewButton" onClick={() => setComposing(true)}>
               <Plus />
@@ -122,9 +122,9 @@ function HighlightsView() {
         <HighlightDialog
           book={selected.book}
           onClose={() => setComposing(false)}
-          onCreated={(group) => {
-            applyGroup(group)
-            setSelectedId(group.book_id)
+          onCreated={(highlights) => {
+            setHighlights(highlights)
+            setSelectedId(selected.book.id)
           }}
         />
       )}
@@ -149,7 +149,7 @@ function BookRow({ group, active, onSelect }: BookRowProps) {
   return (
     <button
       type="button"
-      id={`highlightBook-${group.bookId}`}
+      id={`highlightBook-${group.book.id}`}
       role="option"
       aria-selected={active}
       className={active ? 'highlightsBookRow active' : 'highlightsBookRow'}
@@ -157,7 +157,7 @@ function BookRow({ group, active, onSelect }: BookRowProps) {
     >
       <span className="highlightsBookCopy">
         <strong>{group.book.title}</strong>
-        <span>{countLabel(group.count)}</span>
+        <span>{countLabel(group.highlights.length)}</span>
       </span>
       <span className="highlightsBookCover">
         <BookCover book={group.book} lazy />
@@ -219,7 +219,7 @@ function HighlightCard({ highlight, onSaveNote, onSaveEdit, onDelete }: Highligh
 
   const meta = [
     highlight.page > 0 ? `Page ${highlight.page}` : '',
-    formatDayLabel(highlight.createdAt),
+    formatDayLabel(highlight.created_at),
   ].filter(Boolean).join('  ·  ')
 
   if (editing) {

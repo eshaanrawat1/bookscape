@@ -1,12 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::{
-  fs,
-  io::Write,
   net::{SocketAddr, TcpStream},
   path::{Path, PathBuf},
   process::{Child, Command, Stdio},
-  sync::{Arc, Mutex},
   thread,
   time::{Duration, Instant},
 };
@@ -18,7 +15,6 @@ use tauri::Manager;
 const BACKEND_HOST: &str = "127.0.0.1";
 const BACKEND_PORT: u16 = 9876;
 const HEALTHCHECK_URL: &str = "http://127.0.0.1:9876/health";
-const EXPECTED_BACKEND_API_VERSION: u64 = 8;
 const TOKEN_ENV_VAR: &str = "BOOKSCAPE_API_TOKEN";
 const TOKEN_HEADER: &str = "X-Bookscape-Token";
 const TOKEN_LEN: usize = 43;
@@ -35,10 +31,7 @@ fn api_token(token: tauri::State<'_, ApiToken>) -> String {
   token.0.clone()
 }
 
-fn token_file_path() -> PathBuf {
-  project_root().join("backend/data/.api-token")
-}
-
+/// Fresh each launch, so a backend left over from an earlier run can't answer for this one.
 fn generate_token() -> String {
   rand::thread_rng()
     .sample_iter(&Alphanumeric)
@@ -47,93 +40,20 @@ fn generate_token() -> String {
     .collect()
 }
 
-/// Read or create the launch token; mirrors `read_or_create_token` in backend/app/auth.py.
-fn read_or_create_token() -> std::io::Result<String> {
-  let path = token_file_path();
-  if let Some(parent) = path.parent() {
-    fs::create_dir_all(parent)?;
-  }
-
-  for _ in 0..3 {
-    if let Ok(existing) = fs::read_to_string(&path) {
-      let existing = existing.trim().to_string();
-      if !existing.is_empty() {
-        return Ok(existing);
-      }
-      // Empty means a crash mid-write; clear it or create_new refuses forever.
-      let _ = fs::remove_file(&path);
-    }
-
-    let mut options = fs::OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-      use std::os::unix::fs::OpenOptionsExt;
-      options.mode(0o600);
-    }
-
-    match options.open(&path) {
-      Ok(mut file) => {
-        let token = generate_token();
-        file.write_all(token.as_bytes())?;
-        return Ok(token);
-      }
-      // Lost the race to the backend; go back and read what it wrote.
-      Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-      Err(error) => return Err(error),
-    }
-  }
-
-  Err(std::io::Error::new(
-    std::io::ErrorKind::Other,
-    format!("could not establish an API token at {}", path.display()),
-  ))
-}
-
 fn backend_addr() -> SocketAddr {
   SocketAddr::from(([127, 0, 0, 1], BACKEND_PORT))
 }
 
-struct BackendGuard(Arc<Mutex<Option<Child>>>);
+struct BackendGuard(Child);
 
 impl Drop for BackendGuard {
   fn drop(&mut self) {
-    if let Ok(mut guard) = self.0.lock() {
-      if let Some(mut child) = guard.take() {
-        let _ = child.kill();
-      }
-    }
+    let _ = self.0.kill();
   }
 }
 
 fn is_backend_listening() -> bool {
   TcpStream::connect_timeout(&backend_addr(), Duration::from_millis(200)).is_ok()
-}
-
-/// Whether the running backend has the right API version and accepts our token; stale ones get recycled.
-fn backend_is_current(token: &str) -> bool {
-  let client = match Client::builder().timeout(Duration::from_secs(2)).build() {
-    Ok(client) => client,
-    Err(_) => return false,
-  };
-
-  let response = match client.get(HEALTHCHECK_URL).header(TOKEN_HEADER, token).send() {
-    Ok(response) => response,
-    Err(_) => return false,
-  };
-
-  if !response.status().is_success() {
-    return false;
-  }
-
-  match response.json::<serde_json::Value>() {
-    Ok(payload) => payload
-      .get("backend_api_version")
-      .and_then(|value| value.as_u64())
-      .map(|version| version == EXPECTED_BACKEND_API_VERSION)
-      .unwrap_or(false),
-    Err(_) => false,
-  }
 }
 
 fn kill_backend_listener() {
@@ -188,19 +108,16 @@ fn resolve_python() -> PathBuf {
   }
 }
 
-fn launch_backend(token: &str) -> std::io::Result<Option<Child>> {
+fn launch_backend(token: &str) -> std::io::Result<Child> {
   if is_backend_listening() {
-    if backend_is_current(token) {
-      return Ok(None);
-    }
-
     kill_backend_listener();
-    thread::sleep(Duration::from_millis(500));
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while is_backend_listening() && Instant::now() < deadline {
+      thread::sleep(Duration::from_millis(50));
+    }
   }
 
-  let python = resolve_python();
-
-  let child = Command::new(python)
+  Command::new(resolve_python())
     .current_dir(project_root())
     .env(TOKEN_ENV_VAR, token)
     .args([
@@ -215,9 +132,7 @@ fn launch_backend(token: &str) -> std::io::Result<Option<Child>> {
     .stdin(Stdio::null())
     .stdout(Stdio::inherit())
     .stderr(Stdio::inherit())
-    .spawn()?;
-
-  Ok(Some(child))
+    .spawn()
 }
 
 fn wait_for_backend(token: &str) -> bool {
@@ -262,18 +177,19 @@ fn main() {
       }
 
       // First, because the backend, health checks and webview all depend on it.
-      let token = read_or_create_token()?;
+      let token = generate_token();
       app.manage(ApiToken(token.clone()));
 
-      let backend = launch_backend(&token);
-      if let Err(error) = &backend {
-        eprintln!("failed to launch backend: {error}");
-        show_main_window(app.handle());
-        return Ok(());
+      match launch_backend(&token) {
+        Ok(backend) => {
+          app.manage(BackendGuard(backend));
+        }
+        Err(error) => {
+          eprintln!("failed to launch backend: {error}");
+          show_main_window(app.handle());
+          return Ok(());
+        }
       }
-
-      let backend = backend?;
-      app.manage(BackendGuard(Arc::new(Mutex::new(backend))));
 
       let app_handle = app.handle();
       thread::spawn(move || {

@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
-DB_FILENAME = "bookscape.db"
+DB_PATH = Path(__file__).resolve().parents[1] / "data" / "bookscape.db"
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS books (
@@ -95,14 +95,8 @@ CREATE TABLE IF NOT EXISTS app_settings (
 """
 
 
-def db_path(root: Path) -> Path:
-    data_dir = root / "backend" / "data"
-    data_dir.mkdir(parents=True, exist_ok=True)
-    return data_dir / DB_FILENAME
-
-
-def get_connection(root: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path(root), timeout=5, check_same_thread=False)
+def get_connection() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH, timeout=5, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=5000")
@@ -111,8 +105,8 @@ def get_connection(root: Path) -> sqlite3.Connection:
 
 
 @contextmanager
-def transaction(root: Path) -> Iterator[sqlite3.Connection]:
-    conn = get_connection(root)
+def transaction() -> Iterator[sqlite3.Connection]:
+    conn = get_connection()
     try:
         yield conn
         conn.commit()
@@ -145,8 +139,9 @@ def _drop_obsidian_leftovers(conn: sqlite3.Connection) -> None:
     conn.execute("DELETE FROM app_settings WHERE key = 'obsidian_vault_path'")
 
 
-def init_app_db(root: Path) -> None:
-    conn = get_connection(root)
+def init_app_db() -> None:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = get_connection()
     try:
         conn.executescript(SCHEMA_SQL)
         _add_missing_columns(conn)

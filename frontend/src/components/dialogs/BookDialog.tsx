@@ -4,7 +4,7 @@ import {
   LoaderCircle, Hash, Sigma, Calendar, CalendarCheck, TextAlignStart,
 } from 'lucide-react'
 import { apiFetch } from '../../api.js'
-import { normaliseBook, formatCompactNumber } from '../../utils.js'
+import { formatCompactNumber } from '../../utils.js'
 import BookCover from '../books/BookCover.jsx'
 import DateProperty from './DateProperty.jsx'
 import GenrePills from '../books/GenrePills.jsx'
@@ -13,7 +13,7 @@ import { useLibraryData } from '../../context/LibraryDataContext.jsx'
 import { useNavigation } from '../../context/NavigationContext.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 import type { DialogCloseProps } from './Dialog.jsx'
-import type { Book, BookProps, Collection, RawBookPayload } from '../../types.js'
+import type { Book, BookProps, Collection } from '../../types.js'
 
 interface BookDialogProps extends BookProps, DialogCloseProps {
   isNavigation?: boolean
@@ -36,25 +36,26 @@ interface ReadingProgressRecord {
 
 const recordFromBook = (book: Book): ReadingProgressRecord => ({
   status: book.status,
-  current_page: book.currentPage,
-  total_pages: book.totalPages,
-  start_date: book.startDate,
-  finish_date: book.finishDate,
-  my_rating: book.myRating,
+  current_page: book.current_page,
+  total_pages: book.total_pages,
+  start_date: book.start_date,
+  finish_date: book.finish_date,
+  my_rating: book.my_rating,
   notes: book.notes,
 })
 
-// Saved-state fingerprint. Both sides must use exactly these fields or autosave fires on every open.
-const recordSignature = (record: ReadingProgressRecord): string => JSON.stringify({
-  status: String(record.status || 'done').trim().toLowerCase() || 'done',
-  current_page: Number(record.current_page) || 0,
-  total_pages: Number(record.total_pages) || 0,
-  start_date: String(record.start_date || '').trim(),
-  finish_date: String(record.finish_date || '').trim(),
-  // Rounded to the server's two decimals so the fingerprint matches the PUT response and autosave settles.
-  my_rating: Math.round((Number(record.my_rating) || 0) * 100) / 100,
-  notes: String(record.notes || '').trim(),
+// What gets saved, and so what autosave compares. Ranges are the server's to enforce.
+const toPayload = (record: ReadingProgressRecord) => ({
+  status: record.status,
+  current_page: parseInt(String(record.current_page), 10) || 0,
+  total_pages: parseInt(String(record.total_pages), 10) || 0,
+  start_date: record.start_date.trim(),
+  finish_date: record.finish_date.trim(),
+  my_rating: Number(record.my_rating) || 0,
+  notes: record.notes.trim(),
 })
+
+const recordSignature = (record: ReadingProgressRecord): string => JSON.stringify(toPayload(record))
 
 const STATUS_OPTIONS = [
   ['done', 'Finished'],
@@ -71,7 +72,7 @@ const TRACKED_STATUSES = ['reading', 'done', 'dnf']
 function BookDialog({ book: openedBook, isNavigation = false, exiting = false, cardRef, onClose }: BookDialogProps) {
   const { collections, booksByIds, addBookToCollection, applyBook } = useLibraryData()
   const book = booksByIds([openedBook.id])[0] || openedBook
-  const { onOpen, onOpenAuthor, onOpenSeries } = useNavigation()
+  const { onOpen, onOpenDrilldown } = useNavigation()
   const { showToast, showError } = useToast()
   const [view, setView] = useState<BookDialogView>(() => (
     TRACKED_STATUSES.includes(book.status) ? 'tracking' : 'library'
@@ -134,12 +135,11 @@ function BookDialog({ book: openedBook, isNavigation = false, exiting = false, c
   }
 
   const [collectionMenuOpen, setCollectionMenuOpen] = useState(false)
-  const [savingCollection, setSavingCollection] = useState('')
+  const [savingCollection, setSavingCollection] = useState<number | null>(null)
   const [highlighting, setHighlighting] = useState(false)
 
   const bookId = book.id
-  const displayBook = book
-  const similarBooks = booksByIds(book.similarIds)
+  const similarBooks = booksByIds(book.similar_book_ids)
   const dialogGenres = book.genres.slice(0, 5)
 
   // Tracking view state
@@ -166,26 +166,17 @@ function BookDialog({ book: openedBook, isNavigation = false, exiting = false, c
 
   const persistRecord = async (nextRecord: ReadingProgressRecord) => {
     try {
-      const payload = {
-        status: String(nextRecord.status || 'done').trim().toLowerCase() || 'done',
-        current_page: Math.max(0, parseInt(String(nextRecord.current_page), 10) || 0),
-        total_pages: Math.max(0, parseInt(String(nextRecord.total_pages), 10) || 0),
-        start_date: String(nextRecord.start_date || '').trim(),
-        finish_date: String(nextRecord.finish_date || '').trim(),
-        my_rating: Math.min(5, Math.max(0, Number(nextRecord.my_rating) || 0)),
-        notes: String(nextRecord.notes || '').trim(),
-      }
-      const data = await apiFetch<{ book: RawBookPayload }>(`/books/${bookId}/state`, {
+      const payload = toPayload(nextRecord)
+      const { book: saved } = await apiFetch<{ book: Book }>(`/books/${bookId}/state`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      const saved = normaliseBook(data.book)
       // Clearing Total Pages means "use the catalog's length". The server answers
       // with that length, and it must not appear in the field mid-edit.
       const nextSaved: ReadingProgressRecord = {
         ...recordFromBook(saved),
-        total_pages: payload.total_pages > 0 ? saved.totalPages : nextRecord.total_pages,
+        total_pages: payload.total_pages > 0 ? saved.total_pages : nextRecord.total_pages,
       }
       setRecord(nextSaved)
       lastSavedRef.current = recordSignature(nextSaved)
@@ -239,11 +230,11 @@ function BookDialog({ book: openedBook, isNavigation = false, exiting = false, c
     try {
       await addBookToCollection(collection.id, bookId)
       setCollectionMenuOpen(false)
-      showToast(`Added “${displayBook.title}” to ${collection.name}.`, { key: `collection:${bookId}` })
+      showToast(`Added “${book.title}” to ${collection.name}.`, { key: `collection:${bookId}` })
     } catch (err) {
       showError(err, 'Could not add this book.', `collection:${bookId}`)
     } finally {
-      setSavingCollection('')
+      setSavingCollection(null)
     }
   }
 
@@ -264,28 +255,28 @@ function BookDialog({ book: openedBook, isNavigation = false, exiting = false, c
         </button>
         <div className="dialogTop">
           <div className="dialogCover">
-            <BookCover book={displayBook} />
+            <BookCover book={book} />
           </div>
           <div className="dialogCopy">
-            <h2>{displayBook.title}</h2>
-            {displayBook.series ? (
+            <h2>{book.title}</h2>
+            {book.series ? (
               <button
                 type="button"
                 className="dialogSeries dialogSeriesButton"
-                onClick={() => onOpenSeries(displayBook.series)}
-                aria-label={`View the ${displayBook.series} series`}
+                onClick={() => onOpenDrilldown('series', book.series)}
+                aria-label={`View the ${book.series} series`}
               >
-                {displayBook.series}
-                {displayBook.seriesNumber ? ` #${displayBook.seriesNumber}` : ''}
+                {book.series}
+                {book.series_number ? ` #${book.series_number}` : ''}
               </button>
             ) : null}
-            {displayBook.author ? (
+            {book.author ? (
               <button
                 type="button"
                 className="dialogAuthor dialogAuthorButton"
-                onClick={() => onOpenAuthor(displayBook.author)}
+                onClick={() => onOpenDrilldown('author', book.author)}
               >
-                {displayBook.author}
+                {book.author}
               </button>
             ) : null}
 
@@ -331,29 +322,29 @@ function BookDialog({ book: openedBook, isNavigation = false, exiting = false, c
             {view === 'library' ? (
               <>
                 <div className="dialogStatsRow">
-                  {displayBook.rating > 0 && (
+                  {book.avg_rating > 0 && (
                     <span className="dialogStatItem">
                       <Star />
-                      <span>{displayBook.rating.toFixed(2)}{displayBook.ratingCount > 0 ? ` (${formatCompactNumber(displayBook.ratingCount)})` : ''}</span>
+                      <span>{book.avg_rating.toFixed(2)}{book.rating_count > 0 ? ` (${formatCompactNumber(book.rating_count)})` : ''}</span>
                     </span>
                   )}
-                  {displayBook.reviewCount > 0 && (
+                  {book.review_count > 0 && (
                     <span className="dialogStatItem">
                       <MessageSquareText />
-                      <span>{formatCompactNumber(displayBook.reviewCount)}</span>
+                      <span>{formatCompactNumber(book.review_count)}</span>
                     </span>
                   )}
-                  {displayBook.pages > 0 && (
+                  {book.total_pages > 0 && (
                     <span className="dialogStatItem">
                       <FileText />
-                      <span>{formatCompactNumber(displayBook.pages)} pages</span>
+                      <span>{formatCompactNumber(book.total_pages)} pages</span>
                     </span>
                   )}
                 </div>
 
                 {dialogGenres.length > 0 && <GenrePills genres={dialogGenres} />}
 
-                <p className="dialogBlurb">{displayBook.blurb || 'A great read from your library.'}</p>
+                <p className="dialogBlurb">{book.description || 'A great read from your library.'}</p>
 
                 <div className="dialogActionPanel">
                   <div className="dialogActionRow">
@@ -587,7 +578,7 @@ function BookDialog({ book: openedBook, isNavigation = false, exiting = false, c
         )}
 
         {highlighting && (
-          <HighlightDialog book={displayBook} onClose={() => setHighlighting(false)} />
+          <HighlightDialog book={book} onClose={() => setHighlighting(false)} />
         )}
       </article>
   )

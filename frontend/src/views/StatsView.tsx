@@ -10,7 +10,7 @@ import useStats from '../hooks/useStats.js'
 
 function StatsView() {
   const { summary, year, setYear } = useStats()
-  const { onOpenBooksRead } = useNavigation()
+  const { onOpenDrilldown } = useNavigation()
   const { books, availableYears: years } = summary
 
   if (years.length === 0) {
@@ -66,7 +66,7 @@ function StatsView() {
             title="Books read"
             subtitle={year ? "All the books you've read this year." : "All the books you've ever read."}
           >
-            <button type="button" className="statsSeeAll" onClick={() => onOpenBooksRead(year)}>
+            <button type="button" className="statsSeeAll" onClick={() => onOpenDrilldown('books-read', year)}>
               See all
             </button>
           </SectionHeader>

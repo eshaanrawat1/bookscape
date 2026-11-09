@@ -11,7 +11,7 @@ export interface BookCardProps extends BookProps {
 }
 
 function BookCard({ book, showRemoveButton = false, removeLabel = '', onRemove }: BookCardProps) {
-  const { onOpen, onOpenAuthor } = useNavigation()
+  const { onOpen, onOpenDrilldown } = useNavigation()
   const card = (
     <div className="bookCard">
       <button type="button" className="bookCardButton" onClick={() => onOpen(book)}>
@@ -27,7 +27,7 @@ function BookCard({ book, showRemoveButton = false, removeLabel = '', onRemove }
           className="bookAuthorButton"
           onClick={(event) => {
             event.stopPropagation()
-            onOpenAuthor(book.author)
+            onOpenDrilldown('author', book.author)
           }}
         >
           {book.author}

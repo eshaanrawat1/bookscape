@@ -4,53 +4,24 @@ from __future__ import annotations
 
 import os
 import secrets
-from pathlib import Path
 
 from starlette.datastructures import Headers
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 TOKEN_ENV_VAR = "BOOKSCAPE_API_TOKEN"
-TOKEN_FILENAME = ".api-token"
 TOKEN_HEADER = "x-bookscape-token"
 
-_CREATE_ATTEMPTS = 3
 
+def launch_token() -> str:
+    """The token Tauri generated for this launch; set the env var yourself to run the backend by hand.
 
-def token_path(root: Path) -> Path:
-    return root / "backend" / "data" / TOKEN_FILENAME
-
-
-def read_or_create_token(root: Path) -> str:
-    """Return the shared token, creating it at 0600 with O_EXCL if absent; the env var wins."""
-    env_token = os.getenv(TOKEN_ENV_VAR, "").strip()
-    if env_token:
-        return env_token
-
-    path = token_path(root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    for _ in range(_CREATE_ATTEMPTS):
-        try:
-            existing = path.read_text(encoding="utf-8").strip()
-        except FileNotFoundError:
-            existing = ""
-        if existing:
-            return existing
-
-        # An empty file is a crash caught mid-write; clear it or O_EXCL refuses forever.
-        path.unlink(missing_ok=True)
-
-        token = secrets.token_urlsafe(32)
-        try:
-            handle = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        except FileExistsError:
-            continue
-        with os.fdopen(handle, "w", encoding="utf-8") as fh:
-            fh.write(token)
-        return token
-
-    raise RuntimeError(f"could not establish an API token at {path}")
+    Taken out of the environment so the scraper and its browser never inherit it.
+    """
+    token = os.environ.pop(TOKEN_ENV_VAR, "").strip()
+    if not token:
+        raise RuntimeError(f"{TOKEN_ENV_VAR} is not set")
+    return token
 
 
 class TokenAuthMiddleware:

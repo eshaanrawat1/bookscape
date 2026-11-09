@@ -2,46 +2,53 @@ import { useState, type ReactNode } from 'react'
 import { ChevronRight, ExternalLink } from 'lucide-react'
 import { apiFetch, apiFetchStream } from '../../api.js'
 import Dialog, { DialogStatus, type DialogCloseProps } from './Dialog.jsx'
-import type { RawBookPayload } from '../../types.js'
+import type { Book } from '../../types.js'
 import { errorMessage } from '../../utils.js'
 
 const GOODREADS_URL = 'https://www.goodreads.com/'
 
+type CardBook = Pick<Book, 'title' | 'author' | 'image_url'>
+
+// Not yet a Book: what the scraper found, sent back unchanged to save it. A duplicate carries only the card fields.
+interface ScrapedBook extends CardBook {
+  uid: string
+  genres?: string[]
+  page_count?: number
+}
+
 interface ScraperDialogProps extends DialogCloseProps {
-  onSuccess: (book: RawBookPayload) => void
+  onSuccess: (book: Book) => void
 }
 
 interface PreviewEvent {
   stage: 'installing_browser' | 'fetching_page' | 'fetching_similar' | 'duplicate' | 'preview' | 'error'
   message?: string
-  book?: RawBookPayload
+  book?: ScrapedBook
 }
 
 interface ConfirmResponse {
   ok: boolean
-  book?: RawBookPayload
+  book?: Book
 }
 
 type Stage =
   | { kind: 'idle' }
   | { kind: 'fetching'; message: string }
-  | { kind: 'duplicate'; existing: RawBookPayload }
-  | { kind: 'preview'; book: RawBookPayload }
-  | { kind: 'saving'; book: RawBookPayload }
-  | { kind: 'success'; book: RawBookPayload }
+  | { kind: 'duplicate'; existing: ScrapedBook }
+  | { kind: 'preview'; book: ScrapedBook }
+  | { kind: 'saving'; book: ScrapedBook }
+  | { kind: 'success'; book: Book }
   | { kind: 'error'; message: string }
 
-function bookMeta(book: RawBookPayload): string {
+function scrapedMeta(book: ScrapedBook): string {
   const parts: string[] = []
-  const genres = Array.isArray(book.genres) ? book.genres.filter(Boolean) : []
-  if (genres[0]) parts.push(String(genres[0]))
-  const pages = Number(book.page_count)
-  if (Number.isFinite(pages) && pages > 0) parts.push(`${pages} pp`)
+  if (book.genres?.[0]) parts.push(book.genres[0])
+  if (book.page_count) parts.push(`${book.page_count} pp`)
   return parts.join(' · ')
 }
 
 interface PreviewCardProps {
-  book: RawBookPayload
+  book: CardBook
   meta?: string
   // Replaces the title and author, for a card that is announcing something.
   children?: ReactNode
@@ -51,15 +58,15 @@ function PreviewCard({ book, meta, children }: PreviewCardProps) {
   return (
     <div className="scraperPreviewCard">
       {book.image_url ? (
-        <img src={String(book.image_url)} alt="" className="scraperPreviewCover" />
+        <img src={book.image_url} alt="" className="scraperPreviewCover" />
       ) : (
         <div className="scraperPreviewCover scraperPreviewCoverPlaceholder">Cover</div>
       )}
       <div className="scraperPreviewInfo">
         {children ?? (
           <>
-            <p className="scraperPreviewTitle">{String(book.title || 'Untitled')}</p>
-            <p className="scraperPreviewAuthor">{String(book.author || '')}</p>
+            <p className="scraperPreviewTitle">{book.title || 'Untitled'}</p>
+            <p className="scraperPreviewAuthor">{book.author}</p>
             {meta !== undefined && <p className="scraperPreviewMeta">{meta}</p>}
           </>
         )}
@@ -104,7 +111,7 @@ function ScraperDialog({ onClose, onSuccess }: ScraperDialogProps) {
     }
   }
 
-  const confirmImport = async (book: RawBookPayload) => {
+  const confirmImport = async (book: ScrapedBook) => {
     setStage({ kind: 'saving', book })
     try {
       const res = await apiFetch<ConfirmResponse>('/scrape-book/confirm', {
@@ -219,7 +226,7 @@ function ScraperDialog({ onClose, onSuccess }: ScraperDialogProps) {
 
       {(stage.kind === 'preview' || stage.kind === 'saving') && (
         <div className="scraperForm">
-          <PreviewCard book={stage.book} meta={bookMeta(stage.book)} />
+          <PreviewCard book={stage.book} meta={scrapedMeta(stage.book)} />
 
           {stage.kind === 'saving' && (
             <DialogStatus>Saving to your library…</DialogStatus>

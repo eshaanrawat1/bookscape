@@ -2,7 +2,7 @@ import { useEffect, useRef, type FormEvent, type RefObject } from 'react'
 import { ChevronRight, Clock, Search, X } from 'lucide-react'
 import BookCover from '../components/books/BookCover.jsx'
 import BookGrid from '../components/books/BookGrid.jsx'
-import { formatCompactNumber } from '../utils.js'
+import { bookMeta } from '../utils.js'
 import useSearch from '../hooks/useSearch.js'
 import useRecentSearches from '../hooks/useRecentSearches.js'
 import useListNavigation from '../hooks/useListNavigation.js'
@@ -257,7 +257,7 @@ function SearchPreviewDropdown({
           <div className="searchPreviewCopy">
             <strong>{book.title}</strong>
             {book.author ? <span>{book.author}</span> : null}
-            <p>{previewMeta(book)}</p>
+            <p>{bookMeta(book)}</p>
           </div>
           <ChevronRight className="searchPreviewChevron" />
         </button>
@@ -267,13 +267,6 @@ function SearchPreviewDropdown({
       </button>
     </div>
   )
-}
-
-function previewMeta(book: Book): string {
-  const parts: string[] = []
-  if (book.genre) parts.push(book.genre)
-  if (book.pages) parts.push(`${formatCompactNumber(book.pages)} pages`)
-  return parts.join(' · ')
 }
 
 interface SearchLandingProps {

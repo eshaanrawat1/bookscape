@@ -2,78 +2,43 @@ import type { LucideIcon } from 'lucide-react'
 
 export type ReadingStatus = 'not_started' | 'want' | 'reading' | 'done' | 'dnf'
 
-// Shapes vary by endpoint; normaliseBook() is the single place that coerces them into a Book.
-export interface RawBookPayload {
-  id?: string
-  uid?: string
-  title?: string
-  author?: string
-  image_url?: string
-  description?: string
-  avg_rating?: number
-  rating_count?: number
-  review_count?: number
-  page_count?: number
-  series?: string
-  series_number?: string
-  genres?: string[]
-  similar_book_ids?: string[]
-  status?: ReadingStatus
-  current_page?: number
-  total_pages?: number
-  start_date?: string
-  finish_date?: string
-  my_rating?: number
-  notes?: string
-  updated_at?: string
-  [key: string]: unknown
-}
-
+// Exactly what the API sends, so a field has one name from the column to the component.
 export interface Book {
   id: string
   title: string
   author: string
-  cover: string
-  genre: string
-  genres: string[]
-  // seriesNumber stays text: Goodreads numbers novellas "1.5".
+  image_url: string
+  description: string
+  avg_rating: number
+  rating_count: number
+  review_count: number
   series: string
-  seriesNumber: string
-  pages: number
-  totalPages: number
-  currentPage: number
-  startDate: string
-  finishDate: string
-  rating: number
-  reviewCount: number
-  ratingCount: number
-  progress: number
+  // Stays text: Goodreads numbers novellas "1.5".
+  series_number: string
+  genres: string[]
+  similar_book_ids: string[]
   status: ReadingStatus
-  blurb: string
-  similarIds: string[]
+  current_page: number
+  // Your edition's length when it differs, otherwise the catalog's.
+  total_pages: number
+  start_date: string
+  finish_date: string
   // 0 is "not rated yet", as on the server.
-  myRating: number
+  my_rating: number
   notes: string
-  updatedAt: string
+  updated_at: string
 }
 
 export interface BookProps {
   book: Book
 }
 
-export interface RawCollection {
-  id: number
-  name: string
-  icon?: string
-  book_ids?: string[]
-}
-
 export interface Collection {
-  id: string
+  id: number
   name: string
   // A lucide name from collectionIcons.ts, or '' for the default dot.
   icon: string
-  bookIds: string[]
+  book_ids: string[]
 }
 
 export interface GenreSection {
@@ -82,36 +47,18 @@ export interface GenreSection {
 }
 
 // `page` is 0 for "no page recorded"; `note` is separate from the per-book notes field.
-export interface RawHighlight {
+export interface Highlight {
   id: number
   book_id: string
   text: string
   page: number
   note: string
   created_at: string
-  updated_at: string
 }
 
-export interface Highlight {
-  id: number
-  bookId: string
-  text: string
-  page: number
-  note: string
-  createdAt: string
-  updatedAt: string
-}
-
-export interface RawHighlightGroup {
-  book_id: string
-  highlights: RawHighlight[]
-}
-
-// Newest first; the backend drops groups whose catalog row is gone, so `book` is always present.
+// Newest-highlighted book first.
 export interface HighlightGroup {
-  bookId: string
   book: Book
-  count: number
   highlights: Highlight[]
 }
 
@@ -170,12 +117,10 @@ export interface LibraryDataContextValue {
   booksByIds: (ids: string[]) => Book[]
   // Puts one changed book into the list, or adds it if it is new.
   applyBook: (book: Book) => void
-  // Refetches everything and resolves with the fresh list of books.
-  addBookToCollection: (collectionId: string, bookId: string) => Promise<void>
-  removeBookFromCollection: (collectionId: string, bookId: string) => Promise<void>
+  addBookToCollection: (collectionId: number, bookId: string) => Promise<void>
+  removeBookFromCollection: (collectionId: number, bookId: string) => Promise<void>
   createCollection: () => Promise<Collection | undefined>
-  renameCollection: (collection: Collection, name: string) => Promise<void>
-  setCollectionIcon: (collection: Collection, icon: string) => Promise<void>
+  updateCollection: (collectionId: number, fields: { name?: string; icon?: string }) => Promise<void>
   deleteCollection: (collection: Collection) => Promise<void>
 }
 
@@ -199,13 +144,12 @@ export interface ToastContextValue {
   showError: (err: unknown, fallback: string, key?: ToastOptions['key']) => void
 }
 
+export type DrilldownKind = 'author' | 'series' | 'genre' | 'books-read'
+
 export interface NavigationContextValue {
   onOpen: (book: Book) => void
-  onOpenAuthor: (author: string) => void
-  onOpenSeries: (series: string) => void
-  onOpenGenre: (genre: string) => void
-  // The stats page's Books read drilldown. '' is all time, as on the stats page.
-  onOpenBooksRead: (year: string) => void
+  // For 'books-read' the value is a year, or '' for all time.
+  onOpenDrilldown: (kind: DrilldownKind, value: string) => void
   onOpenWantToRead: () => void
   onEditReadingGoal: () => void
 }

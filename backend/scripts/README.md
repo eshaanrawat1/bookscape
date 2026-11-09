@@ -5,7 +5,7 @@ one exception noted below: the app shells out to `scraper.py --fetch-one`.
 
 All resolve their paths relative to `backend/data/`, so they can be run from
 any directory, and all write straight into `bookscape.db` through the same
-`upsert_book()` / repository the API uses. There is no intermediate file: the
+`upsert_book()` the API uses. There is no intermediate file: the
 database is the single source of truth.
 
 ```

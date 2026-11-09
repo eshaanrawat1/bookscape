@@ -6,8 +6,7 @@ from pathlib import Path
 from typing import Callable
 
 from ..db import transaction
-from ..repository import DataRepository
-from .catalog import list_books, upsert_book
+from .catalog import list_books, upsert_book, upsert_book_state
 from .csv_utils import (
     LIST_SEPARATOR,
     parse_date,
@@ -72,11 +71,12 @@ def _export_row(book: dict, tracked: bool) -> dict:
     return {name: _escape_formula(value) for name, value in row.items()}
 
 
-def export_books_csv(root: Path, path: Path) -> int:
+def export_books_csv(path: Path) -> int:
     """Write every catalog book to `path`; books never tracked have blank reading columns."""
-    states = DataRepository(root).list_book_states()
-    books = sorted(list_books(root), key=lambda b: (b["title"].casefold(), b["id"]))
-    rows = [_export_row(book, book["id"] in states) for book in books]
+    with transaction() as conn:
+        tracked = {row["uid"] for row in conn.execute("SELECT uid FROM user_book_state")}
+    books = sorted(list_books(), key=lambda b: (b["title"].casefold(), b["id"]))
+    rows = [_export_row(book, book["id"] in tracked) for book in books]
 
     # The BOM is what makes Excel read the file as UTF-8.
     with path.open("w", encoding="utf-8-sig", newline="") as f:
@@ -136,11 +136,10 @@ def _read_rows(path: Path) -> list[tuple[int, dict[str, str]]]:
         raise ValueError(f"Could not parse the CSV: {e}") from e
 
 
-def import_books_csv(root: Path, path: Path) -> ImportResult:
+def import_books_csv(path: Path) -> ImportResult:
     """Upsert each row by uid; bad rows are skipped and reported, and nothing is ever deleted."""
     rows = _read_rows(path)
-    repo = DataRepository(root)
-    with transaction(root) as conn:
+    with transaction() as conn:
         known_uids = {row["uid"] for row in conn.execute("SELECT uid FROM books")}
 
     result = ImportResult(imported=0)
@@ -158,9 +157,9 @@ def import_books_csv(root: Path, path: Path) -> ImportResult:
             continue
 
         if book:
-            upsert_book(root, {"uid": uid, **book})
+            upsert_book({"uid": uid, **book})
         if state:
-            repo.upsert_book_state(uid, **state)
+            upsert_book_state(uid, **state)
         known_uids.add(uid)
         result.imported += 1
 

@@ -3,12 +3,12 @@ import { Minus, Plus } from 'lucide-react'
 import Dialog, { type DialogCloseProps } from './Dialog.jsx'
 import { createHighlight } from '../../hooks/useHighlights.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import type { BookProps, RawHighlightGroup } from '../../types.js'
+import type { BookProps, Highlight } from '../../types.js'
 import { errorMessage } from '../../utils.js'
 
 interface HighlightDialogProps extends BookProps, DialogCloseProps {
-  // Gets the refreshed group so a caller showing the list can patch it in place.
-  onCreated?: (group: RawHighlightGroup) => void
+  // Gets the refreshed list so a caller showing it can swap it in.
+  onCreated?: (highlights: Highlight[]) => void
 }
 
 const onlyDigits = (raw: string): string => raw.replace(/\D/g, '').slice(0, 6)
@@ -33,8 +33,7 @@ function HighlightDialog({ book, onClose, onCreated }: HighlightDialogProps) {
     setSaving(true)
     setError(null)
     try {
-      const group = await createHighlight(book.id, text.trim(), pageNumber)
-      onCreated?.(group)
+      onCreated?.(await createHighlight(book.id, text.trim(), pageNumber))
       showToast('Highlight saved.', { key: `highlight:${book.id}` })
       onClose()
     } catch (err) {

@@ -1,21 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Menu, Plus, Upload, Download, ArrowLeft } from 'lucide-react'
 
 import { apiFetch, BOOTSTRAP_RETRIES, BOOTSTRAP_RETRY_DELAY_MS } from './api.js'
 import {
   sleep,
   loadBootstrapData,
-  mapCollections,
   nextCollectionName,
-  normaliseBook,
-  authorViewId,
-  authorNameFromView,
-  seriesViewId,
-  seriesNameFromView,
-  genreViewId,
-  genreNameFromView,
-  booksReadViewId,
-  booksReadYearFromView,
+  drilldownView,
+  drilldownValue,
   errorMessage,
 } from './utils.js'
 import { viewMeta, shortcutLabel } from './constants.js'
@@ -47,20 +39,46 @@ import SeriesView from './views/SeriesView.jsx'
 import GenreView from './views/GenreView.jsx'
 import BooksReadView from './views/BooksReadView.jsx'
 import CollectionView from './views/CollectionView.jsx'
-import type { Book, Collection, CsvAction, RawCollection } from './types.js'
+import type { Book, Collection, CsvAction, DrilldownKind } from './types.js'
 
 const CSV_FILTERS = [{ name: 'CSV', extensions: ['csv'] }]
 const CSV_TOAST_KEY = 'csv'
 
-// Pages with a Back link and where it lands when there's no history.
-const DRILLDOWNS = [
-  { prefix: 'author:', fallback: 'library' },
-  { prefix: 'series:', fallback: 'library' },
-  { prefix: 'genre:', fallback: 'library' },
-  { prefix: 'books-read:', fallback: 'stats' },
-]
+interface Drilldown {
+  // Where Back lands when there's no history.
+  fallback: string
+  meta: (value: string) => { title: string; subtitle?: string }
+  render: (value: string) => ReactNode
+}
 
-const drilldownFor = (view: string) => DRILLDOWNS.find(({ prefix }) => view.startsWith(prefix))
+// Pages with a Back link, keyed by the prefix of their view id.
+const DRILLDOWNS: Record<DrilldownKind, Drilldown> = {
+  author: {
+    fallback: 'library',
+    meta: (author) => ({ title: author || 'Author' }),
+    render: (author) => <AuthorView author={author} />,
+  },
+  series: {
+    fallback: 'library',
+    meta: (series) => ({ title: series || 'Series' }),
+    render: (series) => <SeriesView series={series} />,
+  },
+  genre: {
+    fallback: 'library',
+    meta: (genre) => ({ title: genre || 'Genre' }),
+    render: (genre) => <GenreView genre={genre} />,
+  },
+  'books-read': {
+    fallback: 'stats',
+    meta: (year) => ({
+      title: 'Books read',
+      subtitle: year ? `Everything you finished in ${year}.` : "Everything you've ever finished.",
+    }),
+    render: (year) => <BooksReadView year={year} />,
+  },
+}
+
+const drilldownFor = (view: string): Drilldown | undefined => DRILLDOWNS[view.split(':')[0] as DrilldownKind]
 
 export default function App() {
   const { showToast, showError } = useToast()
@@ -71,6 +89,7 @@ export default function App() {
 
   const [books, setBooks] = useState<Book[]>([])
   const [collections, setCollections] = useState<Collection[]>([])
+  const [goalTarget, setGoalTarget] = useState(0)
   const [loading, setLoading] = useState(true)
   const [csvBusy, setCsvBusy] = useState<CsvAction | null>(null)
   const [showScraperDialog, setShowScraperDialog] = useState(false)
@@ -92,6 +111,12 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
+  function applyBootstrapData(data: Awaited<ReturnType<typeof loadBootstrapData>>) {
+    setBooks(data.books)
+    setCollections(data.collections)
+    setGoalTarget(data.goalTarget)
+  }
+
   useEffect(() => {
     let cancelled = false
     async function load() {
@@ -102,8 +127,7 @@ export default function App() {
             const data = await loadBootstrapData()
             if (cancelled) return
 
-            setBooks(data.books)
-            setCollections(data.collections)
+            applyBootstrapData(data)
             setError(null)
             return
           } catch (err) {
@@ -126,10 +150,7 @@ export default function App() {
   }, [])
 
   async function reloadAppData(): Promise<void> {
-    const data = await loadBootstrapData()
-
-    setBooks(data.books)
-    setCollections(data.collections)
+    applyBootstrapData(await loadBootstrapData())
   }
 
   const applyBook = useCallback((book: Book) => {
@@ -147,59 +168,32 @@ export default function App() {
   )
   const { currentlyReading, wantToRead, finished, dnf } = useMemo(() => selectShelves(books), [books])
 
-  const readingGoal = useReadingGoal(finished)
+  const readingGoal = useReadingGoal(finished, goalTarget, setGoalTarget, loading)
 
   const activeCollection = view.startsWith('collection:')
     ? collections.find((c) => `collection:${c.id}` === view)
     : null
-  const activeAuthorName = authorNameFromView(view)
-  const activeSeriesName = seriesNameFromView(view)
-  const activeGenreName = genreNameFromView(view)
-  const activeBooksReadYear = booksReadYearFromView(view)
-  const meta: { title?: string; subtitle?: string; name?: string } | undefined = activeCollection
-    ? { ...activeCollection, subtitle: 'Kept together on purpose.' }
-    : view.startsWith('author:')
-      ? { title: activeAuthorName || 'Author' }
-      : view.startsWith('series:')
-        ? { title: activeSeriesName || 'Series' }
-        : view.startsWith('genre:')
-          ? { title: activeGenreName || 'Genre' }
-          : view.startsWith('books-read:')
-            ? {
-              title: 'Books read',
-              subtitle: activeBooksReadYear
-                ? `Everything you finished in ${activeBooksReadYear}.`
-                : "Everything you've ever finished.",
-            }
-            : viewMeta[view]
+  const activeDrilldown = drilldownFor(view)
+  const meta: { title: string; subtitle?: string } | undefined = activeCollection
+    ? { title: activeCollection.name, subtitle: 'Kept together on purpose.' }
+    : activeDrilldown
+      ? activeDrilldown.meta(drilldownValue(view))
+      : viewMeta[view]
 
   const openBookDialog = (book: Book) =>
     setSelected((prev) => ({ book, isNavigation: prev !== null }))
 
   // Hopping between drilldowns keeps the original return target, so Back leaves the drilldown.
-  const openDrilldown = (target: string) => {
-    setPreviousView((current) => (drilldownFor(target) === drilldownFor(view) ? current : view))
+  const openDrilldown = (kind: DrilldownKind, value: string) => {
+    if (!value.trim() && kind !== 'books-read') return
+    setPreviousView((current) => (DRILLDOWNS[kind] === activeDrilldown ? current : view))
     setSelected(null)
     setMobileNav(false)
-    setView(target)
+    setView(drilldownView(kind, value))
   }
-  const openAuthorPage = (author: string) => {
-    const cleanAuthor = String(author || '').trim()
-    if (cleanAuthor) openDrilldown(authorViewId(cleanAuthor))
-  }
-  const openSeriesPage = (series: string) => {
-    const cleanSeries = String(series || '').trim()
-    if (cleanSeries) openDrilldown(seriesViewId(cleanSeries))
-  }
-  const openGenrePage = (genre: string) => {
-    const cleanGenre = String(genre || '').trim()
-    if (cleanGenre) openDrilldown(genreViewId(cleanGenre))
-  }
-  const openBooksReadPage = (year: string) => openDrilldown(booksReadViewId(year))
   const goBack = () => {
-    const drilldown = drilldownFor(view)
-    if (!drilldown) return
-    setView(previousView && !previousView.startsWith(drilldown.prefix) ? previousView : drilldown.fallback)
+    if (!activeDrilldown) return
+    setView(drilldownFor(previousView) === activeDrilldown ? activeDrilldown.fallback : previousView)
     setMobileNav(false)
   }
   // A sidebar destination, not a drilldown, so previousView stays untouched.
@@ -230,30 +224,25 @@ export default function App() {
   // Every collection route answers with the full list, ids only, so this is
   // cheap and leaves nothing to merge.
   async function sendCollections(path: string, method: string, body?: object) {
-    const data = await apiFetch<{ id?: number; collections?: RawCollection[] }>(path, {
+    const data = await apiFetch<{ id?: number; collections: Collection[] }>(path, {
       method,
       headers: body ? { 'Content-Type': 'application/json' } : undefined,
       body: body ? JSON.stringify(body) : undefined,
     })
-    const next = mapCollections(data.collections)
-    setCollections(next)
-    return { createdId: String(data.id ?? ''), next }
+    setCollections(data.collections)
+    return data
   }
 
   async function createCollection(): Promise<Collection | undefined> {
-    const { createdId, next } = await sendCollections('/collections', 'POST', {
+    const { id, collections: next } = await sendCollections('/collections', 'POST', {
       name: nextCollectionName(collections),
     })
-    setView(`collection:${createdId}`)
-    return next.find((collection) => collection.id === createdId)
+    setView(`collection:${id}`)
+    return next.find((collection) => collection.id === id)
   }
 
-  async function renameCollection(collection: Collection, name: string): Promise<void> {
-    await sendCollections(`/collections/${collection.id}`, 'PATCH', { name })
-  }
-
-  async function setCollectionIcon(collection: Collection, icon: string): Promise<void> {
-    await sendCollections(`/collections/${collection.id}`, 'PATCH', { icon })
+  async function updateCollection(collectionId: number, fields: { name?: string; icon?: string }): Promise<void> {
+    await sendCollections(`/collections/${collectionId}`, 'PATCH', fields)
   }
 
   async function deleteCollection(collection: Collection): Promise<void> {
@@ -263,11 +252,11 @@ export default function App() {
     }
   }
 
-  async function addBookToCollection(collectionId: string, bookId: string): Promise<void> {
+  async function addBookToCollection(collectionId: number, bookId: string): Promise<void> {
     await sendCollections(`/collections/${collectionId}/books`, 'POST', { book_id: bookId })
   }
 
-  async function removeBookFromCollection(collectionId: string, bookId: string): Promise<void> {
+  async function removeBookFromCollection(collectionId: number, bookId: string): Promise<void> {
     await sendCollections(`/collections/${collectionId}/books/${bookId}`, 'DELETE')
   }
 
@@ -331,17 +320,13 @@ export default function App() {
     addBookToCollection,
     removeBookFromCollection,
     createCollection,
-    renameCollection,
-    setCollectionIcon,
+    updateCollection,
     deleteCollection,
   }
 
   const navigation = {
     onOpen: openBookDialog,
-    onOpenAuthor: openAuthorPage,
-    onOpenSeries: openSeriesPage,
-    onOpenGenre: openGenrePage,
-    onOpenBooksRead: openBooksReadPage,
+    onOpenDrilldown: openDrilldown,
     onOpenWantToRead: openWantToRead,
     onEditReadingGoal: () => setShowGoalDialog(true),
   }
@@ -398,13 +383,13 @@ export default function App() {
                     <Menu />
                   </button>
                   <div>
-                    {drilldownFor(view) && (
+                    {activeDrilldown && (
                       <button type="button" className="kickerLink" onClick={goBack}>
                         <ArrowLeft size={14} />
                         Back
                       </button>
                     )}
-                    <h1>{meta?.title || meta?.name}</h1>
+                    <h1>{meta?.title}</h1>
                     <p>{meta?.subtitle}</p>
                   </div>
                 </div>
@@ -428,8 +413,7 @@ export default function App() {
           {showScraperDialog && (
             <ScraperDialog
               onClose={() => setShowScraperDialog(false)}
-              onSuccess={(newBook) => {
-                const book = normaliseBook(newBook)
+              onSuccess={(book) => {
                 setShowScraperDialog(false)
                 applyBook(book)
                 setSelected({ book })
@@ -459,6 +443,9 @@ function ViewContent({ view }: { view: string }) {
     return <CollectionView activeCollection={activeCollection} />
   }
 
+  const drilldown = drilldownFor(view)
+  if (drilldown) return drilldown.render(drilldownValue(view))
+
   switch (view) {
     case 'reading-now':
       return <ReadingNow />
@@ -477,18 +464,6 @@ function ViewContent({ view }: { view: string }) {
     case 'dnf':
       return <BookGrid books={dnf} />
     default:
-      if (view.startsWith('author:')) {
-        return <AuthorView author={authorNameFromView(view)} />
-      }
-      if (view.startsWith('series:')) {
-        return <SeriesView series={seriesNameFromView(view)} />
-      }
-      if (view.startsWith('genre:')) {
-        return <GenreView genre={genreNameFromView(view)} />
-      }
-      if (view.startsWith('books-read:')) {
-        return <BooksReadView year={booksReadYearFromView(view)} />
-      }
       return null
   }
 }

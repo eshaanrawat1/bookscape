@@ -39,7 +39,7 @@ function SeriesView({ series }: SeriesViewProps) {
   const { books: allBooks } = useLibraryData()
   const books = useMemo(() => selectSeriesBooks(allBooks, series), [allBooks, series])
 
-  const numbered = books.filter((book) => book.seriesNumber).length
+  const numbered = books.filter((book) => book.series_number).length
   const summary = summariseSeries(books)
 
   return (
@@ -81,8 +81,8 @@ function SeriesBookRow({ book, isNextUp }: SeriesBookRowProps) {
       className="seriesBookRow"
       leading={
         // Unnumbered books keep the slot so covers stay aligned.
-        <span className="seriesBookRowNumber" aria-hidden={!book.seriesNumber}>
-          {book.seriesNumber ? `#${book.seriesNumber}` : ''}
+        <span className="seriesBookRowNumber" aria-hidden={!book.series_number}>
+          {book.series_number ? `#${book.series_number}` : ''}
         </span>
       }
       trailing={

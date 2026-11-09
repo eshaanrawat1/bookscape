@@ -8,10 +8,10 @@ interface BookCoverProps extends BookProps {
 
 function BookCover({ book, lazy = false }: BookCoverProps) {
   const [loaded, setLoaded] = useState(false)
-  const prevCoverRef = useRef(book.cover)
+  const prevCoverRef = useRef(book.image_url)
 
-  if (prevCoverRef.current !== book.cover) {
-    prevCoverRef.current = book.cover
+  if (prevCoverRef.current !== book.image_url) {
+    prevCoverRef.current = book.image_url
     setLoaded(false)
   }
 
@@ -29,7 +29,7 @@ function BookCover({ book, lazy = false }: BookCoverProps) {
       <div className="coverImage">
         <div className="spineShadow" />
         <img
-          src={book.cover}
+          src={book.image_url}
           alt={`Cover of ${book.title} by ${book.author}`}
           className={loaded ? 'coverLoaded' : ''}
           loading={lazy ? 'lazy' : undefined}

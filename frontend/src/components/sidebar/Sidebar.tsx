@@ -19,15 +19,14 @@ function Sidebar({ active, onSelect }: SidebarProps) {
   const {
     collections,
     createCollection: onCreateCollection,
-    renameCollection: onRenameCollection,
-    setCollectionIcon: onSetCollectionIcon,
+    updateCollection,
     deleteCollection: onDeleteCollection,
   } = useLibraryData()
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<number | null>(null)
   const [draftName, setDraftName] = useState('')
   const [collectionError, setCollectionError] = useState('')
   const [saving, setSaving] = useState(false)
-  const [iconPicker, setIconPicker] = useState<{ id: string; anchor: HTMLElement } | null>(null)
+  const [iconPicker, setIconPicker] = useState<{ id: number; anchor: HTMLElement } | null>(null)
   const [pendingDelete, setPendingDelete] = useState<Collection | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -56,7 +55,7 @@ function Sidebar({ active, onSelect }: SidebarProps) {
 
     setSaving(true)
     try {
-      await onRenameCollection(collection, clean)
+      await updateCollection(collection.id, { name: clean })
       setEditingId(null)
       setCollectionError('')
     } catch (err) {
@@ -71,7 +70,7 @@ function Sidebar({ active, onSelect }: SidebarProps) {
     if (icon === collection.icon) return
     setCollectionError('')
     try {
-      await onSetCollectionIcon(collection, icon)
+      await updateCollection(collection.id, { icon })
     } catch (err) {
       setCollectionError(errorMessage(err, 'Could not change the icon.'))
     }
@@ -145,7 +144,7 @@ function Sidebar({ active, onSelect }: SidebarProps) {
             const id = `collection:${collection.id}`
             const isActive = active === id
             const isEditing = editingId === collection.id
-            const bookCount = collection.bookIds.length
+            const bookCount = collection.book_ids.length
             // An icon name the current lucide set no longer has resolves to
             // null, and the row quietly falls back to the plain dot.
             const Icon = resolveCollectionIcon(collection.icon)

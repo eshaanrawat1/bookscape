@@ -50,10 +50,10 @@ function BookListRow({ book, subtitle, className, leading, trailing }: BookListR
         </div>
         {trailing}
         <span className="authorBookRowRating">
-          {book.rating > 0 ? (
+          {book.avg_rating > 0 ? (
             <>
               <Star fill="currentColor" />
-              <span>{book.rating.toFixed(2)}</span>
+              <span>{book.avg_rating.toFixed(2)}</span>
             </>
           ) : null}
         </span>

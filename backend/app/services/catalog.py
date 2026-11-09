@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import difflib
 import json
-from pathlib import Path
+import sqlite3
+from typing import Iterable, Literal, get_args
 
 from ..db import transaction
-from ..utils import clamp_my_rating
+
+Status = Literal["not_started", "want", "reading", "done", "dnf"]
+VALID_STATUSES = set(get_args(Status))
 
 BOOK_COLUMNS = {
     "title",
@@ -23,15 +26,44 @@ BOOK_COLUMNS = {
     "scraped_at",
 }
 
+STATE_COLUMNS = {
+    "status",
+    "current_page",
+    "total_pages",
+    "start_date",
+    "finish_date",
+    "my_rating",
+    "notes",
+}
+
 NON_GENRE_NAMES = {"...more", "…more", "more"}
 
+# The one shape a book takes: what Goodreads says plus what you say. No state row
+# means not started, and a total_pages of 0 means the catalog's own length.
+_BOOK_SELECT = """
+SELECT
+  b.uid AS id,
+  COALESCE(NULLIF(b.title, ''), 'Untitled') AS title,
+  b.author, b.image_url, b.description, b.avg_rating, b.rating_count, b.review_count,
+  b.page_count, b.series, b.series_number, b.genres, b.similar_book_ids,
+  COALESCE(s.status, 'not_started') AS status,
+  COALESCE(s.current_page, 0) AS current_page,
+  COALESCE(NULLIF(s.total_pages, 0), b.page_count) AS total_pages,
+  COALESCE(s.start_date, '') AS start_date,
+  COALESCE(s.finish_date, '') AS finish_date,
+  COALESCE(s.my_rating, 0) AS my_rating,
+  COALESCE(s.notes, '') AS notes,
+  COALESCE(s.updated_at, '') AS updated_at
+FROM books b LEFT JOIN user_book_state s ON s.uid = b.uid
+"""
 
-def _parse_json_list(value: object) -> list:
-    try:
-        parsed = json.loads(value) if value else []
-        return parsed if isinstance(parsed, list) else []
-    except Exception:
-        return []
+# No row means not started, so a row that has gone back to saying nothing is
+# removed rather than kept as an empty stand-in for the same fact.
+_DELETE_IF_EMPTY = """
+DELETE FROM user_book_state
+WHERE uid = ? AND status = 'not_started' AND current_page = 0 AND total_pages = 0
+  AND start_date = '' AND finish_date = '' AND my_rating = 0 AND notes = ''
+"""
 
 
 def _clean_genres(names: list | None) -> list[str]:
@@ -47,57 +79,40 @@ def _clean_genres(names: list | None) -> list[str]:
     return clean
 
 
-def _to_book(row, state: dict | None) -> dict:
-    """The one shape a book takes: what Goodreads says plus what you say."""
-    state = state or {}
-    page_count = int(row["page_count"] or 0)
+def _to_book(row: sqlite3.Row) -> dict:
     return {
-        "id": row["uid"],
-        "title": row["title"],
-        "author": row["author"],
-        "image_url": row["image_url"],
-        "description": row["description"],
-        "avg_rating": float(row["avg_rating"] or 0),
-        "rating_count": int(row["rating_count"] or 0),
-        "review_count": int(row["review_count"] or 0),
-        "page_count": page_count,
-        "series": row["series"],
-        "series_number": row["series_number"],
-        "genres": _parse_json_list(row["genres"]),
-        "similar_book_ids": [str(sid) for sid in _parse_json_list(row["similar_book_ids"])],
-        "status": str(state.get("status") or "not_started"),
-        "current_page": int(state.get("current_page") or 0),
-        "total_pages": int(state.get("total_pages") or 0) or page_count,
-        "start_date": str(state.get("start_date") or ""),
-        "finish_date": str(state.get("finish_date") or ""),
-        "my_rating": clamp_my_rating(state.get("my_rating")),
-        "notes": str(state.get("notes") or ""),
-        "updated_at": str(state.get("updated_at") or ""),
+        **dict(row),
+        "genres": json.loads(row["genres"]),
+        "similar_book_ids": json.loads(row["similar_book_ids"]),
     }
 
 
-def list_books(root: Path) -> list[dict]:
-    with transaction(root) as conn:
-        rows = conn.execute("SELECT * FROM books").fetchall()
-        states = {row["uid"]: dict(row) for row in conn.execute("SELECT * FROM user_book_state")}
-    return [_to_book(row, states.get(row["uid"])) for row in rows]
+def list_books() -> list[dict]:
+    with transaction() as conn:
+        return [_to_book(row) for row in conn.execute(_BOOK_SELECT)]
 
 
-def resolve_book(root: Path, book_id: str) -> dict | None:
-    book_id = str(book_id or "").strip()
-    if not book_id:
-        return None
-    with transaction(root) as conn:
-        row = conn.execute("SELECT * FROM books WHERE uid = ?", (book_id,)).fetchone()
-        if not row:
-            return None
-        state = conn.execute("SELECT * FROM user_book_state WHERE uid = ?", (book_id,)).fetchone()
-    return _to_book(row, dict(state) if state else None)
+def resolve_book(book_id: str) -> dict | None:
+    with transaction() as conn:
+        row = conn.execute(f"{_BOOK_SELECT} WHERE b.uid = ?", (book_id,)).fetchone()
+    return _to_book(row) if row else None
 
 
-def upsert_book(root: Path, book: dict) -> None:
-    """Insert or partially update a catalog row. Only keys present in `book` are
-    touched, so a partial dict never blanks a field it does not carry."""
+def _upsert(
+    conn: sqlite3.Connection, table: str, uid: str, fields: dict, also_set: Iterable[str] = ()
+) -> None:
+    """Insert or partially update a row: only the columns in `fields` are touched."""
+    columns = ", ".join(["uid", *fields])
+    placeholders = ", ".join("?" * (len(fields) + 1))
+    assignments = [*(f"{c} = excluded.{c}" for c in fields), *also_set]
+    conflict = "DO UPDATE SET " + ", ".join(assignments) if assignments else "DO NOTHING"
+    conn.execute(
+        f"INSERT INTO {table} ({columns}) VALUES ({placeholders}) ON CONFLICT(uid) {conflict}",
+        [uid, *fields.values()],
+    )
+
+
+def upsert_book(book: dict) -> None:
     uid = str(book.get("uid") or "").strip()
     if not uid:
         raise ValueError("book uid is required")
@@ -108,36 +123,47 @@ def upsert_book(root: Path, book: dict) -> None:
     if "similar_book_ids" in fields:
         fields["similar_book_ids"] = json.dumps(fields["similar_book_ids"] or [])
 
-    columns = list(fields.keys())
-    col_list = ", ".join(["uid", *columns])
-    placeholders = ", ".join(["?"] * (len(columns) + 1))
-    conflict = (
-        "DO UPDATE SET " + ", ".join(f"{c} = excluded.{c}" for c in columns)
-        if columns
-        else "DO NOTHING"
-    )
+    with transaction() as conn:
+        _upsert(conn, "books", uid, fields)
 
-    with transaction(root) as conn:
-        conn.execute(
-            f"INSERT INTO books ({col_list}) VALUES ({placeholders}) ON CONFLICT(uid) {conflict}",
-            [uid, *fields.values()],
+
+def upsert_book_state(uid: str, **fields) -> None:
+    fields = {k: v for k, v in fields.items() if k in STATE_COLUMNS}
+
+    # A DNF has no finish date, or it adds an empty stats year. Here so CSV imports are covered too.
+    if fields.get("status") == "dnf":
+        fields["finish_date"] = ""
+
+    with transaction() as conn:
+        # Every caller hands over the length it was shown, which is usually
+        # the catalog's own. Storing that would freeze a copy that a later
+        # re-scrape could not correct, so only a real difference is kept.
+        if "total_pages" in fields:
+            book = conn.execute("SELECT page_count FROM books WHERE uid = ?", (uid,)).fetchone()
+            if book and fields["total_pages"] == book["page_count"]:
+                fields["total_pages"] = 0
+
+        _upsert(
+            conn,
+            "user_book_state",
+            uid,
+            fields,
+            also_set=["updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')"],
         )
+        conn.execute(_DELETE_IF_EMPTY, (uid,))
 
 
-def search_book_ids(root: Path, query: str, limit: int = 10) -> list[str]:
+def search_book_ids(query: str, limit: int = 10) -> list[str]:
     """Ids of the best matches, best first. The client already holds the books."""
-    q = str(query or "").lower().strip()
+    q = query.lower().strip()
     if not q:
         return []
 
     scored = []
-    for book in list_books(root):
+    for book in list_books():
         title_lower = book["title"].strip().lower()
-        if not title_lower:
-            continue
-
         author_lower = book["author"].strip().lower()
-        genres_text = " ".join(str(g) for g in book["genres"])
+        genres_text = " ".join(book["genres"])
         text_lower = f"{title_lower} {author_lower} {genres_text} {book['description']}".lower()
 
         if title_lower.startswith(q):

@@ -544,11 +544,11 @@ def _now() -> str:
 
 def save_book(book: Book) -> None:
     """Write a scraped book through the app's upsert, which only touches the keys present."""
-    upsert_book(PROJECT_ROOT, asdict(book))
+    upsert_book(asdict(book))
 
 
 def already_scraped(uid: str) -> bool:
-    return bool(uid) and resolve_book(PROJECT_ROOT, uid) is not None
+    return bool(uid) and resolve_book(uid) is not None
 
 
 # Playwright's browser cache lives outside the app and can go missing, so repair it in place.
@@ -790,7 +790,7 @@ def main():
         print(json.dumps(Frontier().stats(), indent=2))
         return
 
-    init_app_db(PROJECT_ROOT)
+    init_app_db()
     frontier = Frontier()
     limiter  = RateLimiter()
 

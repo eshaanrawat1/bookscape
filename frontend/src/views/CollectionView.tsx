@@ -13,7 +13,7 @@ function CollectionView({ activeCollection }: CollectionViewProps) {
   return (
     <div className="stack">
       <BookGrid
-        books={booksByIds(activeCollection.bookIds)}
+        books={booksByIds(activeCollection.book_ids)}
         showRemoveButton
         removeLabel={activeCollection.name}
         onRemove={(bookId) => removeBookFromCollection(activeCollection.id, bookId)}
