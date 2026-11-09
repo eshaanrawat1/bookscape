@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiFetch } from '../api.js'
-import { normaliseBook } from '../utils.js'
+import { normaliseBook, errorMessage } from '../utils.js'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
-import type { Book, RawBookPayload } from '../types.js'
+import type { Book, CatalogBooks, RawBookPayload } from '../types.js'
 
 // The catalog drilldowns — an author's books, a series, a genre — are one fetch
 // with a different query string, so they share this hook instead of three copies
@@ -15,7 +15,7 @@ import type { Book, RawBookPayload } from '../types.js'
 // owns its own results and would otherwise keep showing whatever the book looked
 // like when the page was opened — a progress bar frozen at the page you were on
 // before you just changed it.
-function useCatalogBooks(url: string, missingMessage: string) {
+function useCatalogBooks(url: string, missingMessage: string): CatalogBooks {
   const { dataVersion } = useLibraryData()
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(false)
@@ -48,7 +48,7 @@ function useCatalogBooks(url: string, missingMessage: string) {
       .catch((err: unknown) => {
         if (cancelled) return
         setBooks([])
-        setError(err instanceof Error ? err.message : missingMessage)
+        setError(errorMessage(err, missingMessage))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)

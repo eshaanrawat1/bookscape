@@ -1,5 +1,5 @@
-import Progress from './Progress.jsx'
-import type { Book } from '../types.js'
+import Progress from '../ui/Progress.jsx'
+import type { Book } from '../../types.js'
 
 interface CoverProgressProps {
   book: Book | null

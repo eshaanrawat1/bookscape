@@ -18,6 +18,7 @@ import {
   genreNameFromView,
   booksReadViewId,
   booksReadYearFromView,
+  errorMessage,
 } from './utils.js'
 import { viewMeta, shortcutLabel } from './constants.js'
 import { buildCommands } from './commands.js'
@@ -32,13 +33,14 @@ import useAppHotkeys from './hooks/useAppHotkeys.js'
 import useReadingGoal from './hooks/useReadingGoal.js'
 
 // Components
-import Sidebar from './components/Sidebar.jsx'
-import BookDialogStage, { type Selected } from './components/BookDialogStage.jsx'
-import ScraperDialog from './components/ScraperDialog.jsx'
-import SettingsDialog from './components/SettingsDialog.jsx'
-import ReadingGoalDialog from './components/ReadingGoalDialog.jsx'
-import CommandPalette from './components/CommandPalette.jsx'
-import BookGrid from './components/BookGrid.jsx'
+import Sidebar from './components/sidebar/Sidebar.jsx'
+import EmptyState from './components/ui/EmptyState.jsx'
+import BookDialogStage, { type Selected } from './components/dialogs/BookDialogStage.jsx'
+import ScraperDialog from './components/dialogs/ScraperDialog.jsx'
+import SettingsDialog from './components/dialogs/SettingsDialog.jsx'
+import ReadingGoalDialog from './components/dialogs/ReadingGoalDialog.jsx'
+import CommandPalette from './components/dialogs/CommandPalette.jsx'
+import BookGrid from './components/books/BookGrid.jsx'
 
 // Views
 import ReadingNow from './views/ReadingNow.jsx'
@@ -51,10 +53,22 @@ import SeriesView from './views/SeriesView.jsx'
 import GenreView from './views/GenreView.jsx'
 import BooksReadView from './views/BooksReadView.jsx'
 import CollectionView from './views/CollectionView.jsx'
-import type { Book, Collection, GenreSection, RawBookPayload, RawList } from './types.js'
+import type { Book, Collection, GenreSection, RawBookPayload, RawList, VaultAction } from './types.js'
+
+// The pages with a Back link, and where it lands with nothing to go back to.
+// Books read is reached from the stats page, so it falls back there rather than
+// to the library the others return to.
+const DRILLDOWNS = [
+  { prefix: 'author:', fallback: 'library' },
+  { prefix: 'series:', fallback: 'library' },
+  { prefix: 'genre:', fallback: 'library' },
+  { prefix: 'books-read:', fallback: 'stats' },
+]
+
+const drilldownFor = (view: string) => DRILLDOWNS.find(({ prefix }) => view.startsWith(prefix))
 
 export default function App() {
-  const { showToast } = useToast()
+  const { showToast, showError } = useToast()
   const [view, setView] = useState('reading-now')
   const [previousView, setPreviousView] = useState('reading-now')
   const [mobileNav, setMobileNav] = useState(false)
@@ -67,7 +81,7 @@ export default function App() {
   const [globalLibrary, setGlobalLibrary] = useState<GenreSection[]>([])
   const [dataVersion, setDataVersion] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [vaultBusy, setVaultBusy] = useState<'push' | 'pull' | null>(null)
+  const [vaultBusy, setVaultBusy] = useState<VaultAction | null>(null)
   const [showScraperDialog, setShowScraperDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
   const [showGoalDialog, setShowGoalDialog] = useState(false)
@@ -115,7 +129,7 @@ export default function App() {
         }
 
         if (!cancelled) {
-          setError(lastError instanceof Error ? lastError.message : 'Could not load books.')
+          setError(errorMessage(lastError, 'Could not load books.'))
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -178,52 +192,31 @@ export default function App() {
   const openBookDialog = (book: Book) =>
     setSelected((prev) => ({ book, isNavigation: prev !== null }))
 
-  const openAuthorPage = (author: string) => {
-    const cleanAuthor = String(author || '').trim()
-    if (!cleanAuthor) return
-    setPreviousView((current) => (view.startsWith('author:') ? current : view))
+  // Hopping between two pages of the same kind keeps the original return target,
+  // so Back leaves the drilldown rather than walking back through it.
+  const openDrilldown = (target: string) => {
+    setPreviousView((current) => (drilldownFor(target) === drilldownFor(view) ? current : view))
     setSelected(null)
     setMobileNav(false)
-    setView(authorViewId(cleanAuthor))
+    setView(target)
   }
-  const goBackFromAuthor = () => {
-    setView(previousView && !previousView.startsWith('author:') ? previousView : 'library')
-    setMobileNav(false)
+  const openAuthorPage = (author: string) => {
+    const cleanAuthor = String(author || '').trim()
+    if (cleanAuthor) openDrilldown(authorViewId(cleanAuthor))
   }
   const openSeriesPage = (series: string) => {
     const cleanSeries = String(series || '').trim()
-    if (!cleanSeries) return
-    setPreviousView((current) => (view.startsWith('series:') ? current : view))
-    setSelected(null)
-    setMobileNav(false)
-    setView(seriesViewId(cleanSeries))
-  }
-  const goBackFromSeries = () => {
-    setView(previousView && !previousView.startsWith('series:') ? previousView : 'library')
-    setMobileNav(false)
+    if (cleanSeries) openDrilldown(seriesViewId(cleanSeries))
   }
   const openGenrePage = (genre: string) => {
     const cleanGenre = String(genre || '').trim()
-    if (!cleanGenre) return
-    setPreviousView((current) => (view.startsWith('genre:') ? current : view))
-    setSelected(null)
-    setMobileNav(false)
-    setView(genreViewId(cleanGenre))
+    if (cleanGenre) openDrilldown(genreViewId(cleanGenre))
   }
-  const goBackFromGenre = () => {
-    setView(previousView && !previousView.startsWith('genre:') ? previousView : 'library')
-    setMobileNav(false)
-  }
-  // Reached from the stats page's Books read row, so it falls back to 'stats'
-  // rather than to the library the other drilldowns return to.
-  const openBooksReadPage = (year: string) => {
-    setPreviousView((current) => (view.startsWith('books-read:') ? current : view))
-    setSelected(null)
-    setMobileNav(false)
-    setView(booksReadViewId(year))
-  }
-  const goBackFromBooksRead = () => {
-    setView(previousView && !previousView.startsWith('books-read:') ? previousView : 'stats')
+  const openBooksReadPage = (year: string) => openDrilldown(booksReadViewId(year))
+  const goBack = () => {
+    const drilldown = drilldownFor(view)
+    if (!drilldown) return
+    setView(previousView && !previousView.startsWith(drilldown.prefix) ? previousView : drilldown.fallback)
     setMobileNav(false)
   }
   // 'want-to-read' is a sidebar destination rather than a drilldown, so this
@@ -350,10 +343,7 @@ export default function App() {
       await apiFetch('/sync/obsidian/push', { method: 'POST' })
       showToast('Pushed your library to the vault.', { key: 'vault:library' })
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not push to Obsidian vault.', {
-        tone: 'error',
-        key: 'vault:library',
-      })
+      showError(err, 'Could not push to Obsidian vault.', 'vault:library')
     } finally {
       setVaultBusy(null)
     }
@@ -367,10 +357,7 @@ export default function App() {
       await reloadAppData()
       showToast('Pulled your library from the vault.', { key: 'vault:library' })
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not pull from Obsidian vault.', {
-        tone: 'error',
-        key: 'vault:library',
-      })
+      showError(err, 'Could not pull from Obsidian vault.', 'vault:library')
     } finally {
       setVaultBusy(null)
     }
@@ -464,26 +451,8 @@ export default function App() {
                     <Menu />
                   </button>
                   <div>
-                    {view.startsWith('genre:') && (
-                      <button type="button" className="kickerLink" onClick={goBackFromGenre}>
-                        <ArrowLeft size={14} />
-                        Back
-                      </button>
-                    )}
-                    {view.startsWith('author:') && (
-                      <button type="button" className="kickerLink" onClick={goBackFromAuthor}>
-                        <ArrowLeft size={14} />
-                        Back
-                      </button>
-                    )}
-                    {view.startsWith('series:') && (
-                      <button type="button" className="kickerLink" onClick={goBackFromSeries}>
-                        <ArrowLeft size={14} />
-                        Back
-                      </button>
-                    )}
-                    {view.startsWith('books-read:') && (
-                      <button type="button" className="kickerLink" onClick={goBackFromBooksRead}>
+                    {drilldownFor(view) && (
+                      <button type="button" className="kickerLink" onClick={goBack}>
                         <ArrowLeft size={14} />
                         Back
                       </button>
@@ -496,9 +465,9 @@ export default function App() {
 
               <div className="mainContent">
                 {loading ? (
-                  <div className="emptyState"><p>Loading your books…</p></div>
+                  <EmptyState message="Loading your books…" />
                 ) : error ? (
-                  <div className="emptyState"><h2>Could not load books</h2><p>{error}</p></div>
+                  <EmptyState title="Could not load books" message={error} />
                 ) : (
                   <ViewContent view={view} />
                 )}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch, BOOTSTRAP_RETRIES, BOOTSTRAP_RETRY_DELAY_MS } from '../api.js'
-import { sleep } from '../utils.js'
+import { sleep, errorMessage } from '../utils.js'
 import type { Book, ReadingGoalState } from '../types.js'
 
 // A year is 365 days for pacing purposes. The dialog's two fields are a
@@ -74,7 +74,7 @@ function useReadingGoal(finished: Book[]): ReadingGoalState {
             if (cancelled) return
             continue
           }
-          setError(err instanceof Error ? err.message : 'Could not load your reading goal.')
+          setError(errorMessage(err, 'Could not load your reading goal.'))
           setLoading(false)
         }
       }
@@ -96,7 +96,7 @@ function useReadingGoal(finished: Book[]): ReadingGoalState {
       })
       setTarget(Math.max(0, Number(data.target) || 0))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save your reading goal.')
+      setError(errorMessage(err, 'Could not save your reading goal.'))
       throw err
     } finally {
       setSaving(false)

@@ -1,79 +1,34 @@
-import { ChevronRight, Star } from 'lucide-react'
-import BookCover from '../components/BookCover.jsx'
+import { BookList, BookListRow } from '../components/books/BookList.jsx'
+import CatalogPage from '../components/books/CatalogPage.jsx'
 import useAuthorBooks from '../hooks/useAuthorBooks.js'
-import { useNavigation } from '../context/NavigationContext.jsx'
 import type { Book } from '../types.js'
 
 interface AuthorViewProps {
   author: string
 }
 
+function genreLine(book: Book): string {
+  return (book.genres.length ? book.genres : book.genre ? [book.genre] : []).join(' · ')
+}
+
 function AuthorView({ author }: AuthorViewProps) {
-  const { books, loading, error } = useAuthorBooks(author)
-  const { onOpen } = useNavigation()
+  const catalog = useAuthorBooks(author)
 
   return (
-    <div className="stack authorPage">
-      {loading ? (
-        <div className="emptyState">
-          <p>Loading author books…</p>
-        </div>
-      ) : error ? (
-        <div className="emptyState">
-          <h2>Could not load author</h2>
-          <p>{error}</p>
-        </div>
-      ) : books.length > 0 ? (
-        <section className="authorBooksSection">
-          <div className="shelfHeader">
-            <h2>All books</h2>
-            <p className="authorBooksCaption">Every title matched to this author</p>
-          </div>
-          <ul className="authorBookList">
-            {books.map((book) => (
-              <AuthorBookRow key={book.id} book={book} onOpen={onOpen} />
-            ))}
-          </ul>
-        </section>
-      ) : (
-        <div className="emptyState">
-          <h2>No books found</h2>
-          <p>We couldn't find any titles in the catalog for this author.</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-interface AuthorBookRowProps {
-  book: Book
-  onOpen: (book: Book) => void
-}
-
-function AuthorBookRow({ book, onOpen }: AuthorBookRowProps) {
-  const meta = (book.genres.length ? book.genres : book.genre ? [book.genre] : []).join(' · ')
-
-  return (
-    <li>
-      <button type="button" className="authorBookRow" onClick={() => onOpen(book)}>
-        <div className="authorBookRowCover">
-          <BookCover book={book} />
-        </div>
-        <div className="authorBookRowCopy">
-          <strong>{book.title}</strong>
-          {meta ? <span>{meta}</span> : null}
-        </div>
-        <span className="authorBookRowRating">
-          {book.rating > 0 ? (
-            <>
-              <Star fill="currentColor" />
-              <span>{book.rating.toFixed(2)}</span>
-            </>
-          ) : null}
-        </span>
-        <ChevronRight className="authorBookRowChevron" />
-      </button>
-    </li>
+    <CatalogPage
+      {...catalog}
+      className="authorPage"
+      loadingMessage="Loading author books…"
+      errorTitle="Could not load author"
+      emptyTitle="No books found"
+      emptyMessage="We couldn't find any titles in the catalog for this author."
+    >
+      <BookList title="All books" caption="Every title matched to this author">
+        {catalog.books.map((book) => (
+          <BookListRow key={book.id} book={book} subtitle={genreLine(book)} />
+        ))}
+      </BookList>
+    </CatalogPage>
   )
 }
 

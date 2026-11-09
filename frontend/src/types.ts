@@ -11,14 +11,7 @@ export interface RawBookPayload {
   title?: string
   author?: string
   image_url?: string
-  linked_catalog_book?: {
-    series?: string
-    series_number?: string
-    avg_rating?: number | string
-    rating_count?: number | string
-    review_count?: number | string
-    page_count?: number
-  } | null
+  linked_catalog_book?: RawLinkedCatalogBook | null
   genre?: string
   genres?: string[]
   series?: string
@@ -41,6 +34,11 @@ export interface RawBookPayload {
   similar_books?: RawBookPayload[]
   [key: string]: unknown
 }
+
+type RawLinkedCatalogBook = Pick<
+  RawBookPayload,
+  'series' | 'series_number' | 'avg_rating' | 'rating_count' | 'review_count' | 'page_count'
+>
 
 export interface Book {
   id: string
@@ -67,6 +65,18 @@ export interface Book {
   blurb: string
   _raw: RawBookPayload
   similar_books?: RawBookPayload[]
+}
+
+// The props of anything that draws a single book.
+export interface BookProps {
+  book: Book
+}
+
+// What every catalog drilldown's fetch reports.
+export interface CatalogBooks {
+  books: Book[]
+  loading: boolean
+  error: string | null
 }
 
 export interface RawList {
@@ -246,6 +256,8 @@ export interface ToastOptions {
 
 export interface ToastContextValue {
   showToast: (message: string, options?: ToastOptions) => void
+  // A failed action: the thrown message if it has one, else `fallback`.
+  showError: (err: unknown, fallback: string, key?: ToastOptions['key']) => void
 }
 
 export interface NavigationContextValue {
@@ -261,6 +273,10 @@ export interface NavigationContextValue {
   onEditReadingGoal: () => void
 }
 
+export type VaultAction = 'push' | 'pull'
+
+type CommandAction = () => void | Promise<void>
+
 export type CommandGroup = 'Navigate' | 'Actions' | 'Collections'
 
 export interface Command {
@@ -272,17 +288,17 @@ export interface Command {
   hint?: string
   // Extra text folded into fuzzy matching but never shown.
   keywords?: string
-  run: () => void | Promise<void>
+  run: CommandAction
 }
 
 export interface CommandDeps {
   collections: Collection[]
-  vaultBusy: 'push' | 'pull' | null
+  vaultBusy: VaultAction | null
   goTo: (viewId: string) => void
   onAddBook: () => void
-  onNewCollection: () => void | Promise<void>
-  onRefresh: () => void | Promise<void>
+  onNewCollection: CommandAction
+  onRefresh: CommandAction
   onVaultSettings: () => void
-  onPush: () => void | Promise<void>
-  onPull: () => void | Promise<void>
+  onPush: CommandAction
+  onPull: CommandAction
 }

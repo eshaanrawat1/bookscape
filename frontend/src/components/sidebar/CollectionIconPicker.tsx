@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import useModalLayer from '../hooks/useModalLayer.js'
-import { collectionIcons, collectionIconLabel } from '../collectionIcons.js'
+import useModalLayer from '../../hooks/useModalLayer.js'
+import { collectionIcons, collectionIconLabel } from '../../collectionIcons.js'
 
 interface CollectionIconPickerProps {
   // The dot the picker hangs off. The panel is positioned from its rect rather

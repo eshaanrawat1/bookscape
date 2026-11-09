@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { Plus, X, type LucideIcon } from 'lucide-react'
-import { collectionIdFromName } from '../utils.js'
-import { resolveCollectionIcon } from '../collectionIcons.js'
-import { mainNav, shelfNav } from '../constants.js'
-import { useLibraryData } from '../context/LibraryDataContext.jsx'
-import BrandMark from './BrandMark.jsx'
+import { collectionIdFromName, errorMessage } from '../../utils.js'
+import { resolveCollectionIcon } from '../../collectionIcons.js'
+import { mainNav, shelfNav } from '../../constants.js'
+import { useLibraryData } from '../../context/LibraryDataContext.jsx'
+import BrandMark from '../ui/BrandMark.jsx'
 import CollectionIconPicker from './CollectionIconPicker.jsx'
-import ConfirmDialog from './ConfirmDialog.jsx'
-import ReadingGoalWidget from './ReadingGoalWidget.jsx'
-import type { Collection } from '../types.js'
+import ConfirmDialog from '../dialogs/ConfirmDialog.jsx'
+import ReadingGoalWidget from '../goal/ReadingGoalWidget.jsx'
+import type { Collection } from '../../types.js'
 
 interface SidebarProps {
   active: string
@@ -61,7 +61,7 @@ function Sidebar({ active, onSelect }: SidebarProps) {
       setEditingId(null)
       setCollectionError('')
     } catch (err) {
-      setCollectionError(err instanceof Error ? err.message : 'Could not rename collection.')
+      setCollectionError(errorMessage(err, 'Could not rename collection.'))
     } finally {
       setSaving(false)
     }
@@ -74,7 +74,7 @@ function Sidebar({ active, onSelect }: SidebarProps) {
     try {
       await onSetCollectionIcon(collection, icon)
     } catch (err) {
-      setCollectionError(err instanceof Error ? err.message : 'Could not change the icon.')
+      setCollectionError(errorMessage(err, 'Could not change the icon.'))
     }
   }
 
@@ -86,7 +86,7 @@ function Sidebar({ active, onSelect }: SidebarProps) {
       await onDeleteCollection(pendingDelete)
       setPendingDelete(null)
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not delete collection.')
+      setDeleteError(errorMessage(err, 'Could not delete collection.'))
     } finally {
       setDeleting(false)
     }
@@ -100,7 +100,7 @@ function Sidebar({ active, onSelect }: SidebarProps) {
       setEditingId(collectionIdFromName(createdName))
       setDraftName(createdName)
     } catch (err) {
-      setCollectionError(err instanceof Error ? err.message : 'Could not create collection.')
+      setCollectionError(errorMessage(err, 'Could not create collection.'))
     } finally {
       setSaving(false)
     }
@@ -279,10 +279,9 @@ interface NavItem {
   icon: LucideIcon
 }
 
-interface NavButtonProps {
+interface NavButtonProps extends Pick<SidebarProps, 'onSelect'> {
   item: NavItem
   active: boolean
-  onSelect: (id: string) => void
 }
 
 function NavButton({ item, active, onSelect }: NavButtonProps) {

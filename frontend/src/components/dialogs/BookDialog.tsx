@@ -3,24 +3,25 @@ import {
   X, Star, MessageSquareText, FileText, Plus, Heart, Highlighter, ChevronDown, Upload, Download,
   LoaderCircle, Hash, Sigma, Calendar, CalendarCheck, TextAlignStart,
 } from 'lucide-react'
-import { apiFetch } from '../api.js'
-import { normaliseBook, getCatalogBookId, formatCompactNumber, resolveSavedWantToReadBook } from '../utils.js'
-import BookCover from './BookCover.jsx'
+import { apiFetch } from '../../api.js'
+import { normaliseBook, getCatalogBookId, formatCompactNumber, resolveSavedWantToReadBook } from '../../utils.js'
+import BookCover from '../books/BookCover.jsx'
 import DateProperty from './DateProperty.jsx'
-import GenrePills from './GenrePills.jsx'
+import GenrePills from '../books/GenrePills.jsx'
 import HighlightDialog from './HighlightDialog.jsx'
-import { useLibraryData } from '../context/LibraryDataContext.jsx'
-import { useNavigation } from '../context/NavigationContext.jsx'
-import { useToast } from '../context/ToastContext.jsx'
-import type { Book, RawBookPayload } from '../types.js'
+import { useLibraryData } from '../../context/LibraryDataContext.jsx'
+import { useNavigation } from '../../context/NavigationContext.jsx'
+import { useToast } from '../../context/ToastContext.jsx'
+import type { DialogCloseProps } from './Dialog.jsx'
+import type { Book, BookProps, RawBookPayload, VaultAction } from '../../types.js'
 
-interface BookDialogProps {
-  book: Book
+interface BookDialogProps extends BookProps, DialogCloseProps {
   isNavigation?: boolean
   exiting?: boolean
   cardRef?: Ref<HTMLElement>
-  onClose: () => void
 }
+
+type BookDialogView = 'library' | 'tracking'
 
 interface ReadingProgressRecord {
   status: string
@@ -82,8 +83,8 @@ const TRACKED_STATUSES = ['reading', 'done', 'dnf']
 function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onClose }: BookDialogProps) {
   const { collections, wantToReadBooks, addBookToCollection, toggleBookWantToRead, refreshLibrary } = useLibraryData()
   const { onOpen, onOpenAuthor, onOpenSeries } = useNavigation()
-  const { showToast } = useToast()
-  const [view, setView] = useState<'library' | 'tracking'>(() => (
+  const { showToast, showError } = useToast()
+  const [view, setView] = useState<BookDialogView>(() => (
     TRACKED_STATUSES.includes(book.status) ? 'tracking' : 'library'
   ))
   const panelViewportRef = useRef<HTMLDivElement>(null)
@@ -95,7 +96,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
     typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   )
 
-  const switchView = (nextView: 'library' | 'tracking') => {
+  const switchView = (nextView: BookDialogView) => {
     if (nextView === view) return
     if (!prefersReducedMotion()) {
       const viewport = panelViewportRef.current
@@ -263,7 +264,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
   const progressPct = trackedTotalPages > 0
     ? Math.min(100, Math.max(0, Math.round((trackedCurrentPage / trackedTotalPages) * 100)))
     : 0
-  const [obsidianBusy, setObsidianBusy] = useState<'push' | 'pull' | null>(null)
+  const [obsidianBusy, setObsidianBusy] = useState<VaultAction | null>(null)
   const canSyncObsidian = Boolean(bookId) && TRACKED_STATUSES.includes(draft.status)
 
   // Toasts from this dialog name the book. They outlive the dialog by design —
@@ -279,10 +280,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
       await apiFetch(`/sync/obsidian/push/${bookId}`, { method: 'POST' })
       showToast(`Pushed “${displayBook.title}” to the vault.`, { key: vaultToastKey })
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not push to vault.', {
-        tone: 'error',
-        key: vaultToastKey,
-      })
+      showError(err, 'Could not push to vault.', vaultToastKey)
     } finally {
       setObsidianBusy(null)
     }
@@ -305,10 +303,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
       await refreshLibrary()
       showToast(`Pulled “${displayBook.title}” from the vault.`, { key: vaultToastKey })
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not pull from vault.', {
-        tone: 'error',
-        key: vaultToastKey,
-      })
+      showError(err, 'Could not pull from vault.', vaultToastKey)
     } finally {
       setObsidianBusy(null)
     }
@@ -413,10 +408,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
         { key: `want-to-read:${bookId}` },
       )
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not save this book.', {
-        tone: 'error',
-        key: `want-to-read:${bookId}`,
-      })
+      showError(err, 'Could not save this book.', `want-to-read:${bookId}`)
     } finally {
       setSavingToRead(false)
     }
@@ -430,10 +422,7 @@ function BookDialog({ book, isNavigation = false, exiting = false, cardRef, onCl
       setCollectionMenuOpen(false)
       showToast(`Added “${displayBook.title}” to ${collectionName}.`, { key: `collection:${bookId}` })
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not add this book.', {
-        tone: 'error',
-        key: `collection:${bookId}`,
-      })
+      showError(err, 'Could not add this book.', `collection:${bookId}`)
     } finally {
       setSavingCollection('')
     }

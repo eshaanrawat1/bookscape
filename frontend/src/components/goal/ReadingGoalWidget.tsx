@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, Target } from 'lucide-react'
-import Progress from './Progress.jsx'
-import { useLibraryData } from '../context/LibraryDataContext.jsx'
-import { useNavigation } from '../context/NavigationContext.jsx'
+import Progress from '../ui/Progress.jsx'
+import { useLibraryData } from '../../context/LibraryDataContext.jsx'
+import { useNavigation } from '../../context/NavigationContext.jsx'
 
 // Which way the widget is folded is chrome, not library data, so it lives in
 // localStorage next to the recent searches rather than behind the API. Reads

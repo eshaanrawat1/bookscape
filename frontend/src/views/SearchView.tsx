@@ -1,13 +1,13 @@
 import { useEffect, useRef, type FormEvent, type RefObject } from 'react'
 import { ChevronRight, Clock, Search, X } from 'lucide-react'
-import BookCover from '../components/BookCover.jsx'
-import BookGrid from '../components/BookGrid.jsx'
+import BookCover from '../components/books/BookCover.jsx'
+import BookGrid from '../components/books/BookGrid.jsx'
 import { formatCompactNumber } from '../utils.js'
 import useSearch from '../hooks/useSearch.js'
 import useRecentSearches from '../hooks/useRecentSearches.js'
 import useListNavigation from '../hooks/useListNavigation.js'
 import { useNavigation } from '../context/NavigationContext.jsx'
-import type { Book } from '../types.js'
+import type { Book, NavigationContextValue } from '../types.js'
 
 function SearchView() {
   const {
@@ -146,14 +146,12 @@ function RecentSearches({ recents, onSelect, onRemove, onClear }: RecentSearches
   )
 }
 
-interface SearchHeaderProps {
+interface SearchHeaderProps extends Pick<SearchPreviewDropdownProps, 'onOpen' | 'onSubmit'> {
   draft: string
   previewResults?: Book[]
   previewLoading?: boolean
   showPreview?: boolean
   onDraftChange: (value: string) => void
-  onSubmit: (event: FormEvent) => void
-  onOpen?: (book: Book) => void
   inputRef: RefObject<HTMLInputElement>
 }
 
@@ -229,12 +227,11 @@ function SearchHeader({
   )
 }
 
-interface SearchPreviewDropdownProps {
+interface SearchPreviewDropdownProps extends Partial<Pick<NavigationContextValue, 'onOpen'>> {
   results: Book[]
   loading: boolean
   activeIndex: number
   onHover: (index: number) => void
-  onOpen?: (book: Book) => void
   onSubmit: (event: FormEvent) => void
 }
 

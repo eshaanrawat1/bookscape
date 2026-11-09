@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { Target } from 'lucide-react'
-import BookCover from './BookCover.jsx'
-import Progress from './Progress.jsx'
-import { useLibraryData } from '../context/LibraryDataContext.jsx'
-import { useNavigation } from '../context/NavigationContext.jsx'
-import type { Book } from '../types.js'
+import BookCover from '../books/BookCover.jsx'
+import Progress from '../ui/Progress.jsx'
+import { useLibraryData } from '../../context/LibraryDataContext.jsx'
+import { useNavigation } from '../../context/NavigationContext.jsx'
+import type { BookProps } from '../../types.js'
 
 // How many bonus slots sit past a met goal. They are never filled — read 25
 // against a goal of 20 and there are still five ahead of you — so the run is an
@@ -118,7 +118,7 @@ function ReadingGoalCard() {
   )
 }
 
-function GoalCover({ book }: { book: Book }) {
+function GoalCover({ book }: BookProps) {
   const { onOpen } = useNavigation()
   return (
     <button

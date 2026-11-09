@@ -1,4 +1,4 @@
-import BookGrid from '../components/BookGrid.jsx'
+import BookGrid from '../components/books/BookGrid.jsx'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import type { Collection } from '../types.js'
 

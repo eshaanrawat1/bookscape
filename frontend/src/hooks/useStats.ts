@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiFetch } from '../api.js'
 import type { StatsSummary } from '../types.js'
+import { errorMessage } from '../utils.js'
 
 function useStats() {
   const [summary, setSummary] = useState<StatsSummary | null>(null)
@@ -37,7 +38,7 @@ function useStats() {
         setSummary(data)
         setError(null)
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load stats.')
+        if (!cancelled) setError(errorMessage(err, 'Could not load stats.'))
       } finally {
         if (!cancelled && !handingOff) setLoading(false)
       }

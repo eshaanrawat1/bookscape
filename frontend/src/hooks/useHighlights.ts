@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../api.js'
-import { normaliseBook } from '../utils.js'
+import { normaliseBook, errorMessage } from '../utils.js'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import type { Highlight, HighlightGroup, RawHighlight, RawHighlightGroup } from '../types.js'
 
@@ -59,7 +59,7 @@ function useHighlights() {
       })
       .catch((err) => {
         if (cancelled) return
-        setError(err instanceof Error ? err.message : 'Could not load your highlights.')
+        setError(errorMessage(err, 'Could not load your highlights.'))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)

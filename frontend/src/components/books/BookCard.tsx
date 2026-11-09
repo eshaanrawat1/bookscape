@@ -1,11 +1,10 @@
 import { X } from 'lucide-react'
 import BookCover from './BookCover.jsx'
 import CoverProgress from './CoverProgress.jsx'
-import { useNavigation } from '../context/NavigationContext.jsx'
-import type { Book } from '../types.js'
+import { useNavigation } from '../../context/NavigationContext.jsx'
+import type { BookProps } from '../../types.js'
 
-interface BookCardProps {
-  book: Book
+export interface BookCardProps extends BookProps {
   showRemoveButton?: boolean
   removeLabel?: string
   onRemove?: (bookId: string) => void

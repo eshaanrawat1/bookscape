@@ -1,10 +1,11 @@
 import BookCard from './BookCard.jsx'
 import BookCover from './BookCover.jsx'
 import CoverProgress from './CoverProgress.jsx'
-import ProgressRing from './ProgressRing.jsx'
-import { useNavigation } from '../context/NavigationContext.jsx'
-import { normaliseBook } from '../utils.js'
-import type { Book, SeriesProgress } from '../types.js'
+import ProgressRing from '../ui/ProgressRing.jsx'
+import SectionHeader from '../ui/SectionHeader.jsx'
+import { useNavigation } from '../../context/NavigationContext.jsx'
+import { normaliseBook } from '../../utils.js'
+import type { Book, SeriesProgress } from '../../types.js'
 
 interface ContinueReadingProps {
   books: Book[]
@@ -39,12 +40,7 @@ function ContinueReading({ books, series }: ContinueReadingProps) {
 
   return (
     <section className="shelf">
-      <div className="shelfHeader">
-        <div>
-          <h2>Continue reading</h2>
-          <p>Books and series you are partway through.</p>
-        </div>
-      </div>
+      <SectionHeader title="Continue reading" subtitle="Books and series you are partway through." />
       <div className="shelfScroll">
         {readingSeries.map((entry) => (
           <SeriesCard key={entry.series} entry={entry} />

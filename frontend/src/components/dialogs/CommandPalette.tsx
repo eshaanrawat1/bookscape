@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
-import BookCover from './BookCover.jsx'
-import { searchBooks, formatCompactNumber } from '../utils.js'
-import { filterCommands } from '../commands.js'
-import { useNavigation } from '../context/NavigationContext.jsx'
-import useModalLayer from '../hooks/useModalLayer.js'
-import useListNavigation from '../hooks/useListNavigation.js'
-import type { Book, Command, CommandGroup } from '../types.js'
+import BookCover from '../books/BookCover.jsx'
+import { searchBooks, formatCompactNumber } from '../../utils.js'
+import { filterCommands } from '../../commands.js'
+import { useNavigation } from '../../context/NavigationContext.jsx'
+import Dialog, { type DialogCloseProps } from './Dialog.jsx'
+import useListNavigation from '../../hooks/useListNavigation.js'
+import type { Book, Command, CommandGroup } from '../../types.js'
 
 // Matches the search view's preview so the two surfaces feel like one thing.
 const DEBOUNCE_MS = 180
@@ -16,9 +16,8 @@ type PaletteRow =
   | { kind: 'command'; key: string; group: CommandGroup; command: Command }
   | { kind: 'book'; key: string; group: 'Books'; book: Book }
 
-interface CommandPaletteProps {
+interface CommandPaletteProps extends DialogCloseProps {
   commands: Command[]
-  onClose: () => void
 }
 
 function CommandPalette({ commands, onClose }: CommandPaletteProps) {
@@ -28,10 +27,6 @@ function CommandPalette({ commands, onClose }: CommandPaletteProps) {
   const [booksLoading, setBooksLoading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const rowRefs = useRef<(HTMLButtonElement | null)[]>([])
-
-  // No blocksHotkeys: ⌘K should toggle the palette shut and ⌘1–6 should
-  // navigate straight through it.
-  useModalLayer({ onEscape: onClose })
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -107,63 +102,64 @@ function CommandPalette({ commands, onClose }: CommandPaletteProps) {
   const activeId = activeIndex >= 0 && rows[activeIndex] ? `paletteRow-${activeIndex}` : undefined
 
   return (
-    <div className="dialogScrim paletteScrim" onClick={onClose}>
-      <article
-        className="bookDialog commandPalette"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Command palette"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="paletteField">
-          <Search />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            spellCheck={false}
-            autoComplete="off"
-            placeholder="Search books or run a command…"
-            aria-label="Search books or run a command"
-            aria-autocomplete="list"
-            aria-controls="paletteResults"
-            aria-activedescendant={activeId}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
+    // No blocksHotkeys: ⌘K should toggle the palette shut and ⌘1–6 should
+    // navigate straight through it.
+    <Dialog
+      label="Command palette"
+      className="commandPalette"
+      scrimClassName="paletteScrim"
+      showClose={false}
+      blocksHotkeys={false}
+      onClose={onClose}
+    >
+      <div className="paletteField">
+        <Search />
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          spellCheck={false}
+          autoComplete="off"
+          placeholder="Search books or run a command…"
+          aria-label="Search books or run a command"
+          aria-autocomplete="list"
+          aria-controls="paletteResults"
+          aria-activedescendant={activeId}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={handleKeyDown}
+        />
+      </div>
 
-        <div className="paletteResults" id="paletteResults" role="listbox" aria-label="Results">
-          {rows.length === 0 ? (
-            <p className="paletteStatus">
-              {booksLoading ? 'Searching books…' : `No matches for “${trimmed}”.`}
-            </p>
-          ) : (
-            rows.map((row, index) => (
-              <PaletteRowItem
-                key={row.key}
-                row={row}
-                index={index}
-                active={index === activeIndex}
-                showHeader={index === 0 || rows[index - 1].group !== row.group}
-                rowRef={(node) => { rowRefs.current[index] = node }}
-                onHover={() => setActiveIndex(index)}
-                onRun={() => runRow(index)}
-              />
-            ))
-          )}
-          {rows.length > 0 && booksLoading ? (
-            <p className="paletteStatus">Searching books…</p>
-          ) : null}
-        </div>
+      <div className="paletteResults" id="paletteResults" role="listbox" aria-label="Results">
+        {rows.length === 0 ? (
+          <p className="paletteStatus">
+            {booksLoading ? 'Searching books…' : `No matches for “${trimmed}”.`}
+          </p>
+        ) : (
+          rows.map((row, index) => (
+            <PaletteRowItem
+              key={row.key}
+              row={row}
+              index={index}
+              active={index === activeIndex}
+              showHeader={index === 0 || rows[index - 1].group !== row.group}
+              rowRef={(node) => { rowRefs.current[index] = node }}
+              onHover={() => setActiveIndex(index)}
+              onRun={() => runRow(index)}
+            />
+          ))
+        )}
+        {rows.length > 0 && booksLoading ? (
+          <p className="paletteStatus">Searching books…</p>
+        ) : null}
+      </div>
 
-        <footer className="paletteFooter">
-          <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
-          <span><kbd>↵</kbd> open</span>
-          <span><kbd>esc</kbd> close</span>
-        </footer>
-      </article>
-    </div>
+      <footer className="paletteFooter">
+        <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+        <span><kbd>↵</kbd> open</span>
+        <span><kbd>esc</kbd> close</span>
+      </footer>
+    </Dialog>
   )
 }
 

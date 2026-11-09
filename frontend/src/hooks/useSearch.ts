@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { searchBooks } from '../utils.js'
+import { searchBooks, errorMessage } from '../utils.js'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import type { Book } from '../types.js'
 
@@ -83,7 +83,7 @@ function useSearch() {
     try {
       setResults(await searchBooks(nextQuery, RESULT_LIMIT))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not search books.')
+      setError(errorMessage(err, 'Could not search books.'))
       setResults([])
     } finally {
       setLoading(false)

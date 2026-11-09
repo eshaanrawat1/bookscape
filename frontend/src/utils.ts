@@ -216,8 +216,15 @@ async function searchBooks(query: string, limit: number): Promise<Book[]> {
   return (data.results || []).map(normaliseBook)
 }
 
+// Whatever a rejected call threw, as text. Our API errors already carry the
+// backend's wording; anything else falls back to the caller's.
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error ? err.message : fallback
+}
+
 export {
   sleep,
+  errorMessage,
   loadBootstrapData,
   searchBooks,
   collectionIdFromName,

@@ -1,4 +1,5 @@
-import Shelf from '../components/Shelf.jsx'
+import Shelf from '../components/books/Shelf.jsx'
+import EmptyState from '../components/ui/EmptyState.jsx'
 import { useLibraryData } from '../context/LibraryDataContext.jsx'
 import { useNavigation } from '../context/NavigationContext.jsx'
 
@@ -6,11 +7,7 @@ function LibraryView() {
   const { globalLibrary } = useLibraryData()
   const { onOpenGenre } = useNavigation()
   if (!globalLibrary || globalLibrary.length === 0) {
-    return (
-      <div className="emptyState">
-        <p>Loading library...</p>
-      </div>
-    )
+    return <EmptyState message="Loading library..." />
   }
   return (
     <div className="stack">

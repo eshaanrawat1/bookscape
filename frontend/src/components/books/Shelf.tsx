@@ -1,5 +1,6 @@
 import BookCard from './BookCard.jsx'
-import type { Book } from '../types.js'
+import SectionHeader from '../ui/SectionHeader.jsx'
+import type { Book } from '../../types.js'
 
 interface ShelfProps {
   title: string
@@ -13,15 +14,11 @@ function Shelf({ title, subtitle, books, onSeeAll }: ShelfProps) {
 
   return (
     <section className="shelf">
-      <div className="shelfHeader">
-        <div>
-          <h2>{title}</h2>
-          {subtitle && <p>{subtitle}</p>}
-        </div>
+      <SectionHeader title={title} subtitle={subtitle}>
         {onSeeAll && (
           <button onClick={() => onSeeAll(title)}>See all</button>
         )}
-      </div>
+      </SectionHeader>
       <div className="shelfScroll">
         {books.map((book) => (
           <BookCard key={book.id} book={book} />

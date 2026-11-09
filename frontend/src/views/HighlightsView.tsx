@@ -1,8 +1,9 @@
 import { useState, type KeyboardEvent } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
-import BookCover from '../components/BookCover.jsx'
-import BrandMark from '../components/BrandMark.jsx'
-import HighlightDialog from '../components/HighlightDialog.jsx'
+import BookCover from '../components/books/BookCover.jsx'
+import BrandMark from '../components/ui/BrandMark.jsx'
+import EmptyState from '../components/ui/EmptyState.jsx'
+import HighlightDialog from '../components/dialogs/HighlightDialog.jsx'
 import useAutoGrowTextarea from '../hooks/useAutoGrowTextarea.js'
 import useHighlights from '../hooks/useHighlights.js'
 import { formatDayLabel } from '../utils.js'
@@ -11,7 +12,7 @@ import type { Highlight, HighlightGroup } from '../types.js'
 
 function HighlightsView() {
   const { groups, loading, error, applyGroup, updateHighlight, deleteHighlight } = useHighlights()
-  const { showToast } = useToast()
+  const { showToast, showError } = useToast()
   // The selection is a book id rather than an index: the list reorders as
   // highlights are added, and an index would silently follow whatever book
   // moved into that slot.
@@ -31,11 +32,11 @@ function HighlightsView() {
   }
 
   if (loading) {
-    return <div className="emptyState"><p>Loading your highlights…</p></div>
+    return <EmptyState message="Loading your highlights…" />
   }
 
   if (error) {
-    return <div className="emptyState"><h2>Could not load highlights</h2><p>{error}</p></div>
+    return <EmptyState title="Could not load highlights" message={error} />
   }
 
   // No create button here on purpose: a highlight is always saved against a
@@ -95,10 +96,7 @@ function HighlightsView() {
                   try {
                     await updateHighlight(highlight.id, { note })
                   } catch (err) {
-                    showToast(err instanceof Error ? err.message : 'Could not save the note.', {
-                      tone: 'error',
-                      key: `highlight:${highlight.id}`,
-                    })
+                    showError(err, 'Could not save the note.', `highlight:${highlight.id}`)
                   }
                 }}
                 onSaveEdit={async (fields) => {
@@ -106,10 +104,7 @@ function HighlightsView() {
                     await updateHighlight(highlight.id, fields)
                     return true
                   } catch (err) {
-                    showToast(err instanceof Error ? err.message : 'Could not save the highlight.', {
-                      tone: 'error',
-                      key: `highlight:${highlight.id}`,
-                    })
+                    showError(err, 'Could not save the highlight.', `highlight:${highlight.id}`)
                     // Reported false so the card stays in edit mode on the text
                     // that failed rather than reverting it out from under you.
                     return false
@@ -120,10 +115,7 @@ function HighlightsView() {
                     await deleteHighlight(highlight.id)
                     showToast('Highlight deleted.', { key: `highlight:${highlight.id}` })
                   } catch (err) {
-                    showToast(err instanceof Error ? err.message : 'Could not delete the highlight.', {
-                      tone: 'error',
-                      key: `highlight:${highlight.id}`,
-                    })
+                    showError(err, 'Could not delete the highlight.', `highlight:${highlight.id}`)
                   }
                 }}
               />
@@ -186,7 +178,7 @@ interface HighlightCardProps {
   highlight: Highlight
   onSaveNote: (note: string) => Promise<void>
   // Resolves true when the write landed; false leaves the card in edit mode.
-  onSaveEdit: (fields: { text: string; page: number }) => Promise<boolean>
+  onSaveEdit: (fields: Pick<Highlight, 'text' | 'page'>) => Promise<boolean>
   onDelete: () => Promise<void>
 }
 

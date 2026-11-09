@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
-import { ToastContext } from '../context/ToastContext.jsx'
-import type { Toast, ToastOptions, ToastTone } from '../types.js'
+import { ToastContext } from '../../context/ToastContext.jsx'
+import { errorMessage } from '../../utils.js'
+import type { Toast, ToastContextValue, ToastOptions, ToastTone } from '../../types.js'
 
 // Errors get longer than confirmations — "Saved to Want to read." is read at a
 // glance, "Could not reach the Obsidian vault at /Users/…" is not.
@@ -116,8 +117,12 @@ function ToastProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const showError = useCallback<ToastContextValue['showError']>((err, fallback, key) => {
+    showToast(errorMessage(err, fallback), { tone: 'error', key })
+  }, [showToast])
+
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={{ showToast, showError }}>
       {children}
       {createPortal(
         // Always mounted, even with nothing to show: a live region has to exist

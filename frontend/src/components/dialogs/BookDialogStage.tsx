@@ -1,16 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import BookDialog from './BookDialog.jsx'
-import useModalLayer from '../hooks/useModalLayer.js'
-import type { Book } from '../types.js'
+import type { DialogCloseProps } from './Dialog.jsx'
+import useModalLayer from '../../hooks/useModalLayer.js'
+import type { Book } from '../../types.js'
 
 export interface Selected {
   book: Book
   isNavigation?: boolean
 }
 
-interface BookDialogStageProps {
+interface BookDialogStageProps extends DialogCloseProps {
   selected: Selected
-  onClose: () => void
 }
 
 // Card-to-card navigation (clicking a "similar book") crossfades the incoming

@@ -1,4 +1,5 @@
-import BookGrid from '../components/BookGrid.jsx'
+import BookGrid from '../components/books/BookGrid.jsx'
+import CatalogPage from '../components/books/CatalogPage.jsx'
 import useCatalogBooks from '../hooks/useCatalogBooks.js'
 
 interface BooksReadViewProps {
@@ -10,31 +11,21 @@ interface BooksReadViewProps {
 // stats page itself reads, asked for one key — the endpoint returns every book
 // in the year rather than a capped page, so the grid is the whole shelf.
 function BooksReadView({ year }: BooksReadViewProps) {
-  const { books, loading, error } = useCatalogBooks(
+  const catalog = useCatalogBooks(
     year ? `/stats?year=${encodeURIComponent(year)}` : '/stats',
     'Could not load the books you have read.',
   )
 
   return (
-    <div className="stack">
-      {loading ? (
-        <div className="emptyState">
-          <p>Loading books read…</p>
-        </div>
-      ) : error ? (
-        <div className="emptyState">
-          <h2>Could not load books read</h2>
-          <p>{error}</p>
-        </div>
-      ) : books.length > 0 ? (
-        <BookGrid books={books} />
-      ) : (
-        <div className="emptyState">
-          <h2>No books read</h2>
-          <p>{year ? `Nothing finished in ${year} yet.` : "You haven't finished a book yet."}</p>
-        </div>
-      )}
-    </div>
+    <CatalogPage
+      {...catalog}
+      loadingMessage="Loading books read…"
+      errorTitle="Could not load books read"
+      emptyTitle="No books read"
+      emptyMessage={year ? `Nothing finished in ${year} yet.` : "You haven't finished a book yet."}
+    >
+      <BookGrid books={catalog.books} />
+    </CatalogPage>
   )
 }
 

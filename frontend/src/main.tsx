@@ -1,7 +1,7 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
-import ToastProvider from './components/ToastProvider'
+import ToastProvider from './components/ui/ToastProvider'
 import './styles.css'
 
 // Above App rather than inside it: App's own vault actions raise toasts, and a
