@@ -171,7 +171,6 @@ export interface LibraryDataContextValue {
   // Puts one changed book into the list, or adds it if it is new.
   applyBook: (book: Book) => void
   // Refetches everything and resolves with the fresh list of books.
-  refreshLibrary: () => Promise<Book[]>
   addBookToCollection: (collectionId: string, bookId: string) => Promise<void>
   removeBookFromCollection: (collectionId: string, bookId: string) => Promise<void>
   createCollection: () => Promise<Collection | undefined>
@@ -211,7 +210,7 @@ export interface NavigationContextValue {
   onEditReadingGoal: () => void
 }
 
-export type VaultAction = 'push' | 'pull'
+export type CsvAction = 'import' | 'export'
 
 type CommandAction = () => void | Promise<void>
 
@@ -231,12 +230,11 @@ export interface Command {
 
 export interface CommandDeps {
   collections: Collection[]
-  vaultBusy: VaultAction | null
+  csvBusy: CsvAction | null
   goTo: (viewId: string) => void
   onAddBook: () => void
   onNewCollection: CommandAction
   onRefresh: CommandAction
-  onVaultSettings: () => void
-  onPush: CommandAction
-  onPull: CommandAction
+  onImportCsv: CommandAction
+  onExportCsv: CommandAction
 }

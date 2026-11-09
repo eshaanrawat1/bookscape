@@ -39,28 +39,27 @@ To run the pieces separately during development:
   (`highlights`: a passage, its page, and your note on it).
 
 There is no auth and no cloud sync; everything is local-only. Collection
-membership, highlights, and the `want` status are Bookscape-only concepts and
-never leave the database.
+membership and highlights are Bookscape-only concepts and never leave the
+database.
 
-## Obsidian vault
+## CSV import and export
 
-Point Bookscape at any folder — via the file icon in the top bar (native
-folder picker) or `PUT /api/settings/vault-path` — and Push/Pull your
-reading/finished books as `.md` notes, at either the whole-vault level or a
-single book at a time:
+The upload and download icons in the top bar (or the command palette) import
+from and export to a CSV file, one row per book, with these columns:
 
-- `POST /api/sync/obsidian` / `POST /api/sync/obsidian/pull/{uid}` — import
-  notes from the vault. Only books with `status: reading` or `status: done`
-  are imported; a scan of 0 files is treated as an error (protects against an
-  unmounted drive), and importing never deletes existing Bookscape state.
-- `POST /api/sync/obsidian/push` / `POST /api/sync/obsidian/push/{uid}` —
-  export reading/finished books to the vault, full-regenerated each time.
-  Filenames are derived from the title and reused thereafter; a title
-  collision between two books is skipped (not fatal) and reported back for
-  manual resolution in Obsidian. Notes round-trip like status/progress/dates —
-  whichever direction (Push or Pull) ran most recently wins.
+`uid`, `title`, `author`, `series`, `series_number`, `genres`, `description`,
+`page_count`, `avg_rating`, `rating_count`, `review_count`, `image_url`,
+`similar_book_ids`, `status`, `current_page`, `total_pages`, `start_date`,
+`finish_date`, `my_rating`, `notes`
 
-All of the above accept `?dry_run=true` to preview without writing.
+- Export writes the whole catalog. Books you have never tracked have blank
+  reading columns.
+- Import matches rows on `uid`, which is the only required column, and a book
+  not already in the catalog also needs a `title`. A blank cell or absent column
+  leaves the stored value alone, and importing never deletes anything.
+- `genres` and `similar_book_ids` are `;`-separated. `status` is `not_started`,
+  `want`, `reading`, `done`, or `dnf`. Dates are `YYYY-MM-DD`.
+- A row with an invalid value is skipped and reported; the rest still import.
 
 ## Scraper
 

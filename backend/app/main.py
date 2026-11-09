@@ -14,13 +14,13 @@ from .services.highlights import HighlightStore
 from .routes.books import create_router as create_books_router
 from .routes.collections import create_router as create_collections_router
 from .routes.highlights import create_router as create_highlights_router
-from .routes.sync import create_router as create_sync_router
+from .routes.csv_transfer import create_router as create_csv_router
 from .routes.scraper import create_router as create_scraper_router
 from .routes.settings import create_router as create_settings_router
 
 
 ROOT = Path(__file__).resolve().parents[2]
-BACKEND_API_VERSION = 7
+BACKEND_API_VERSION = 8
 
 # The packaged webview's per-platform origins plus the Vite dev server.
 ALLOWED_ORIGINS = [
@@ -58,7 +58,7 @@ api_router = APIRouter()
 api_router.include_router(create_books_router(ROOT, repo))
 api_router.include_router(create_collections_router(ROOT, collections))
 api_router.include_router(create_highlights_router(ROOT, highlights))
-api_router.include_router(create_sync_router(ROOT))
+api_router.include_router(create_csv_router(ROOT))
 api_router.include_router(create_scraper_router(ROOT))
 api_router.include_router(create_settings_router(repo))
 

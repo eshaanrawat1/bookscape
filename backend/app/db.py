@@ -45,8 +45,7 @@ CREATE TABLE IF NOT EXISTS user_book_state (
   my_rating         REAL NOT NULL DEFAULT 0
                        CHECK (my_rating >= 0 AND my_rating <= 5),
   notes             TEXT NOT NULL DEFAULT '',
-  obsidian_filename TEXT,
-  updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE INDEX IF NOT EXISTS idx_ubs_status ON user_book_state(status);
 
@@ -77,8 +76,7 @@ CREATE INDEX IF NOT EXISTS idx_cb_uid ON collection_books(uid);
 -- reading of 0 — a highlight's page is either known or it isn't, and no book
 -- has a page zero to confuse it with.
 --
--- Bookscape-only, like collections: highlights never reach the Obsidian vault in
--- either direction.
+-- Bookscape-only, like collections: highlights are not part of CSV import/export.
 CREATE TABLE IF NOT EXISTS highlights (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   uid        TEXT NOT NULL REFERENCES books(uid) ON DELETE CASCADE,
@@ -140,11 +138,19 @@ def _add_missing_columns(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
 
+def _drop_obsidian_leftovers(conn: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(user_book_state)")}
+    if "obsidian_filename" in columns:
+        conn.execute("ALTER TABLE user_book_state DROP COLUMN obsidian_filename")
+    conn.execute("DELETE FROM app_settings WHERE key = 'obsidian_vault_path'")
+
+
 def init_app_db(root: Path) -> None:
     conn = get_connection(root)
     try:
         conn.executescript(SCHEMA_SQL)
         _add_missing_columns(conn)
+        _drop_obsidian_leftovers(conn)
         conn.commit()
     finally:
         conn.close()

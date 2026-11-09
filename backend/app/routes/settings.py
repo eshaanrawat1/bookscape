@@ -1,23 +1,15 @@
 from __future__ import annotations
 
 from datetime import date
-from fastapi import APIRouter, HTTPException, Query
-from pathlib import Path
+from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from ..repository import DataRepository
-from ..services.obsidian.vault import validate_vault_path
-
-VAULT_PATH_KEY = "obsidian_vault_path"
 
 # Per-year key so 1 January starts clean rather than inheriting last year's target.
 READING_GOAL_KEY_PREFIX = "reading_goal:"
 # Typo guard, not a real ceiling.
 MAX_READING_GOAL = 1000
-
-
-class VaultPathIn(BaseModel):
-    path: str
 
 
 class ReadingGoalIn(BaseModel):
@@ -28,22 +20,6 @@ class ReadingGoalIn(BaseModel):
 
 def create_router(repo: DataRepository) -> APIRouter:
     router = APIRouter()
-
-    @router.get("/settings/vault-path")
-    def get_vault_path() -> dict:
-        return {"vault_path": repo.get_setting(VAULT_PATH_KEY, "")}
-
-    @router.put("/settings/vault-path")
-    def set_vault_path(payload: VaultPathIn) -> dict:
-        # Existence is checked at sync time (the drive may be unmounted); the location is validated now.
-        clean = payload.path.strip()
-        if clean:
-            try:
-                validate_vault_path(Path(clean).expanduser().resolve())
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail=str(e)) from e
-        repo.set_setting(VAULT_PATH_KEY, clean)
-        return {"vault_path": clean}
 
     # Read count is deliberately absent: the client counts it from the finished books it draws.
     @router.get("/settings/reading-goal")
