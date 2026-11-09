@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 import csv
-import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
 from ..db import transaction
-from ..repository import VALID_STATUSES, DataRepository
-from ..utils import clamp_my_rating, parse_iso_date
+from ..repository import DataRepository
 from .catalog import list_books, upsert_book
+from .csv_utils import (
+    LIST_SEPARATOR,
+    parse_date,
+    parse_list,
+    parse_my_rating,
+    parse_non_negative_float,
+    parse_non_negative_int,
+    parse_status,
+)
 
 BOOK_FIELDS = (
     "title",
@@ -37,7 +44,6 @@ STATE_FIELDS = (
 CSV_COLUMNS = ("uid", *BOOK_FIELDS, *STATE_FIELDS)
 
 LIST_FIELDS = {"genres", "similar_book_ids"}
-LIST_SEPARATOR = ";"
 
 # Scraped text is third-party, and a spreadsheet would run a cell starting with these as a formula.
 FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
@@ -80,56 +86,20 @@ def export_books_csv(root: Path, path: Path) -> int:
     return len(rows)
 
 
-def _non_negative_int(raw: str) -> int:
-    value = int(raw)
-    if value < 0:
-        raise ValueError
-    return value
-
-
-def _non_negative_float(raw: str) -> float:
-    value = float(raw)
-    if not math.isfinite(value) or value < 0:
-        raise ValueError
-    return value
-
-
-def _list(raw: str) -> list[str]:
-    return [item.strip() for item in raw.split(LIST_SEPARATOR) if item.strip()]
-
-
-def _date(raw: str) -> str:
-    parsed = parse_iso_date(raw)
-    if not parsed:
-        raise ValueError
-    return parsed.isoformat()
-
-
-def _status(raw: str) -> str:
-    status = raw.lower()
-    if status not in VALID_STATUSES:
-        raise ValueError
-    return status
-
-
-def _my_rating(raw: str) -> float:
-    return clamp_my_rating(_non_negative_float(raw))
-
-
 # Anything not listed is plain text.
 PARSERS: dict[str, Callable[[str], object]] = {
-    "genres": _list,
-    "similar_book_ids": _list,
-    "page_count": _non_negative_int,
-    "avg_rating": _non_negative_float,
-    "rating_count": _non_negative_int,
-    "review_count": _non_negative_int,
-    "status": _status,
-    "current_page": _non_negative_int,
-    "total_pages": _non_negative_int,
-    "start_date": _date,
-    "finish_date": _date,
-    "my_rating": _my_rating,
+    "genres": parse_list,
+    "similar_book_ids": parse_list,
+    "page_count": parse_non_negative_int,
+    "avg_rating": parse_non_negative_float,
+    "rating_count": parse_non_negative_int,
+    "review_count": parse_non_negative_int,
+    "status": parse_status,
+    "current_page": parse_non_negative_int,
+    "total_pages": parse_non_negative_int,
+    "start_date": parse_date,
+    "finish_date": parse_date,
+    "my_rating": parse_my_rating,
 }
 
 
