@@ -9,7 +9,6 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from .auth import TOKEN_HEADER, TokenAuthMiddleware, read_or_create_token
 from .db import init_app_db
 from .repository import DataRepository
-from .services.catalog import has_data
 from .services.highlights import HighlightStore
 from .services.reading import ReadingListStore
 from .routes.catalog import create_router as create_catalog_router
@@ -75,11 +74,11 @@ api_router.include_router(create_highlights_router(ROOT, highlights))
 api_router.include_router(create_stats_router(ROOT, repo))
 api_router.include_router(create_sync_router(ROOT))
 api_router.include_router(create_scraper_router(ROOT))
-api_router.include_router(create_settings_router(ROOT, repo))
+api_router.include_router(create_settings_router(repo))
 
 app.include_router(api_router, prefix="/api")
 
 
 @app.get("/health")
 def health() -> dict:
-    return {"ok": True, "has_data": has_data(ROOT), "backend_api_version": BACKEND_API_VERSION}
+    return {"ok": True, "backend_api_version": BACKEND_API_VERSION}

@@ -147,7 +147,6 @@ export interface StatsSummary {
   books_read: number
   pages_read: number
   genres_covered: number
-  genre_list: string[]
   days_reading: number
   months: number[]
   // Oldest first, one entry per calendar year including the empty ones in
@@ -260,9 +259,6 @@ export interface NavigationContextValue {
   // Opens the reading-goal dialog. A dialog rather than a view, like onOpen, so
   // the card and the sidebar widget can both raise it without either owning it.
   onEditReadingGoal: () => void
-  // Generic jump to any view id — 'library', 'collection:foo', 'genre:Sci-Fi'.
-  // Descendants otherwise have no way to reach App's `view` state.
-  goTo: (viewId: string) => void
 }
 
 export type CommandGroup = 'Navigate' | 'Actions' | 'Collections'

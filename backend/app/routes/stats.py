@@ -123,7 +123,6 @@ def create_router(root: Path, repo: DataRepository) -> APIRouter:
             "books_read": len(books_list),
             "pages_read": sum(_pages(b) for b in books_list),
             "genres_covered": len(genres),
-            "genre_list": sorted(genres),
             "days_reading": _days_reading(books_list),
             "months": _months(books_list),
             # Empty when a single year is asked for: that view is drawn month

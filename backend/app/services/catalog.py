@@ -150,12 +150,6 @@ def upsert_book(root: Path, book: dict) -> None:
             _replace_genres(conn, uid, book.get("genres") or [])
 
 
-def has_data(root: Path) -> bool:
-    with transaction(root) as conn:
-        row = conn.execute("SELECT 1 FROM books LIMIT 1").fetchone()
-    return row is not None
-
-
 def resolve_book(root: Path, book_id: str) -> dict | None:
     book_id = str(book_id or "").strip()
     if not book_id:

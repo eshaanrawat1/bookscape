@@ -94,21 +94,19 @@ class HighlightStore:
 
     # Writes
 
-    def create(self, uid: str, text: object, page: object = 0) -> dict:
+    def create(self, uid: str, text: object, page: object = 0) -> None:
         clean_uid = str(uid or "").strip()
         if not clean_uid:
             raise ValueError("book_id is required")
         clean_text = self._clean_text(text)
         clean_page = self._clean_page(page)
         with transaction(self.root) as conn:
-            cur = conn.execute(
+            conn.execute(
                 "INSERT INTO highlights (uid, text, page) VALUES (?, ?, ?)",
                 (clean_uid, clean_text, clean_page),
             )
-            row = conn.execute("SELECT * FROM highlights WHERE id = ?", (cur.lastrowid,)).fetchone()
-        return self._row_to_highlight(row)
 
-    def update(self, highlight_id: int, **fields) -> dict:
+    def update(self, highlight_id: int, **fields) -> None:
         """Patch one highlight. Only the keys present are touched."""
         updates: dict[str, object] = {}
         if "text" in fields:
@@ -129,8 +127,6 @@ class HighlightStore:
             )
             if cur.rowcount == 0:
                 raise KeyError("Highlight not found")
-            row = conn.execute("SELECT * FROM highlights WHERE id = ?", (highlight_id,)).fetchone()
-        return self._row_to_highlight(row)
 
     def delete(self, highlight_id: int) -> None:
         with transaction(self.root) as conn:

@@ -30,7 +30,7 @@ class ReadingGoalIn(BaseModel):
     year: int | None = Field(default=None, ge=1900, le=3000)
 
 
-def create_router(root: Path, repo: DataRepository) -> APIRouter:
+def create_router(repo: DataRepository) -> APIRouter:
     router = APIRouter()
 
     @router.get("/settings/vault-path")

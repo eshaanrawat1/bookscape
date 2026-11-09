@@ -405,7 +405,6 @@ export default function App() {
     onOpenBooksRead: openBooksReadPage,
     onOpenWantToRead: openWantToRead,
     onEditReadingGoal: () => setShowGoalDialog(true),
-    goTo,
   }
 
   // Only assembled while the palette is on screen — several entries close over

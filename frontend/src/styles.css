@@ -1386,14 +1386,6 @@ svg {
 /* Shelf & Book Card                                                        */
 /* ========================================================================== */
 
-.bookMeta {
-  margin: 0;
-  color: var(--muted-foreground);
-  font-size: 1.22rem;
-  font-weight: 400;
-  letter-spacing: 0.01em;
-}
-
 .shelf,
 .dialogCopy {
   display: flex;
@@ -4702,8 +4694,7 @@ svg {
     font-size: 1.5rem;
   }
 
-  .brandTag,
-  .bookMeta {
+  .brandTag {
     font-size: 1rem;
   }
 
