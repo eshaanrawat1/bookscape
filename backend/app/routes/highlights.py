@@ -52,7 +52,7 @@ def create_router(root: Path, highlights: HighlightStore) -> APIRouter:
             for group in highlights.list_all()
             if (book := load_book(root, group["book_id"]))
         ]
-        return {"groups": groups, "count": sum(group["count"] for group in groups)}
+        return {"groups": groups}
 
     @router.post("/highlights")
     def create_highlight(payload: CreateHighlightIn) -> dict:

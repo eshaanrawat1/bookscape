@@ -78,7 +78,7 @@ const ICONS: Record<string, LucideIcon> = {
   Gem, Dice5,
 }
 
-export interface CollectionIconEntry {
+interface CollectionIconEntry {
   name: string
   Icon: LucideIcon
   // 'BookOpen' searched as 'book open', so typing what you see in the tooltip

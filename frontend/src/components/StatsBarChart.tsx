@@ -95,4 +95,3 @@ function summarise(bars: ChartBar[], unit: 'month' | 'year', label: string): str
 }
 
 export default StatsBarChart
-export type { ChartBar }

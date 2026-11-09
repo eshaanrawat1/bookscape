@@ -57,4 +57,4 @@ const monthLabels: string[] = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ]
 
-export { viewMeta, mainNav, shelfNav, monthLabels, isMac, shortcutLabel, navOrder, navShortcut }
+export { viewMeta, mainNav, shelfNav, monthLabels, shortcutLabel, navOrder, navShortcut }

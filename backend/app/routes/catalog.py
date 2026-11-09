@@ -27,7 +27,7 @@ def create_router(root: Path) -> APIRouter:
 
     @router.get("/search")
     def search(q: str = Query(..., min_length=1), limit: int = Query(default=10, ge=1, le=50)) -> dict:
-        return {"query": q, "results": search_books(root, q, limit=limit)}
+        return {"results": search_books(root, q, limit=limit)}
 
     @router.get("/global-library")
     def get_global_library_route() -> dict:
@@ -35,27 +35,22 @@ def create_router(root: Path) -> APIRouter:
 
     @router.get("/author-books")
     def get_author_books(author: str = Query(..., min_length=1)) -> dict:
-        books = get_books_by_author(root, author)
-        return {"author": author, "books": books, "count": len(books)}
+        return {"books": get_books_by_author(root, author)}
 
     @router.get("/series-books")
     def get_series_books(series: str = Query(..., min_length=1)) -> dict:
-        books = get_books_by_series(root, series)
-        return {"series": series, "books": books, "count": len(books)}
+        return {"books": get_books_by_series(root, series)}
 
     @router.get("/series-progress")
     def get_series_progress_route() -> dict:
-        series = get_series_progress(root)
-        return {"series": series, "count": len(series)}
+        return {"series": get_series_progress(root)}
 
     @router.get("/suggested-books")
     def get_suggested_books_route() -> dict:
-        books = get_suggested_books(root)
-        return {"books": books, "count": len(books)}
+        return {"books": get_suggested_books(root)}
 
     @router.get("/genre-books")
     def get_genre_books(genre: str = Query(..., min_length=1), limit: int = Query(default=100, ge=1, le=200)) -> dict:
-        books = get_books_by_genre(root, genre, limit)
-        return {"genre": genre, "books": books, "count": len(books)}
+        return {"books": get_books_by_genre(root, genre, limit)}
 
     return router

@@ -632,7 +632,7 @@ def parse_book(html: str, url: str) -> Optional[tuple]:
 
 def scrape_book_page(url: str, *, headed: bool = False, include_similar: bool = True) -> Optional[Book]:
     with sync_playwright() as pw:
-        browser, context, page = make_browser_context(pw, headed=headed)
+        browser, page = make_browser_context(pw, headed=headed)
         try:
             print("@@STAGE@@ fetching_page", flush=True)
             _get_appsync_config(page)
@@ -753,7 +753,7 @@ def _install_chromium() -> bool:
 
 def make_browser_context(playwright, headed: bool = False) -> tuple:
     """
-    Launch Chromium and return (browser, context, page).
+    Launch Chromium and return (browser, page).
     Caller is responsible for closing browser when done.
 
     A missing browser binary is installed and the launch retried, rather than
@@ -783,7 +783,7 @@ def make_browser_context(playwright, headed: bool = False) -> tuple:
         locale="en-US",
     )
     page = context.new_page()
-    return browser, context, page
+    return browser, page
 
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
@@ -814,7 +814,7 @@ def run(
     signal.signal(signal.SIGTERM, _handle_signal)
 
     with sync_playwright() as pw:
-        browser, context, page = make_browser_context(pw, headed=headed)
+        browser, page = make_browser_context(pw, headed=headed)
 
         try:
             _get_appsync_config(page)

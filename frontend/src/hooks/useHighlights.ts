@@ -101,5 +101,5 @@ async function createHighlight(bookId: string, text: string, page: number): Prom
   })
 }
 
-export { createHighlight, normaliseHighlight, normaliseGroup }
+export { createHighlight }
 export default useHighlights

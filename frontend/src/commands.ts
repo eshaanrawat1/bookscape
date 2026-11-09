@@ -130,4 +130,4 @@ function filterCommands(commands: Command[], query: string): Command[] {
     .map((entry) => entry.command)
 }
 
-export { buildCommands, filterCommands, scoreCommand }
+export { buildCommands, filterCommands }

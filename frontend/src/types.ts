@@ -156,7 +156,7 @@ export interface StatsSummary {
   books: RawBookPayload[]
 }
 
-export interface YearCount {
+interface YearCount {
   year: number
   count: number
 }

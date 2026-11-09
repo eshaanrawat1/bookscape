@@ -40,14 +40,7 @@ async function apiFetch<T = unknown>(path: string, options?: RequestInit): Promi
     headers: await authorizedHeaders(options?.headers),
   })
   if (!res.ok) {
-    let detail = ''
-    try {
-      const payload = await res.json()
-      detail = payload?.detail ? `: ${payload.detail}` : ''
-    } catch {
-      detail = ''
-    }
-    throw new Error(`API ${path} -> ${res.status}${detail}`)
+    throw await readErrorDetail(res, path)
   }
   return res.json()
 }
