@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef, type Ref } from 'react'
 import {
-  X, Star, MessageSquareText, FileText, Plus, Highlighter, ChevronDown, Upload, Download,
+  X, Star, MessageSquareText, FileText, Plus, Highlighter, ChevronDown,
   LoaderCircle, Hash, Sigma, Calendar, CalendarCheck, TextAlignStart,
 } from 'lucide-react'
 import { apiFetch } from '../../api.js'
@@ -13,7 +13,7 @@ import { useLibraryData } from '../../context/LibraryDataContext.jsx'
 import { useNavigation } from '../../context/NavigationContext.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 import type { DialogCloseProps } from './Dialog.jsx'
-import type { Book, BookProps, Collection, RawBookPayload, VaultAction } from '../../types.js'
+import type { Book, BookProps, Collection, RawBookPayload } from '../../types.js'
 
 interface BookDialogProps extends BookProps, DialogCloseProps {
   isNavigation?: boolean
@@ -65,11 +65,11 @@ const STATUS_OPTIONS = [
 ]
 const STATUS_LABELS: Record<string, string> = Object.fromEntries(STATUS_OPTIONS)
 
-// Picked-up statuses: these open on the tracking panel, and the vault exports them.
+// Picked-up statuses: these open on the tracking panel.
 const TRACKED_STATUSES = ['reading', 'done', 'dnf']
 
 function BookDialog({ book: openedBook, isNavigation = false, exiting = false, cardRef, onClose }: BookDialogProps) {
-  const { collections, booksByIds, addBookToCollection, applyBook, refreshLibrary } = useLibraryData()
+  const { collections, booksByIds, addBookToCollection, applyBook } = useLibraryData()
   const book = booksByIds([openedBook.id])[0] || openedBook
   const { onOpen, onOpenAuthor, onOpenSeries } = useNavigation()
   const { showToast, showError } = useToast()
@@ -154,43 +154,6 @@ function BookDialog({ book: openedBook, isNavigation = false, exiting = false, c
   const progressPct = trackedTotalPages > 0
     ? Math.min(100, Math.max(0, Math.round((trackedCurrentPage / trackedTotalPages) * 100)))
     : 0
-  const [obsidianBusy, setObsidianBusy] = useState<VaultAction | null>(null)
-  const canSyncObsidian = Boolean(bookId) && TRACKED_STATUSES.includes(draft.status)
-
-  // Toasts outlive the dialog, so they name the book.
-  const vaultToastKey = `vault:${bookId}`
-
-  const pushToVault = async () => {
-    if (!bookId || obsidianBusy) return
-    setObsidianBusy('push')
-    try {
-      await apiFetch(`/sync/obsidian/push/${bookId}`, { method: 'POST' })
-      showToast(`Pushed “${displayBook.title}” to the vault.`, { key: vaultToastKey })
-    } catch (err) {
-      showError(err, 'Could not push to vault.', vaultToastKey)
-    } finally {
-      setObsidianBusy(null)
-    }
-  }
-
-  const pullFromVault = async () => {
-    if (!bookId || obsidianBusy) return
-    setObsidianBusy('pull')
-    try {
-      await apiFetch(`/sync/obsidian/pull/${bookId}`, { method: 'POST' })
-      const pulled = (await refreshLibrary()).find((item) => item.id === bookId)
-      if (pulled) {
-        const nextRecord = recordFromBook(pulled)
-        lastSavedRef.current = recordSignature(nextRecord)
-        setRecord(nextRecord)
-      }
-      showToast(`Pulled “${displayBook.title}” from the vault.`, { key: vaultToastKey })
-    } catch (err) {
-      showError(err, 'Could not pull from vault.', vaultToastKey)
-    } finally {
-      setObsidianBusy(null)
-    }
-  }
 
   const updateField = (field: keyof ReadingProgressRecord, value: string) => {
     setRecord((current) => ({
@@ -302,32 +265,6 @@ function BookDialog({ book: openedBook, isNavigation = false, exiting = false, c
         <div className="dialogTop">
           <div className="dialogCover">
             <BookCover book={displayBook} />
-            {view === 'tracking' && canSyncObsidian && (
-              <div className="trackingVault">
-                <div className="trackingVaultRow">
-                  <button
-                    type="button"
-                    className="dialogIconButton"
-                    onClick={pushToVault}
-                    disabled={obsidianBusy !== null}
-                    aria-label="Push this book to the Obsidian vault"
-                    title="Push to vault"
-                  >
-                    <Upload />
-                  </button>
-                  <button
-                    type="button"
-                    className="dialogIconButton"
-                    onClick={pullFromVault}
-                    disabled={obsidianBusy !== null}
-                    aria-label="Pull this book from the Obsidian vault"
-                    title="Pull from vault"
-                  >
-                    <Download />
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
           <div className="dialogCopy">
             <h2>{displayBook.title}</h2>

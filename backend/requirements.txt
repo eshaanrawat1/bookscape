@@ -3,4 +3,3 @@ uvicorn[standard]
 beautifulsoup4
 lxml
 playwright
-PyYAML

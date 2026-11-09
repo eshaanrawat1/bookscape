@@ -1,9 +1,9 @@
-import { FilePlus2, FolderPlus, RefreshCw, Settings, Upload, Download, Bookmark } from 'lucide-react'
+import { FilePlus2, FolderPlus, RefreshCw, Upload, Download, Bookmark } from 'lucide-react'
 import { mainNav, shelfNav, navShortcut, shortcutLabel } from './constants.js'
 import type { Collection, Command, CommandDeps } from './types.js'
 
 function buildCommands(deps: CommandDeps): Command[] {
-  const { collections, vaultBusy, goTo, onAddBook, onNewCollection, onRefresh, onVaultSettings, onPush, onPull } = deps
+  const { collections, csvBusy, goTo, onAddBook, onNewCollection, onRefresh, onImportCsv, onExportCsv } = deps
 
   const navCommands: Command[] = [...mainNav, ...shelfNav].map((item) => ({
     id: `nav:${item.id}`,
@@ -50,32 +50,24 @@ function buildCommands(deps: CommandDeps): Command[] {
       keywords: 'reload sync data',
       run: onRefresh,
     },
-    {
-      id: 'action:vault-settings',
-      label: 'Vault Settings',
-      group: 'Actions',
-      icon: Settings,
-      keywords: 'obsidian path folder preferences',
-      run: onVaultSettings,
-    },
-    // Hidden rather than disabled during a sync: a row you can highlight but not run reads as broken.
-    ...(vaultBusy === null
+    // Hidden rather than disabled while one runs: a row you can highlight but not run reads as broken.
+    ...(csvBusy === null
       ? ([
         {
-          id: 'action:push-vault',
-          label: 'Push to Vault',
+          id: 'action:import-csv',
+          label: 'Import from CSV',
           group: 'Actions',
           icon: Upload,
-          keywords: 'obsidian export sync',
-          run: onPush,
+          keywords: 'spreadsheet file upload restore',
+          run: onImportCsv,
         },
         {
-          id: 'action:pull-vault',
-          label: 'Pull from Vault',
+          id: 'action:export-csv',
+          label: 'Export to CSV',
           group: 'Actions',
           icon: Download,
-          keywords: 'obsidian import sync',
-          run: onPull,
+          keywords: 'spreadsheet file download backup',
+          run: onExportCsv,
         },
       ] as Command[])
       : []),

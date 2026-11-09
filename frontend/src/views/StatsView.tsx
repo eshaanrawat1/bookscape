@@ -18,7 +18,7 @@ function StatsView() {
       <EmptyState
         className="statsEmptyState"
         title="No finished books yet"
-        message="Finish a book in Obsidian or in the finished books store to see stats here."
+        message="Finish a book to see stats here."
       />
     )
   }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Menu, Plus, File, Upload, Download, ArrowLeft } from 'lucide-react'
+import { Menu, Plus, Upload, Download, ArrowLeft } from 'lucide-react'
 
 import { apiFetch, BOOTSTRAP_RETRIES, BOOTSTRAP_RETRY_DELAY_MS } from './api.js'
 import {
@@ -33,7 +33,6 @@ import Sidebar from './components/sidebar/Sidebar.jsx'
 import EmptyState from './components/ui/EmptyState.jsx'
 import BookDialogStage, { type Selected } from './components/dialogs/BookDialogStage.jsx'
 import ScraperDialog from './components/dialogs/ScraperDialog.jsx'
-import SettingsDialog from './components/dialogs/SettingsDialog.jsx'
 import ReadingGoalDialog from './components/dialogs/ReadingGoalDialog.jsx'
 import CommandPalette from './components/dialogs/CommandPalette.jsx'
 import BookGrid from './components/books/BookGrid.jsx'
@@ -48,7 +47,10 @@ import SeriesView from './views/SeriesView.jsx'
 import GenreView from './views/GenreView.jsx'
 import BooksReadView from './views/BooksReadView.jsx'
 import CollectionView from './views/CollectionView.jsx'
-import type { Book, Collection, RawCollection, VaultAction } from './types.js'
+import type { Book, Collection, CsvAction, RawCollection } from './types.js'
+
+const CSV_FILTERS = [{ name: 'CSV', extensions: ['csv'] }]
+const CSV_TOAST_KEY = 'csv'
 
 // Pages with a Back link and where it lands when there's no history.
 const DRILLDOWNS = [
@@ -70,9 +72,8 @@ export default function App() {
   const [books, setBooks] = useState<Book[]>([])
   const [collections, setCollections] = useState<Collection[]>([])
   const [loading, setLoading] = useState(true)
-  const [vaultBusy, setVaultBusy] = useState<VaultAction | null>(null)
+  const [csvBusy, setCsvBusy] = useState<CsvAction | null>(null)
   const [showScraperDialog, setShowScraperDialog] = useState(false)
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false)
   const [showGoalDialog, setShowGoalDialog] = useState(false)
   const [showPalette, setShowPalette] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -124,12 +125,11 @@ export default function App() {
     return () => { cancelled = true }
   }, [])
 
-  async function reloadAppData(): Promise<Book[]> {
+  async function reloadAppData(): Promise<void> {
     const data = await loadBootstrapData()
 
     setBooks(data.books)
     setCollections(data.collections)
-    return data.books
   }
 
   const applyBook = useCallback((book: Book) => {
@@ -271,30 +271,50 @@ export default function App() {
     await sendCollections(`/collections/${collectionId}/books/${bookId}`, 'DELETE')
   }
 
-  async function pushToVault() {
-    if (vaultBusy) return
-    setVaultBusy('push')
+  async function importCsv() {
+    if (csvBusy) return
+    setCsvBusy('import')
     try {
-      await apiFetch('/sync/obsidian/push', { method: 'POST' })
-      showToast('Pushed your library to the vault.', { key: 'vault:library' })
+      const { open } = await import('@tauri-apps/api/dialog')
+      const path = await open({ multiple: false, filters: CSV_FILTERS })
+      if (typeof path !== 'string') return
+      const { imported, skipped } = await apiFetch<{ imported: number; skipped: { row: number; reason: string }[] }>(
+        '/csv/import',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path }),
+        },
+      )
+      await reloadAppData()
+      const skippedNote = skipped.length
+        ? ` Skipped ${skipped.length} (row ${skipped[0].row}: ${skipped[0].reason}).`
+        : ''
+      showToast(`Imported ${imported} books from CSV.${skippedNote}`, { key: CSV_TOAST_KEY })
     } catch (err) {
-      showError(err, 'Could not push to Obsidian vault.', 'vault:library')
+      showError(err, 'Could not import the CSV.', CSV_TOAST_KEY)
     } finally {
-      setVaultBusy(null)
+      setCsvBusy(null)
     }
   }
 
-  async function pullFromVault() {
-    if (vaultBusy) return
-    setVaultBusy('pull')
+  async function exportCsv() {
+    if (csvBusy) return
+    setCsvBusy('export')
     try {
-      await apiFetch('/sync/obsidian', { method: 'POST' })
-      await reloadAppData()
-      showToast('Pulled your library from the vault.', { key: 'vault:library' })
+      const { save } = await import('@tauri-apps/api/dialog')
+      const path = await save({ defaultPath: 'bookscape-library.csv', filters: CSV_FILTERS })
+      if (!path) return
+      const { exported } = await apiFetch<{ exported: number }>('/csv/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path }),
+      })
+      showToast(`Exported ${exported} books to CSV.`, { key: CSV_TOAST_KEY })
     } catch (err) {
-      showError(err, 'Could not pull from Obsidian vault.', 'vault:library')
+      showError(err, 'Could not export the CSV.', CSV_TOAST_KEY)
     } finally {
-      setVaultBusy(null)
+      setCsvBusy(null)
     }
   }
 
@@ -308,7 +328,6 @@ export default function App() {
     readingGoal,
     booksByIds,
     applyBook,
-    refreshLibrary: reloadAppData,
     addBookToCollection,
     removeBookFromCollection,
     createCollection,
@@ -327,18 +346,17 @@ export default function App() {
     onEditReadingGoal: () => setShowGoalDialog(true),
   }
 
-  // Built only while the palette is open; several entries close over changing vault state.
+  // Built only while the palette is open; several entries close over changing CSV state.
   const commands = showPalette
     ? buildCommands({
       collections,
-      vaultBusy,
+      csvBusy,
       goTo,
       onAddBook: openScraperDialog,
       onNewCollection: async () => { await createCollection() },
-      onRefresh: async () => { await reloadAppData() },
-      onVaultSettings: () => setShowSettingsDialog(true),
-      onPush: pushToVault,
-      onPull: pullFromVault,
+      onRefresh: reloadAppData,
+      onImportCsv: importCsv,
+      onExportCsv: exportCsv,
     })
     : []
 
@@ -347,14 +365,11 @@ export default function App() {
       <NavigationContext.Provider value={navigation}>
         <div className="appRoot">
           <div className="iconPill">
-            <button className="iconPillButton" aria-label="Vault Settings" onClick={() => setShowSettingsDialog(true)}>
-              <File />
+            <button className="iconPillButton" aria-label="Import from CSV" title="Import from CSV" onClick={importCsv} disabled={csvBusy !== null}>
+              <Upload className={csvBusy === 'import' ? 'syncIcon spinning' : 'syncIcon'} />
             </button>
-            <button className="iconPillButton" aria-label="Push to Vault" onClick={pushToVault} disabled={vaultBusy !== null}>
-              <Upload className={vaultBusy === 'push' ? 'syncIcon spinning' : 'syncIcon'} />
-            </button>
-            <button className="iconPillButton" aria-label="Pull from Vault" onClick={pullFromVault} disabled={vaultBusy !== null}>
-              <Download className={vaultBusy === 'pull' ? 'syncIcon spinning' : 'syncIcon'} />
+            <button className="iconPillButton" aria-label="Export to CSV" title="Export to CSV" onClick={exportCsv} disabled={csvBusy !== null}>
+              <Download className={csvBusy === 'export' ? 'syncIcon spinning' : 'syncIcon'} />
             </button>
             <button
               className="iconPillButton"
@@ -420,9 +435,6 @@ export default function App() {
                 setSelected({ book })
               }}
             />
-          )}
-          {showSettingsDialog && (
-            <SettingsDialog onClose={() => setShowSettingsDialog(false)} />
           )}
           {showGoalDialog && (
             <ReadingGoalDialog onClose={() => setShowGoalDialog(false)} />

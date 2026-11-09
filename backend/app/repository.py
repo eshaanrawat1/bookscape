@@ -12,8 +12,8 @@ BOOK_STATE_COLUMNS = {
     "finish_date",
     "my_rating",
     "notes",
-    "obsidian_filename",
 }
+VALID_STATUSES = {"not_started", "want", "reading", "done", "dnf"}
 
 # No row means not started, so a row that has gone back to saying nothing is
 # removed rather than kept as an empty stand-in for the same fact.
@@ -21,7 +21,6 @@ _DELETE_IF_EMPTY = """
 DELETE FROM user_book_state
 WHERE uid = ? AND status = 'not_started' AND current_page = 0 AND total_pages = 0
   AND start_date = '' AND finish_date = '' AND my_rating = 0 AND notes = ''
-  AND obsidian_filename IS NULL
 """
 
 
@@ -59,7 +58,7 @@ class DataRepository:
         if not fields:
             return
 
-        # A DNF has no finish date, or it adds an empty stats year. Here so Obsidian pulls are covered too.
+        # A DNF has no finish date, or it adds an empty stats year. Here so CSV imports are covered too.
         if str(fields.get("status") or "").strip().lower() == "dnf":
             fields["finish_date"] = ""
 

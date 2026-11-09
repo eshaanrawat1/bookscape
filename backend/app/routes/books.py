@@ -4,11 +4,9 @@ from fastapi import APIRouter, HTTPException, Query
 from pathlib import Path
 from pydantic import BaseModel
 
-from ..repository import DataRepository
+from ..repository import VALID_STATUSES, DataRepository
 from ..services.catalog import list_books, resolve_book, search_book_ids
 from ..utils import clamp_my_rating
-
-VALID_STATUSES = {"not_started", "want", "reading", "done", "dnf"}
 
 
 class BookStateIn(BaseModel):
