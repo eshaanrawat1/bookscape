@@ -413,9 +413,9 @@ export default function App() {
           {showScraperDialog && (
             <ScraperDialog
               onClose={() => setShowScraperDialog(false)}
-              onSuccess={(book) => {
+              onAdded={applyBook}
+              onView={(book) => {
                 setShowScraperDialog(false)
-                applyBook(book)
                 setSelected({ book })
               }}
             />

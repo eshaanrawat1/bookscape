@@ -17,7 +17,9 @@ interface ScrapedBook extends CardBook {
 }
 
 interface ScraperDialogProps extends DialogCloseProps {
-  onSuccess: (book: Book) => void
+  // Fires as soon as the book is saved, so the library has it however the dialog closes.
+  onAdded: (book: Book) => void
+  onView: (book: Book) => void
 }
 
 interface PreviewEvent {
@@ -75,7 +77,7 @@ function PreviewCard({ book, meta, children }: PreviewCardProps) {
   )
 }
 
-function ScraperDialog({ onClose, onSuccess }: ScraperDialogProps) {
+function ScraperDialog({ onClose, onAdded, onView }: ScraperDialogProps) {
   const [url, setUrl] = useState('')
   const [stage, setStage] = useState<Stage>({ kind: 'idle' })
 
@@ -120,6 +122,7 @@ function ScraperDialog({ onClose, onSuccess }: ScraperDialogProps) {
         body: JSON.stringify({ book }),
       })
       if (res.ok && res.book) {
+        onAdded(res.book)
         setStage({ kind: 'success', book: res.book })
       } else {
         setStage({ kind: 'error', message: 'Failed to save the book to your library.' })
@@ -255,7 +258,7 @@ function ScraperDialog({ onClose, onSuccess }: ScraperDialogProps) {
             <button
               type="button"
               className="scraperViewLink"
-              onClick={() => onSuccess(stage.book)}
+              onClick={() => onView(stage.book)}
             >
               View in library <ChevronRight size={16} />
             </button>
